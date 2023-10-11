@@ -1,0 +1,249 @@
+
+# SDG
+## https://www.oecd-ilibrary.org/sites/82d15396-en/index.html?itemId=/content/component/82d15396-en
+## https://www.oecd-ilibrary.org/education/percentage-of-15-year-old-students-at-level-2-or-above-in-the-pisa-reading-assessment-2018_3b383e73-en
+
+
+# create data frame
+school.id <- IMPDAT$CNTSCHID
+pisa18 <- data.frame(school.id)
+pisa18$CNT  <- IMPDAT$CNT
+# background predictors
+# immig
+table(IMPDAT$IMMIG, exclude = NULL)
+immig <- IMPDAT$IMMIG
+immig[IMPDAT$IMMIG == 1] <- 0
+immig[IMPDAT$IMMIG > 1] <- 1
+pisa18$IMMIG <- immig
+table(immig, exclude = NULL)
+# IMMIG = 1: first or second generation
+
+
+# ******************* outcome
+#  reading competency
+pisa18$read <- IMPDAT$PV1READ
+summary(pisa18$read)
+# Literacy deprived students are students who performed below Level 2
+# level 2 or above, https://www.oecd.org/pisa/data/pisa2018technicalreport/PISA2018%20TecReport-Ch-15-Proficiency-Scales.pdf
+# see table 15.5
+#pisa18$level2 <- as.numeric(pisa18$read >= 407)
+pisa18$level2 <- as.numeric(pisa18$read < 407)
+table(pisa18$level2, exclude = NULL)
+
+# ********************************************************* predictors **************************************
+# (a) ******************* measures of socio-demographics
+
+gender_pisa <- IMPDAT$ST004D01T # 1, female, 2 male
+#table(gender_pisa, exclude = NULL)
+pisa18$FEMALE <- rep(0, length(gender_pisa))
+pisa18$FEMALE[gender_pisa == 1] <- 1
+
+
+# native
+# https://abdigm.meb.gov.tr/meb_iys_dosyalar/2019_12/05140148_OECD_PISA_2018_Raporu_V2.pdf, p. 213
+lang_home <- IMPDAT$ST022Q01TA
+pisa18$NATIVE <- rep(0,length(lang_home))
+#pisa18$NATIVE[is.na(lang_home)] <- NA
+pisa18$NATIVE[lang_home == 1] <- 1
+
+# social background
+escs_c <- unclass(IMPDAT$ESCS)
+pisa18$escs <- escs_c
+#pisa18$PAREDINT <- IMPDAT$PAREDINT
+pisa18$HISCED <- IMPDAT$HISCED
+pisa18$ACA <- as.numeric(pisa18$HISCED > 5) # Uni or PhD
+# (b) ******************* measures of teacher practices in support of reading literacy
+# Teacher-directed instruction 
+# 1 = every lesson, 4 = never or hardly ever, high value is good
+# hardly ever
+pisa18$dirins1 <- 5 - IMPDAT$ST102Q01TA # The teacher sets clear goals for our learning.
+pisa18$dirins2 <- 5 - IMPDAT$ST102Q02TA # The teacher asks questions to check whether we have understood what was taught.
+pisa18$dirins3 <- 5 - IMPDAT$ST102Q03TA # At the beginning of a lesson, the teacher presents a short summary of the previous lesson.
+pisa18$dirins4 <- 5 - IMPDAT$ST102Q04TA # The teacher tells us what we have to learn.
+
+pisa18$DIRINS <- IMPDAT$DIRINS
+# should be inverted -> done
+# Teacher support # 1 = every lesson,..4 = never or hardly ever
+pisa18$teachsupp1  <- 5 - IMPDAT$ST100Q01TA  # The teacher shows an interest in every student's learning.
+pisa18$teachsupp2  <- 5 - IMPDAT$ST100Q02TA  # The teacher gives extra help when students need it.
+pisa18$teachsupp3  <- 5 - IMPDAT$ST100Q03TA  # The teacher helps students with their learning.
+pisa18$teachsupp4  <- 5 - IMPDAT$ST100Q04TA  # The teacher continues teaching until the students understand.
+
+# Teacher feedback
+# Teacher support # 1 = never or hardly ever,..4 = every lesson
+pisa18$teachfeed1  <- IMPDAT$ST104Q02NA  # The teacher gives me feedback on my strengths in this subject.
+pisa18$teachfeed2  <- IMPDAT$ST104Q03NA  # The teacher tells me in which areas I can still improve.
+pisa18$teachfeed3  <- IMPDAT$ST104Q04NA  # The teacher tells me how I can improve my performance.
+
+# (c) ******************* school climate
+
+# 1 = not at all, 2 = very little, 3 = to some extent 4 = a lot
+# STAFFSHORT: staff_lack, poor_staff, ass_staff_lack, poor_ass_staff
+# Reduced to STAFFLACK only!
+pisa18$staff_lack <- IMPDAT$SC017Q01NA #A lack of teaching staff.
+pisa18$poor_staff <- IMPDAT$SC017Q02NA # Inadequate or poorly qualified teaching staff.
+
+# EDUSHORT: pisa18$mat_lack,pisa18$poor_mat, pisa18$infra_lack, pisa18$poor_infra
+
+#  1 = not at all, 2 = very little, 3 = to some extent 4 = a lot
+# Reduced to EDULACK only!
+pisa18$mat_lack   <- IMPDAT$SC017Q05NA # A lack of educational material (e.g. textbooks, IT equipment, library or laboratory material).
+pisa18$poor_mat   <- IMPDAT$SC017Q06NA # Inadequate or poor quality educational material (e.g. textbooks, IT equipment, library or laboratory material).
+pisa18$infra_lack <- IMPDAT$SC017Q07NA # A lack of physical infrastructure (e.g. building, grounds, heating/cooling, lighting and acoustic systems).
+pisa18$poor_infra <- IMPDAT$SC017Q08NA # Inadequate or poor quality physical infrastructure (e.g. building, grounds, heating/cooling, lighting and acoustic systems).
+
+
+#pisa18$EDUSHORT <- IMPDAT$EDUSHORT
+
+# Disciplinary climate # 1 = Every lesson ,..4= Never or hardly ever
+pisa18$dis1  <- IMPDAT$ST097Q01TA  # Students don't listen to what the teacher says.
+pisa18$dis2  <- IMPDAT$ST097Q02TA  # There is noise and disorder.
+pisa18$dis3  <- IMPDAT$ST097Q03TA  # The teacher has to wait a long time for students to quiet down.
+pisa18$dis4  <- IMPDAT$ST097Q04TA  # Students cannot work well.
+pisa18$dis5  <- IMPDAT$ST097Q05TA  # Students don't start working for a long time after the lesson begins.
+
+
+# STUBEHA, 1 = not at all, 2 = very little, 3 = to some extent 4 = a lot
+pisa18$truancy    <- IMPDAT$SC061Q01TA # SC061Q01TA Student truancy
+pisa18$skip       <- IMPDAT$SC061Q02TA # SC061Q02TA Students skipping classes
+pisa18$no_respect <- IMPDAT$SC061Q03TA # SC061Q03TA Students lacking respect for teachers
+pisa18$alc        <- IMPDAT$SC061Q04TA # SC061Q04TA Student use of alcohol or illegal drugs
+pisa18$bull       <- IMPDAT$SC061Q05TA # SC061Q05TA Students intimidating or bullying other students
+pisa18$no_att     <- IMPDAT$SC061Q11HA # SC061Q11HA Students not being attentive
+
+# Exposure to bullying # 1 = Never or almost never, 2 = A few times a
+# year, 3= A few times a month ..., 4= Once a week or more
+pisa18$bul1  <- IMPDAT$ST038Q03NA  # Other students left me out of things on purpose.
+pisa18$bul2  <- IMPDAT$ST038Q04NA  # Other students made fun of me.
+pisa18$bul3  <- IMPDAT$ST038Q05NA  # I was threatened by other students.
+pisa18$bul4  <- IMPDAT$ST038Q06NA  # Other students took away or destroyed things that belonged to me.
+pisa18$bul5  <- IMPDAT$ST038Q07NA  # I got hit or pushed around by other students.
+pisa18$bul6  <- IMPDAT$ST038Q08NA  # Other students spread nasty rumours about me.
+
+# SENSE OF BELONGING # 1 = Strongly, 2= agree, 3 = disagree, agree, 4 = Strongly disagree
+pisa18$belong1 <- IMPDAT$ST034Q01TA     # I feel like an outsider (or left out of things) at school.
+pisa18$belong2 <- 5 - IMPDAT$ST034Q02TA # I make friends easily at school.
+pisa18$belong3 <- 5 - IMPDAT$ST034Q03TA # I feel like I belong at school
+pisa18$belong4 <- IMPDAT$ST034Q04TA     # I feel awkward and out of place in my school.
+pisa18$belong5 <- 5 - IMPDAT$ST034Q05TA # Other students seem to like me.
+pisa18$belong6 <- IMPDAT$ST034Q06TA     # I feel lonely at school.
+
+# (d) ******************* student attitudes and dispositions toward reading, learning and school.
+
+# p. 79, participation
+pisa18$part1  <- IMPDAT$ST062Q01TA # I <skipped> a whole school day.
+pisa18$part2  <- IMPDAT$ST062Q02TA # I <skipped> some classes.
+pisa18$part3  <- IMPDAT$ST062Q03TA # I arrived late for school. (not included)
+
+
+# self-efficacy, 1  Strongly disagree, 4  Strongly agree
+pisa18$self_eff1  <- IMPDAT$ST188Q01HA  # I usually manage one way or another.
+pisa18$self_eff2  <- IMPDAT$ST188Q02HA  # I feel proud that I have accomplished things.
+pisa18$self_eff3  <- IMPDAT$ST188Q03HA  # I feel that I can handle many things at a time.
+pisa18$self_eff4  <- IMPDAT$ST188Q06HA  # My belief in myself gets me through hard times.
+pisa18$self_eff5  <- IMPDAT$ST188Q07HA  # When I'm in a difficult situation, I can usually find my way out of it.
+
+# enjoyment of reading, 1  Strongly disagree, 4  Strongly agree
+
+# enjoyment of reading, high values indicate a positive attitude towards reading
+pisa18$joy.read1 <- 5 - IMPDAT$ST160Q01IA # I read only if I have to. 
+pisa18$joy.read2 <- IMPDAT$ST160Q02IA     # Reading is one of my favorite hobbies.
+pisa18$joy.read3 <- IMPDAT$ST160Q03IA     # I like talking about books with other people.
+pisa18$joy.read4 <- 5 - IMPDAT$ST160Q04IA # For me, reading is a waste of time.
+pisa18$joy.read5 <- 5 - IMPDAT$ST160Q05IA # I read only to get information that I need.
+
+pisa18$JOYREAD <- IMPDAT$JOYREAD
+# parents, enjoyment of reading, 1  Strongly disagree, 4  Strongly agree
+# enjoyment of reading, high values indicate a positive attitude towards reading
+pisa18$joyp.read1 <- 5 - IMPDAT$PA158Q01HA # I read only if I have to. 
+pisa18$joyp.read2 <- IMPDAT$PA158Q02IA     # Reading is one of my favorite hobbies.
+pisa18$joyp.read3 <- IMPDAT$PA158Q03HA     # I like talking about books with other people.
+pisa18$joyp.read4 <- 5 - IMPDAT$PA158Q04IA # For me, reading is a waste of time.
+pisa18$joyp.read5 <- 5 - IMPDAT$PA158Q05HA # I read only to get information that I need.
+
+pisa18$JOYREADP <- IMPDAT$JOYREADP
+
+# motivation to master tasks, 1  Strongly disagree, 4  Strongly agree
+
+pisa18$mot1  <- IMPDAT$ST182Q03HA  # I find satisfaction in working as hard as I can. 
+pisa18$mot2  <- IMPDAT$ST182Q04HA  # Once I start a task, I persist until it is finished.
+pisa18$mot3  <- IMPDAT$ST182Q05HA  # Part of the enjoyment I get from doing things is when I improve on my past performance.
+pisa18$mot4  <- IMPDAT$ST182Q06HA  # If I am not good at something, I would rather keep struggling to 
+                                   #master it than move on to something I may be good at.
+
+pisa18$WORKMAST <- IMPDAT$WORKMAST
+
+# learning goals, 1:  Not at all true of me ...5 = Extremely true of me
+
+pisa18$goal1 <- IMPDAT$ST208Q01HA # My goal is to learn as much as possible.
+pisa18$goal2 <- IMPDAT$ST208Q02HA # My goal is to completely master the material.
+pisa18$goal3 <- IMPDAT$ST208Q04HA # My goal is to understand the content of my classes as thoroughly as possible. 
+
+# motivational and metacognitive variables
+# SCREADCOMP # Self-concept of reading: Perception of competence
+# # 1 = Strongly disagree...4 = Strongly agree
+pisa18$screadcomp1 <- IMPDAT$ST161Q01HA # I am a good reader.
+pisa18$screadcomp2 <- IMPDAT$ST161Q02HA # I am able to understand difficult texts.
+pisa18$screadcomp3 <- IMPDAT$ST161Q03HA # I read fluently.
+
+# SCREADDIFF # Self-concept of reading: Perception of difficulty
+# # 1 = Strongly disagree...4 = Strongly agree
+pisa18$screaddiff1 <- IMPDAT$ST161Q06HA # I have always had difficulty with reading.
+pisa18$screaddiff2 <- IMPDAT$ST161Q07HA # I have to read a text several times before completely understanding it.
+pisa18$screaddiff3 <- IMPDAT$ST161Q08HA # I find it difficult to answer questions about a text.
+
+# GFOFAIl
+# 1 = Strongly disagree...4 = Strongly agree
+pisa18$gfofail1 <- IMPDAT$ST183Q01HA # When I am failing, I worry about what others think of me.
+pisa18$gfofail2 <- IMPDAT$ST183Q02HA # When I am failing, I am afraid that I might not have enough talent.
+pisa18$gfofail3 <- IMPDAT$ST183Q03HA # When I am failing, this makes me doubt my plans for the future. 
+
+# Value of school
+# 1 = Strongly agree,... 4 = Strongly disagree
+pisa18$value1  <- IMPDAT$ST036Q05TA  # Trying hard at school will help me get a good job. 
+pisa18$value2  <- IMPDAT$ST036Q06TA  # Trying hard at school will help me get into a good <college>. 
+pisa18$value3  <- IMPDAT$ST036Q08TA  # Trying hard at school is important.
+
+
+# (e) ******************* further properties of school
+
+
+# big city
+pisa18$RUR <- IMPDAT$SC001Q01TA # 1 = < 3000, 2 = 3000 to 15 000, 3 = 15 000 to 100000, 4 = 100000 to 1 000 000, 5 = more than 1 000 000
+
+pisa18$RUR[pisa18$RUR == 1] <- 1
+pisa18$RUR[pisa18$RUR == 2] <- 1
+pisa18$RUR[pisa18$RUR == 3] <- 0
+pisa18$RUR[pisa18$RUR == 4] <- 0
+pisa18$RUR[pisa18$RUR == 5] <- 0
+
+pisa18$uni  <- IMPDAT$ST225Q06HA # Which of the following do you expect to complete?, ISCED level 5A or 6
+
+# How many books are there in your home?
+books <- unclass(IMPDAT$ST013Q01TA)
+# 25 books maximum -> rename few_books
+few_book <- rep(0,length(books))
+few_book[books < 3] <- 1
+pisa18$few_book <- few_book
+
+
+pisa18$NN_SC <- IMPDAT$SC048Q01NA/100 # Students whose <heritage language> is different from <test language>
+pisa18$DISH  <- IMPDAT$SC048Q03NA/100 # Students from socioeconomically disadvantaged homes
+
+# Is your school a public or a private school?
+pisa18$PUBLIC12 <- IMPDAT$SC013Q01TA # 1 = public, 2 = private
+pisa18$PUBLIC <- rep(1, length(pisa18$PUBLIC12))
+pisa18$PUBLIC[pisa18$PUBLIC12 == 2] <- 0
+pisa18$failed <- IMPDAT$SC164Q01HA/100 # n the last full academic year, what proportion of 
+# students in your school’s final grade left school without 
+pisa18$SWBP <- IMPDAT$SWBP
+pisa18$SN_SC <- IMPDAT$SC048Q02NA/100 # Students with special needs
+# HISCED"
+pisa18$HISCED <- IMPDAT$HISCED
+
+
+
+
+
+
+
