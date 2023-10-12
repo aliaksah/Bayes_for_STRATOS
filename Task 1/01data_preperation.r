@@ -325,8 +325,10 @@ pisa18$RUR <- IMPDAT$SC001Q01TA # 1 = < 3000, 2 = 3000 to 15 000, 3 = 15 000 to 
 
 #As of <February 1, 2018>, what was the total school enrolment (number of students)?
 
-pisa18$MALES <- IMPDAT$SC002Q01TA
-pisa18FEMS <- IMPDAT$SC002Q02TA
+MALES <- IMPDAT$SC002Q01TA
+FEMS <- IMPDAT$SC002Q02TA
+# Fraction of female students
+pisa18$FEMFRAC <- FEMS/(FEMS + MALES)
 
 pisa18$NN_SC <- IMPDAT$SC048Q01NA/100 # Students whose <heritage language> is different from <test language>
 pisa18$DISH  <- IMPDAT$SC048Q03NA/100 # Students from socioeconomically disadvantaged homes
