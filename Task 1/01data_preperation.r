@@ -227,7 +227,6 @@ self_eff3  <- IMPDAT$ST188Q03HA  # I feel that I can handle many things at a tim
 self_eff4  <- IMPDAT$ST188Q06HA  # My belief in myself gets me through hard times.
 self_eff5  <- IMPDAT$ST188Q07HA  # When I'm in a difficult situation, I can usually find my way out of it.
 
-
 self_eff <- data.frame(self_eff1,self_eff2,self_eff3,self_eff4,self_eff5)
 mean.self_eff <- apply(self_eff,FUN = mean, MARGIN = 1, na.rm = TRUE)
 self_eff_sc <- scale(mean.self_eff)[,1]

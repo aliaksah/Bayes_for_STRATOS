@@ -39,5 +39,6 @@ summary(pisa18$nb.stud)
 pisa18_sc <- pisa18[!duplicated(pisa18$school.id), ]
 rm(pisa18)
 View(pisa18_sc)
+
 dim(pisa18_sc)
 ```
