@@ -169,7 +169,7 @@ unprepared <- IMPDAT$SC061Q10TA #  Teachers not being well prepared for classes
 teachbad.f <- data.frame(bad_teach,miss_teach,resi_staff, strict, unprepared)
 mean.teachbad <- apply(teachbad.f,FUN = mean, MARGIN = 1, na.rm = TRUE)
 teachbad_sc <- scale(mean.teachbad)[,1]
-pisa18$TEACHBAD  <- ave(teachbad_sc, school.id, FUN = function(x) mean(x, na.rm = TRUE))
+pisa18$TEACHBAD <- ave(teachbad_sc, school.id, FUN = function(x) mean(x, na.rm = TRUE))
 
 # Exposure to bullying # 1 = Never or almost never, 2 = A few times a
 # year, 3 = A few times a month ..., 4 = Once a week or more
