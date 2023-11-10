@@ -1,0 +1,44 @@
+---
+title: "Bacteremia prediction"
+author: "Michael Kammer"
+output: html_document
+---
+
+# Background
+
+In `Ratzinger F, et al. A risk prediction model for screening bacteremic patients: a cross sectional study. PLoS One. 2014;9(9):e106765.` 
+the authors presented a model to predict the risk for bacteremia in hospital 
+patients. This is an important task, since bacterial infections pose serious
+health risks for patients, yet the standard method for diagnosis (blood 
+cultures) was not very cost-efficient at that time. Thus, the primary aim
+was to identify patients at low risk of bacteremia.
+
+# Research ideas for our project
+
+Develop and (internally) validate a parsimonious prediction model for
+bacteremia (as binary outcome yes / no). 
+Identify important predictors and "measure" their importance for 
+the predictions. Report on model uncertainty and provide prediction intervals
+for risk predictions. 
+
+# Dataset
+
+The dataset was used by some of us (Georg, Michael) in other projects already. 
+There is also a version that is publicly available which was created by taking 
+some privacy ensuring measures.
+
+Overall the development set comprises 14691 patients, 51 predictors (mostly
+continuous measurements) and 1180 events (bacteria present in blood culture).
+Predictor data is partially missing. 
+
+# Expectations
+
+The reported AUC in a separate validation set in the original publication was 
+around 0.8 using 10 to 20 variables (2 different models), with the proportion of
+neutrophile leukocytes in differential blood count being reported as the 
+strongest individual predictor. 
+
+Ideally, the newly developed models would achieve similar AUC and also identify
+some particular predictors of interest while providing confidence / credible
+intervals for relevant parameters of interest (coefficients, performance, 
+predictions). Missing data should also be dealt with in some way. 
