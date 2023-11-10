@@ -55,7 +55,7 @@ dis5  <- IMPDAT$ST097Q05TA  # Students don't start working for a long time after
 dis_clim <- data.frame(dis1,dis2,dis3,dis4,dis5)
 mean.dis_clim <- apply(dis_clim,FUN = mean, MARGIN = 1, na.rm = TRUE)
 dis_clim_sc <- scale(mean.dis_clim)[,1]
-pisa18$DISCLIMAT <- ave(dis_clim_sc, school.id, FUN = function(x) mean(x, na.rm = TRUE))
+pisa18$DISCLIMA <- ave(dis_clim_sc, school.id, FUN = function(x) mean(x, na.rm = TRUE))
 
 # Teacher support # 1 = every lesson,..4 = never or hardly ever
 teachsupp1  <- 5 - IMPDAT$ST100Q01TA  # The teacher shows an interest in every student's learning.
@@ -66,7 +66,7 @@ teachsupp4  <- 5 - IMPDAT$ST100Q04TA  # The teacher continues teaching until the
 teachsupp <- data.frame(teachsupp1,teachsupp2,teachsupp3,teachsupp4)
 mean.teachsupp <- apply(teachsupp,FUN = mean, MARGIN = 1, na.rm = TRUE)
 teachsupp_sc <- scale(mean.teachsupp)[,1]
-pisa18$TEACHSUPP <- ave(teachsupp_sc, school.id, FUN = function(x) mean(x, na.rm = TRUE))
+pisa18$TEACHSUP <- ave(teachsupp_sc, school.id, FUN = function(x) mean(x, na.rm = TRUE))
 
 # Teacher feedback # 1 = never or hardly ever,..4 = every lesson
 teachfeed1  <- IMPDAT$ST104Q02NA  # The teacher gives me feedback on my strengths in this subject.
@@ -76,7 +76,7 @@ teachfeed3  <- IMPDAT$ST104Q04NA  # The teacher tells me how I can improve my pe
 teachfeed <- data.frame(teachfeed1,teachfeed2,teachfeed3)
 mean.teachfeed <- apply(teachfeed,FUN = mean, MARGIN = 1, na.rm = TRUE)
 teachfeed_sc <- scale(mean.teachfeed)[,1]
-pisa18$TEACHFEED <- ave(teachfeed_sc, school.id, FUN = function(x) mean(x, na.rm = TRUE))
+pisa18$PERFEED <- ave(teachfeed_sc, school.id, FUN = function(x) mean(x, na.rm = TRUE))
 
 # Teacher-directed instruction  # 1 = every lesson,..4 = never or hardly ever
 dirins1 <- 5 - IMPDAT$ST102Q01TA # The teacher sets clear goals for our learning.
@@ -334,12 +334,12 @@ FEMS <- IMPDAT$SC002Q02TA
 pisa18$FEMFRAC <- FEMS/(FEMS + MALES)
 
 pisa18$NN_SC <- IMPDAT$SC048Q01NA/100 # Students whose <heritage language> is different from <test language>
-pisa18$DISH  <- IMPDAT$SC048Q03NA/100 # Students from socioeconomically disadvantaged homes
+DISH  <- IMPDAT$SC048Q03NA/100 # Students from socioeconomically disadvantaged homes
 pisa18$SN_SC <- IMPDAT$SC048Q02NA/100 # Students with special needs
 
-pisa18$DISHOME <- as.numeric(cut_number(pisa18$DISH,2)) - 1
+pisa18$DISHOME <- as.numeric(cut_number(DISH,2)) - 1
 
-pisa18$FAILED <- IMPDAT$SC164Q01HA/100 # n the last full academic year, what proportion of 
+pisa18$FAILED <- IMPDAT$SC164Q01HA/100 # in the last full academic year, what proportion of 
 # students in your school’s final grade left school without 
 
 
