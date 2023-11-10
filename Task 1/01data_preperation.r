@@ -220,7 +220,6 @@ mean.st_attendance <- apply(st_attendance,FUN = mean, MARGIN = 1, na.rm = TRUE)
 st_attendance_sc <- scale(mean.st_attendance)[,1]
 pisa18$ATT <- ave(st_attendance_sc, school.id, FUN = function(x) mean(x, na.rm = TRUE))
 
-
 # self-efficacy, 1  Strongly disagree, 4  Strongly agree
 self_eff1  <- IMPDAT$ST188Q01HA  # I usually manage one way or another.
 self_eff2  <- IMPDAT$ST188Q02HA  # I feel proud that I have accomplished things.
