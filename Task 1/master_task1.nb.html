@@ -1757,23 +1757,144 @@ display: none;
 scales.</h1>
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuc291cmNlKFwicGFja2FnZXMuclwiKVxubG9hZChmaWxlID0gZmlsZS5wYXRoKFwiSU1QREFUX1BJU0EuUkRhdGFcIikpXG5zb3VyY2UoXCIwMWRhdGFfcHJlcGVyYXRpb24uclwiKVxuXG5gYGAifQ== -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuc291cmNlKFwicGFja2FnZXMuclwiKVxuXG5gYGAifQ== -->
 <pre class="r"><code>source(&quot;packages.r&quot;)
-load(file = file.path(&quot;IMPDAT_PISA.RData&quot;))
-source(&quot;01data_preperation.r&quot;)
 </code></pre>
 <!-- rnb-source-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiRXJyb3IgaW4gZXZhbChlaSwgZW52aXIpIDogb2JqZWN0ICdnZm9mYWlsLmYnIG5vdCBmb3VuZFxuIn0= -->
-<pre><code>Error in eval(ei, envir) : object &#39;gfofail.f&#39; not found</code></pre>
+<!-- rnb-output-begin eyJkYXRhIjoiTGFkZSBuw7Z0aWdlcyBQYWtldDogcmJlbmNobWFya1xuTGFkZSBuw7Z0aWdlcyBQYWtldDogZHBseXJcblxuQXR0YWNoZSBQYWtldDog4oCYZHBseXLigJlcblxuRGllIGZvbGdlbmRlbiBPYmpla3RlIHNpbmQgbWFza2llcnQgdm9uIOKAmHBhY2thZ2U6c3RhdHPigJk6XG5cbiAgICBmaWx0ZXIsIGxhZ1xuXG5EaWUgZm9sZ2VuZGVuIE9iamVrdGUgc2luZCBtYXNraWVydCB2b24g4oCYcGFja2FnZTpiYXNl4oCZOlxuXG4gICAgaW50ZXJzZWN0LCBzZXRkaWZmLCBzZXRlcXVhbCwgdW5pb25cblxuUmVnaXN0ZXJlZCBTMyBtZXRob2Qgb3ZlcndyaXR0ZW4gYnkgJ2RhdGEudGFibGUnOlxuICBtZXRob2QgICAgICAgICAgIGZyb21cbiAgcHJpbnQuZGF0YS50YWJsZSAgICAgXG5SZWdpc3RlcmVkIFMzIG1ldGhvZCBvdmVyd3JpdHRlbiBieSAnaHRtbHdpZGdldHMnOlxuICBtZXRob2QgICAgICAgICAgIGZyb20gICAgICAgICBcbiAgcHJpbnQuaHRtbHdpZGdldCB0b29sczpyc3R1ZGlvXG5MYWRlIG7DtnRpZ2VzIFBha2V0OiBSY3BwXG5UaGlzIGlzIHJzdGFuYXJtIHZlcnNpb24gMi4yNi4xXG4tIFNlZSBodHRwczovL21jLXN0YW4ub3JnL3JzdGFuYXJtL2FydGljbGVzL3ByaW9ycyBmb3IgY2hhbmdlcyB0byBkZWZhdWx0IHByaW9ycyFcbi0gRGVmYXVsdCBwcmlvcnMgbWF5IGNoYW5nZSwgc28gaXQncyBzYWZlc3QgdG8gc3BlY2lmeSBwcmlvcnMsIGV2ZW4gaWYgZXF1aXZhbGVudCB0byB0aGUgZGVmYXVsdHMuXG4tIEZvciBleGVjdXRpb24gb24gYSBsb2NhbCwgbXVsdGljb3JlIENQVSB3aXRoIGV4Y2VzcyBSQU0gd2UgcmVjb21tZW5kIGNhbGxpbmdcbiAgb3B0aW9ucyhtYy5jb3JlcyA9IHBhcmFsbGVsOjpkZXRlY3RDb3JlcygpKVxuVGhpcyBpcyBiYXllc3Bsb3QgdmVyc2lvbiAxLjEwLjBcbi0gT25saW5lIGRvY3VtZW50YXRpb24gYW5kIHZpZ25ldHRlcyBhdCBtYy1zdGFuLm9yZy9iYXllc3Bsb3Rcbi0gYmF5ZXNwbG90IHRoZW1lIHNldCB0byBiYXllc3Bsb3Q6OnRoZW1lX2RlZmF1bHQoKVxuICAgKiBEb2VzIF9ub3RfIGFmZmVjdCBvdGhlciBnZ3Bsb3QyIHBsb3RzXG4gICAqIFNlZSA/YmF5ZXNwbG90X3RoZW1lX3NldCBmb3IgZGV0YWlscyBvbiB0aGVtZSBzZXR0aW5nXG5cbkF0dGFjaGUgUGFrZXQ6IOKAmEh1cmF1bHRNaXNj4oCZXG5cbkRhcyBmb2xnZW5kZSBPYmpla3QgaXN0IG1hc2tpZXJ0IOKAmHBhY2thZ2U6cnN0YW5hcm3igJk6XG5cbiAgICBsb2dpdFxuXG5UaGlzIGlzIGxvbyB2ZXJzaW9uIDIuNi4wXG4tIE9ubGluZSBkb2N1bWVudGF0aW9uIGFuZCB2aWduZXR0ZXMgYXQgbWMtc3Rhbi5vcmcvbG9vXG4tIEFzIG9mIHYyLjAuMCBsb28gZGVmYXVsdHMgdG8gMSBjb3JlIGJ1dCB3ZSByZWNvbW1lbmQgdXNpbmcgYXMgbWFueSBhcyBwb3NzaWJsZS4gVXNlIHRoZSAnY29yZXMnIGFyZ3VtZW50IG9yIHNldCBvcHRpb25zKG1jLmNvcmVzID0gTlVNX0NPUkVTKSBmb3IgYW4gZW50aXJlIHNlc3Npb24uIFxuLSBXaW5kb3dzIDEwIHVzZXJzOiBsb28gbWF5IGJlIHZlcnkgc2xvdyBpZiAnbWMuY29yZXMnIGlzIHNldCBpbiB5b3VyIC5ScHJvZmlsZSBmaWxlIChzZWUgaHR0cHM6Ly9naXRodWIuY29tL3N0YW4tZGV2L2xvby9pc3N1ZXMvOTQpLlxuXG5BdHRhY2hlIFBha2V0OiDigJhMYXBsYWNlc0RlbW9u4oCZXG5cbkRhcyBmb2xnZW5kZSBPYmpla3QgaXN0IG1hc2tpZXJ0IOKAmHBhY2thZ2U6SHVyYXVsdE1pc2PigJk6XG5cbiAgICBsb2dpdFxuXG5EaWUgZm9sZ2VuZGVuIE9iamVrdGUgc2luZCBtYXNraWVydCB2b24g4oCYcGFja2FnZTpyc3RhbmFybeKAmTpcblxuICAgIGludmxvZ2l0LCBsb2dpdFxuXG5cbkF0dGFjaGUgUGFrZXQ6IOKAmG1pY2XigJlcblxuRGFzIGZvbGdlbmRlIE9iamVrdCBpc3QgbWFza2llcnQg4oCYcGFja2FnZTpzdGF0c+KAmTpcblxuICAgIGZpbHRlclxuXG5EaWUgZm9sZ2VuZGVuIE9iamVrdGUgc2luZCBtYXNraWVydCB2b24g4oCYcGFja2FnZTpiYXNl4oCZOlxuXG4gICAgY2JpbmQsIHJiaW5kXG5cblxuQXR0YWNoZSBQYWtldDog4oCYa2FibGVFeHRyYeKAmVxuXG5EYXMgZm9sZ2VuZGUgT2JqZWt0IGlzdCBtYXNraWVydCDigJhwYWNrYWdlOmRwbHly4oCZOlxuXG4gICAgZ3JvdXBfcm93c1xuXG5cbkF0dGFjaGUgUGFrZXQ6IOKAmERlc2NUb29sc+KAmVxuXG5EYXMgZm9sZ2VuZGUgT2JqZWt0IGlzdCBtYXNraWVydCDigJhwYWNrYWdlOkxhcGxhY2VzRGVtb27igJk6XG5cbiAgICBNb2RlXG5cblxuQXR0YWNoZSBQYWtldDog4oCYZ3JpZEV4dHJh4oCZXG5cbkRhcyBmb2xnZW5kZSBPYmpla3QgaXN0IG1hc2tpZXJ0IOKAmHBhY2thZ2U6ZHBseXLigJk6XG5cbiAgICBjb21iaW5lXG5cbkluc3RhbGwgcGFja2FnZSBcInN0cmVuZ2VqYWNrZVwiIGZyb20gR2l0SHViIChgZGV2dG9vbHM6Omluc3RhbGxfZ2l0aHViKFwic3RyZW5nZWphY2tlL3N0cmVuZ2VqYWNrZVwiKWApIHRvIGxvYWQgYWxsIHNqLXBhY2thZ2VzIGF0IG9uY2UhXG4tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tXG5Zb3UgaGF2ZSBsb2FkZWQgcGx5ciBhZnRlciBkcGx5ciAtIHRoaXMgaXMgbGlrZWx5IHRvIGNhdXNlIHByb2JsZW1zLlxuSWYgeW91IG5lZWQgZnVuY3Rpb25zIGZyb20gYm90aCBwbHlyIGFuZCBkcGx5ciwgcGxlYXNlIGxvYWQgcGx5ciBmaXJzdCwgdGhlbiBkcGx5cjpcbmxpYnJhcnkocGx5cik7IGxpYnJhcnkoZHBseXIpXG4tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tXG5cbkF0dGFjaGUgUGFrZXQ6IOKAmHBseXLigJlcblxuRGFzIGZvbGdlbmRlIE9iamVrdCBpc3QgbWFza2llcnQg4oCYcGFja2FnZTpnZ3B1YnLigJk6XG5cbiAgICBtdXRhdGVcblxuRGllIGZvbGdlbmRlbiBPYmpla3RlIHNpbmQgbWFza2llcnQgdm9uIOKAmHBhY2thZ2U6ZHBseXLigJk6XG5cbiAgICBhcnJhbmdlLCBjb3VudCwgZGVzYywgZmFpbHdpdGgsIGlkLCBtdXRhdGUsIHJlbmFtZSwgc3VtbWFyaXNlLCBzdW1tYXJpemVcbiJ9 -->
+<pre><code>Lade nötiges Paket: rbenchmark
+Lade nötiges Paket: dplyr
+
+Attache Paket: ‘dplyr’
+
+Die folgenden Objekte sind maskiert von ‘package:stats’:
+
+    filter, lag
+
+Die folgenden Objekte sind maskiert von ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+Registered S3 method overwritten by &#39;data.table&#39;:
+  method           from
+  print.data.table     
+Registered S3 method overwritten by &#39;htmlwidgets&#39;:
+  method           from         
+  print.htmlwidget tools:rstudio
+Lade nötiges Paket: Rcpp
+This is rstanarm version 2.26.1
+- See https://mc-stan.org/rstanarm/articles/priors for changes to default priors!
+- Default priors may change, so it&#39;s safest to specify priors, even if equivalent to the defaults.
+- For execution on a local, multicore CPU with excess RAM we recommend calling
+  options(mc.cores = parallel::detectCores())
+This is bayesplot version 1.10.0
+- Online documentation and vignettes at mc-stan.org/bayesplot
+- bayesplot theme set to bayesplot::theme_default()
+   * Does _not_ affect other ggplot2 plots
+   * See ?bayesplot_theme_set for details on theme setting
+
+Attache Paket: ‘HuraultMisc’
+
+Das folgende Objekt ist maskiert ‘package:rstanarm’:
+
+    logit
+
+This is loo version 2.6.0
+- Online documentation and vignettes at mc-stan.org/loo
+- As of v2.0.0 loo defaults to 1 core but we recommend using as many as possible. Use the &#39;cores&#39; argument or set options(mc.cores = NUM_CORES) for an entire session. 
+- Windows 10 users: loo may be very slow if &#39;mc.cores&#39; is set in your .Rprofile file (see https://github.com/stan-dev/loo/issues/94).
+
+Attache Paket: ‘LaplacesDemon’
+
+Das folgende Objekt ist maskiert ‘package:HuraultMisc’:
+
+    logit
+
+Die folgenden Objekte sind maskiert von ‘package:rstanarm’:
+
+    invlogit, logit
+
+
+Attache Paket: ‘mice’
+
+Das folgende Objekt ist maskiert ‘package:stats’:
+
+    filter
+
+Die folgenden Objekte sind maskiert von ‘package:base’:
+
+    cbind, rbind
+
+
+Attache Paket: ‘kableExtra’
+
+Das folgende Objekt ist maskiert ‘package:dplyr’:
+
+    group_rows
+
+
+Attache Paket: ‘DescTools’
+
+Das folgende Objekt ist maskiert ‘package:LaplacesDemon’:
+
+    Mode
+
+
+Attache Paket: ‘gridExtra’
+
+Das folgende Objekt ist maskiert ‘package:dplyr’:
+
+    combine
+
+Install package &quot;strengejacke&quot; from GitHub (`devtools::install_github(&quot;strengejacke/strengejacke&quot;)`) to load all sj-packages at once!
+----------------------------------------------------------------------------------------
+You have loaded plyr after dplyr - this is likely to cause problems.
+If you need functions from both plyr and dplyr, please load plyr first, then dplyr:
+library(plyr); library(dplyr)
+----------------------------------------------------------------------------------------
+
+Attache Paket: ‘plyr’
+
+Das folgende Objekt ist maskiert ‘package:ggpubr’:
+
+    mutate
+
+Die folgenden Objekte sind maskiert von ‘package:dplyr’:
+
+    arrange, count, desc, failwith, id, mutate, rename, summarise, summarize</code></pre>
 <!-- rnb-output-end -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxubG9hZChmaWxlID0gZmlsZS5wYXRoKFwiSU1QREFUX1BJU0EuUkRhdGFcIikpXG5zb3VyY2UoXCIwMWRhdGFfcHJlcGVyYXRpb24uclwiKVxudG8ucm0gPC0gb2JqZWN0cygpWyFvYmplY3RzKCkgJWluJSBjKFwiUFBhdGhcIixcInBpc2ExOFwiLFwiY291bnRyaWVzXCIpXVxucm0obGlzdCA9IHRvLnJtKVxuYGBgIn0= -->
+<pre class="r"><code>load(file = file.path(&quot;IMPDAT_PISA.RData&quot;))
+source(&quot;01data_preperation.r&quot;)
+to.rm &lt;- objects()[!objects() %in% c(&quot;PPath&quot;,&quot;pisa18&quot;,&quot;countries&quot;)]
+rm(list = to.rm)</code></pre>
+<!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 </div>
-<div id="there-should-be-at-least-ten-students-per-school.-schools-with-fewer-observations-are-excluded-from-the-analysis." class="section level1">
+<div id="there-should-be-at-least-ten-students-per-school.-schools-with-fewer-observations-are" class="section level1">
 <h1>There should be at least ten students per school. Schools with fewer
-observations are excluded from the analysis.</h1>
+observations are</h1>
+</div>
+<div id="excluded-from-the-analysis.-the-variable-nb.stud-informs-about-the-number-of-stundets" class="section level1">
+<h1>excluded from the analysis. The variable nb.stud informs about the
+number of stundets</h1>
+</div>
+<div id="per-school" class="section level1">
+<h1>per school</h1>
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxudGFibGUocGlzYTE4JG5iLnN0dWQpXG5cbmBgYCJ9 -->
+<pre class="r"><code>table(pisa18$nb.stud)
+</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-output-begin eyJkYXRhIjoiXG4gIDEwICAgMTIgICAxMyAgIDE0ICAgMTUgICAxNiAgIDE3ICAgMTggICAxOSAgIDIwICAgMjEgICAyMiAgIDIzICAgMjQgICAyNSAgIDI2ICAgMjcgICAyOCBcbiAgNTAgICAxMiAgIDUyICAgMTQgICA2MCAgIDQ4ICAxMDIgICAxOCAgIDU3ICAgNjAgICA2MyAgMTc2ICAgOTIgICA3MiAgIDI1ICAxMDQgIDEzNSAgIDU2IFxuICAyOSAgIDMwICAgMzEgICAzMiAgIDMzICAgMzQgICAzNSAgIDM2IFxuIDE0NSAgMzAwICA0NjUgIDg2NCAgOTU3IDEyOTIgIDkxMCAgMzYwIFxuIn0= -->
+<pre><code>
+  10   12   13   14   15   16   17   18   19   20   21   22   23   24   25   26   27   28 
+  50   12   52   14   60   48  102   18   57   60   63  176   92   72   25  104  135   56 
+  29   30   31   32   33   34   35   36 
+ 145  300  465  864  957 1292  910  360 </code></pre>
+<!-- rnb-output-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 </div>
@@ -1782,10 +1903,17 @@ observations are excluded from the analysis.</h1>
 one row for each school, there are 284 schools in der data set.</h1>
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuZGltKHBpc2ExOF9zYylcblxuYGBgIn0= -->
+<pre class="r"><code>dim(pisa18_sc)
+</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDI4NCAgNDRcbiJ9 -->
+<pre><code>[1] 284  44</code></pre>
+<!-- rnb-output-end -->
 <!-- rnb-chunk-end -->
 </div>
 
-<div id="rmd-source-code">LS0tDQp0aXRsZTogIlRhc2sgMSINCm91dHB1dDogaHRtbF9ub3RlYm9vaw0KLS0tDQoNCiMgTG9hZCBzaW5nbGUgaW1wdXRlZCBQSVNBIGRhdGEgYW5kIHByZXBhcmUgaXQsIHRodXMgYnVpbGQgUElTQSBzY2FsZXMuDQoNCmBgYHtyfQ0Kc291cmNlKCJwYWNrYWdlcy5yIikNCmxvYWQoZmlsZSA9IGZpbGUucGF0aCgiSU1QREFUX1BJU0EuUkRhdGEiKSkNCnNvdXJjZSgiMDFkYXRhX3ByZXBlcmF0aW9uLnIiKQ0KdG8ucm0gPC0gb2JqZWN0cygpWyFvYmplY3RzKCkgJWluJSBjKCJQUGF0aCIsInBpc2ExOCIsImNvdW50cmllcyIpXQ0Kcm0obGlzdCA9IHRvLnJtKQ0KDQpgYGANCg0KIyBUaGVyZSBzaG91bGQgYmUgYXQgbGVhc3QgdGVuIHN0dWRlbnRzIHBlciBzY2hvb2wuIFNjaG9vbHMgd2l0aCBmZXdlciBvYnNlcnZhdGlvbnMgYXJlIGV4Y2x1ZGVkIGZyb20gdGhlIGFuYWx5c2lzLg0KDQpgYGB7cn0NCnRhYi5pZCA8LSB0YWJsZShwaXNhMTgkc2Nob29sLmlkKQ0KaWQuZnJhbWUgPC0gYXMuZGF0YS5mcmFtZSh0YWIuaWQpDQoNCm5iLnN0dWQgPC0gcmVwKGlkLmZyYW1lJEZyZXEsaWQuZnJhbWUkRnJlcSkNCnBpc2ExOCRuYi5zdHVkIDwtIG5iLnN0dWQNCnJtKHRhYi5pZCxpZC5mcmFtZSxuYi5zdHVkKQ0KcGlzYS5kYXRhIDwtIHN1YnNldChwaXNhMTgsIHBpc2ExOCRuYi5zdHVkID4gOSkNCnBpc2ExOCA8LSBwaXNhLmRhdGENCg0Kcm0ocGlzYS5kYXRhKQ0KYGBgDQoNCiMgT25seSBvbmUgcm93IHBlciBzY2hvb2wsIHJlbW92ZSBkdXBsaWNhdGVkIHJvd3MuIFRoZSBkYXRhIHNldCBoYXMgb25lIHJvdyBmb3IgZWFjaCBzY2hvb2wsIHRoZXJlIGFyZSAyODQgc2Nob29scyBpbiBkZXIgZGF0YSBzZXQuDQoNCmBgYHtyfQ0KcGlzYTE4X3NjIDwtIHBpc2ExOFshZHVwbGljYXRlZChwaXNhMTgkc2Nob29sLmlkKSwgXQ0Kcm0ocGlzYTE4KQ0KYGBg</div>
+<div id="rmd-source-code">LS0tDQp0aXRsZTogIlRhc2sgMSINCm91dHB1dDogaHRtbF9ub3RlYm9vaw0KLS0tDQoNCiMgTG9hZCBzaW5nbGUgaW1wdXRlZCBQSVNBIGRhdGEgYW5kIHByZXBhcmUgaXQsIHRodXMgYnVpbGQgUElTQSBzY2FsZXMuDQoNCmBgYHtyfQ0Kc291cmNlKCJwYWNrYWdlcy5yIikNCmxvYWQoZmlsZSA9IGZpbGUucGF0aCgiSU1QREFUX1BJU0EuUkRhdGEiKSkNCnNvdXJjZSgiMDFkYXRhX3ByZXBlcmF0aW9uLnIiKQ0KdG8ucm0gPC0gb2JqZWN0cygpWyFvYmplY3RzKCkgJWluJSBjKCJQUGF0aCIsInBpc2ExOCIsImNvdW50cmllcyIpXQ0Kcm0obGlzdCA9IHRvLnJtKQ0KaGVhZChwaXNhMTgpDQoNCmBgYA0KDQojIFRoZXJlIHNob3VsZCBiZSBhdCBsZWFzdCB0ZW4gc3R1ZGVudHMgcGVyIHNjaG9vbC4gU2Nob29scyB3aXRoIGZld2VyIG9ic2VydmF0aW9ucyBhcmUgDQojIGV4Y2x1ZGVkIGZyb20gdGhlIGFuYWx5c2lzLiBUaGUgdmFyaWFibGUgbmIuc3R1ZCBpbmZvcm1zIGFib3V0IHRoZSBudW1iZXIgb2Ygc3R1bmRldHMNCiMgcGVyIHNjaG9vbA0KDQpgYGB7cn0NCnRhYi5pZCA8LSB0YWJsZShwaXNhMTgkc2Nob29sLmlkKQ0KaWQuZnJhbWUgPC0gYXMuZGF0YS5mcmFtZSh0YWIuaWQpDQoNCm5iLnN0dWQgPC0gcmVwKGlkLmZyYW1lJEZyZXEsaWQuZnJhbWUkRnJlcSkNCnBpc2ExOCRuYi5zdHVkIDwtIG5iLnN0dWQNCnJtKHRhYi5pZCxpZC5mcmFtZSxuYi5zdHVkKQ0KcGlzYS5kYXRhIDwtIHN1YnNldChwaXNhMTgsIHBpc2ExOCRuYi5zdHVkID4gOSkNCnBpc2ExOCA8LSBwaXNhLmRhdGENCg0Kcm0ocGlzYS5kYXRhKQ0Kc3VtbWFyeShwaXNhMTgkbmIuc3R1ZCkNCmBgYA0KDQojIE9ubHkgb25lIHJvdyBwZXIgc2Nob29sLCByZW1vdmUgZHVwbGljYXRlZCByb3dzLiBUaGUgZGF0YSBzZXQgaGFzIG9uZSByb3cgZm9yIGVhY2ggc2Nob29sLCB0aGVyZSBhcmUgMjg0IHNjaG9vbHMgaW4gZGVyIGRhdGEgc2V0Lg0KDQpgYGB7cn0NCnBpc2ExOF9zYyA8LSBwaXNhMThbIWR1cGxpY2F0ZWQocGlzYTE4JHNjaG9vbC5pZCksIF0NCnJtKHBpc2ExOCkNClZpZXcocGlzYTE4X3NjKQ0KZGltKHBpc2ExOF9zYykNCmBgYA==</div>
 
 
 

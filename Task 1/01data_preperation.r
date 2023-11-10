@@ -155,9 +155,9 @@ alc        <- IMPDAT$SC061Q04TA #  Student use of alcohol or illegal drugs
 bull       <- IMPDAT$SC061Q05TA #  Students intimidating or bullying other students
 no_att     <- IMPDAT$SC061Q11HA #  Students not being attentive
 
-discipline.f <- data.frame(pisa18$truancy,pisa18$skip,pisa18$no_respect, pisa18$alc, pisa18$bull, pisa18$no_att)
+discipline.f <- data.frame(truancy,skip,no_respect, alc, bull, no_att)
 mean.discipline <- apply(discipline.f,FUN = mean, MARGIN = 1, na.rm = TRUE)
-discipline_sc <- scale(mean.staffshort)[,1]
+discipline_sc <- scale(mean.discipline)[,1]
 pisa18$DISCIPLINE  <- ave(discipline_sc , school.id, FUN = function(x) mean(x, na.rm = TRUE))
 
 bad_teach  <- IMPDAT$SC061Q06TA #  Teachers not meeting individual students’ needs
@@ -165,6 +165,11 @@ miss_teach <- IMPDAT$SC061Q07TA #  Teacher absenteeism
 resi_staff <- IMPDAT$SC061Q08TA #  Staff resisting change
 strict     <- IMPDAT$SC061Q09TA #  Teachers being too strict with students
 unprepared <- IMPDAT$SC061Q10TA #  Teachers not being well prepared for classes
+
+teachbad.f <- data.frame(bad_teach,miss_teach,resi_staff, strict, unprepared)
+mean.teachbad <- apply(teachbad.f,FUN = mean, MARGIN = 1, na.rm = TRUE)
+teachbad_sc <- scale(mean.teachbad)[,1]
+pisa18$TEACHBAD  <- ave(teachbad_sc, school.id, FUN = function(x) mean(x, na.rm = TRUE))
 
 # Exposure to bullying # 1 = Never or almost never, 2 = A few times a
 # year, 3 = A few times a month ..., 4 = Once a week or more
