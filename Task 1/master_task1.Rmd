@@ -4,16 +4,20 @@ output: html_notebook
 ---
 
 # Load single imputed PISA data and prepare it, thus build PISA scales.
-
 ```{r}
 source("packages.r")
 load(file = file.path("IMPDAT_PISA.RData"))
+```
+
+# Prepare data
+```{r}
 source("01data_preperation.r")
 to.rm <- objects()[!objects() %in% c("PPath","pisa18","countries")]
 rm(list = to.rm)
 head(pisa18)
 
 ```
+
 
 # There should be at least ten students per school. Schools with fewer observations are 
 # excluded from the analysis. The variable nb.stud informs about the number of stundets
@@ -42,52 +46,40 @@ View(pisa18_sc)
 
 dim(pisa18_sc)
 ```
+# Plot the outcome distribution
 ```{r}
-library("rstanarm")
-library("betareg")
-a.seed <- 12345 
-a.iter <-  2000 
-a.chains <- 4  
-data <- pisa18_sc[, -which(names(pisa18_sc) %in% c("school.id","CNT","nb.stud"))]
 
-#' @title Transforms from the probability to the logit scale
-#' @description Transforms from the probability to the logit scale
-#' @param logit The probability 
-#' @return The corresponding value on the logit scale
-logit <- function(p = p){
-  r <- log(p/(1 - p))
-  return(r)
-}
-
-data$LDFRAC_L <- logit(data$LDFRAC + 0.001)
-
-
+#pdf("outcomeLDFRAC.pdf")
+#hist(pisa18_sc$LDFRAC, col = "darkgrey", border = F, main = "Distribution of Outcome Variable", xlab = "LDFRAC", breaks = 20, freq = F)
+ggplot(pisa18_sc, aes(LDFRAC)) +
+  geom_histogram(alpha = 0.5, aes(y = ..density..), position = 'identity') + ggtitle("Distribution of Outcome Variable")
+#dev.off()
 
 ```
-# stan beta_reg: https://cran.r-project.org/web/packages/rstanarm/vignettes/betareg.html
+# Desciptive summary
+
+
 
 ```{r}
-fits <- list()
-fits[[1]] <- stan_glm(LDFRAC_L ~ DISHOME, data = data, seed = a.seed,
-                      iter = a.iter, chains = a.chains, family = gaussian(link = "identity"))
-
-fits[[2]] <- stan_glm(LDFRAC_L ~ BULL, data = data, seed = a.seed,
-                      iter = a.iter, chains = a.chains, family = gaussian(link = "identity"))
-
-fits[[3]] <- stan_glm(LDFRAC_L ~ STAFFLACK, data = data, seed = a.seed,
-                      iter = a.iter, chains = a.chains, family = gaussian(link = "identity"))
-loo_list <- list()
-# Compute loo
-
-loo_list <- lapply(fits, loo, cores = 1)
+ggplot(pisa18_sc, aes(LDFRAC, fill = factor(DISHOME))) +
+  geom_histogram(alpha = 0.5, aes(y = ..density..), position = 'identity')
 ```
 
-# Compute the stacking weights
+
+
+
+
 
 ```{r}
-wtsStacking <- list()
-
-wtsStacking <- loo_model_weights(loo_list, method = "stacking")
-print(wtsStacking)
+ggplot(pisa18_sc, aes(LDFRAC, fill = factor(STAFFLACK))) +
+  geom_histogram(alpha = 0.5, aes(y = ..density..), position = 'identity')
 ```
+
+
+```{r}
+ggplot(pisa18_sc[pisa18_sc$UNI01==0,], aes(LDFRAC, fill = factor(STAFFLACK))) +
+  geom_histogram(alpha = 0.5, aes(y = ..density..), position = 'identity')
+```
+
+
 

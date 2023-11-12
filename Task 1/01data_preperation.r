@@ -5,7 +5,7 @@ pisa18 <- data.frame(school.id)
 pisa18$CNT  <- IMPDAT$CNT
 LD <- as.numeric(IMPDAT$PV1READ < 407)
 # Outcome, Fraction of literary deprived students
-pisa18$LDFRAC <- ave(LD, school.id, FUN = function(x) mean(x, na.rm = TRUE))/100
+pisa18$LDFRAC <- ave(LD, school.id, FUN = function(x) mean(x, na.rm = TRUE))
 
 #Parent support, 1 = Strongly disagree, to 4 = Strongly agree
 parent_sup1 <- IMPDAT$ST123Q02NA # My parents support my educational efforts and achievements.
@@ -110,6 +110,12 @@ mean.enthus <- apply(enthus,FUN = mean, MARGIN = 1, na.rm = TRUE)
 enthus_sc <- scale(mean.enthus)[,1]
 pisa18$ENTHUS <- ave(enthus_sc, school.id, FUN = function(x) mean(x, na.rm = TRUE))
 
+
+uni  <- IMPDAT$ST225Q06HA # Which of the following do you expect to complete?, ISCED level 5A or 6
+pisa18$UNI <- ave(uni, pisa18$school.id, FUN = function(x) mean(x, na.rm = TRUE))
+cutoff <- quantile(pisa18$UNI, probs= 3/4)
+pisa18$UNI01 <- as.numeric(pisa18$UNI > cutoff)
+
 # Hindered learning 1
 # Is your school’s capacity to provide instruction hindered
 # by any of the following issues?
@@ -129,10 +135,12 @@ poor_mat   <- IMPDAT$SC017Q06NA # Inadequate or poor quality educational materia
 infra_lack <- IMPDAT$SC017Q07NA # A lack of physical infrastructure (e.g. building, grounds, heating/cooling, lighting and acoustic systems).
 poor_infra <- IMPDAT$SC017Q08NA # Inadequate or poor quality physical infrastructure (e.g. building, grounds, heating/cooling, lighting an.
 
-staffshort.f <- data.frame(staff_lack, poor_staff)# ass_staff_lack, poor_ass_staff)
+staffshort.f <- data.frame(staff_lack, poor_staff)#, ass_staff_lack, poor_ass_staff
 mean.staffshort <- apply(staffshort.f,FUN = mean, MARGIN = 1, na.rm = TRUE)
 staffshort_sc <- scale(mean.staffshort)[,1]
-pisa18$STAFFLACK <- as.numeric(staffshort_sc > 0.0)
+cutoff <- quantile(staffshort_sc, probs= 5/10)
+pisa18$STAFFLACK <- as.numeric(staffshort_sc > cutoff )
+
 
 edushort.f <- data.frame(mat_lack, poor_mat, infra_lack, poor_infra)# ass_staff_lack, poor_ass_staff)
 mean.edushort <- apply(edushort.f,FUN = mean, MARGIN = 1, na.rm = TRUE)
@@ -171,6 +179,7 @@ mean.teachbad <- apply(teachbad.f,FUN = mean, MARGIN = 1, na.rm = TRUE)
 teachbad_sc <- scale(mean.teachbad)[,1]
 pisa18$TEACHBAD <- ave(teachbad_sc, school.id, FUN = function(x) mean(x, na.rm = TRUE))
 
+
 # Exposure to bullying # 1 = Never or almost never, 2 = A few times a
 # year, 3 = A few times a month ..., 4 = Once a week or more
 bul1  <- IMPDAT$ST038Q03NA  # Other students left me out of things on purpose.
@@ -196,6 +205,7 @@ bul.yes[is.na(sum.bully)] <- NA
 bul.yes[sum.bully >= 2] <- 1
 
 pisa18$BULL <- ave(bul.yes, school.id, FUN = function(x) mean(x, na.rm = TRUE))
+
 
 # SENSE OF BELONGING # 1 = Strongly, 2= agree, 3 = disagree, agree, 4 = Strongly disagree
 belong1 <- IMPDAT$ST034Q01TA     # I feel like an outsider (or left out of things) at school.
@@ -314,8 +324,6 @@ screaddiff.mean <- apply(screaddiff.f,FUN = mean, MARGIN = 1, na.rm = TRUE)
 screaddiff_sc <- scale(screaddiff.mean)[,1]
 pisa18$DIFF <- ave(screaddiff_sc, school.id, FUN = function(x) mean(x, na.rm = TRUE))
 
-uni  <- IMPDAT$ST225Q06HA # Which of the following do you expect to complete?, ISCED level 5A or 6
-pisa18$UNI <- ave(uni, pisa18$school.id, FUN = function(x) mean(x, na.rm = TRUE))
 
 # Is your school a public or a private school?
 PUBLIC12 <- IMPDAT$SC013Q01TA # 1 = public, 2 = private
@@ -326,6 +334,12 @@ pisa18$PUBLIC[PUBLIC12 == 2] <- 0
 # Which of the following definitions best describes the community in which your school is located?
 pisa18$RUR <- IMPDAT$SC001Q01TA # 1 = < 3000, 2 = 3000 to 15 000, 3 = 15 000 to 100000, 4 = 100000 to 1 000 000, 5 = more than 1 000 000
 
+pisa18$RUR[pisa18$RUR == 1] <- 1
+pisa18$RUR[pisa18$RUR == 2] <- 1
+pisa18$RUR[pisa18$RUR == 3] <- 0
+pisa18$RUR[pisa18$RUR == 4] <- 0
+pisa18$RUR[pisa18$RUR == 5] <- 0
+
 #As of <February 1, 2018>, what was the total school enrolment (number of students)?
 
 MALES <- IMPDAT$SC002Q01TA
@@ -335,10 +349,8 @@ pisa18$FEMFRAC <- FEMS/(FEMS + MALES)
 
 pisa18$NN_SC <- IMPDAT$SC048Q01NA/100 # Students whose <heritage language> is different from <test language>
 DISH  <- IMPDAT$SC048Q03NA/100 # Students from socioeconomically disadvantaged homes
-pisa18$SN_SC <- IMPDAT$SC048Q02NA/100 # Students with special needs
-
 pisa18$DISHOME <- as.numeric(cut_number(DISH,2)) - 1
-
+pisa18$SN_SC <- IMPDAT$SC048Q02NA/100 # Students with special needs
 pisa18$FAILED <- IMPDAT$SC164Q01HA/100 # in the last full academic year, what proportion of 
 # students in your school’s final grade left school without 
 
