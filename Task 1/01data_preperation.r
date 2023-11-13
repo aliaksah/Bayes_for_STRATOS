@@ -113,8 +113,8 @@ pisa18$ENTHUS <- ave(enthus_sc, school.id, FUN = function(x) mean(x, na.rm = TRU
 
 uni  <- IMPDAT$ST225Q06HA # Which of the following do you expect to complete?, ISCED level 5A or 6
 pisa18$UNI <- ave(uni, pisa18$school.id, FUN = function(x) mean(x, na.rm = TRUE))
-cutoff <- quantile(pisa18$UNI, probs= 3/4)
-pisa18$UNI01 <- as.numeric(pisa18$UNI > cutoff)
+#cutoff <- quantile(pisa18$UNI, probs= 3/4)
+#pisa18$UNI01 <- as.numeric(pisa18$UNI > cutoff)
 
 # Hindered learning 1
 # Is your school’s capacity to provide instruction hindered
@@ -135,7 +135,7 @@ poor_mat   <- IMPDAT$SC017Q06NA # Inadequate or poor quality educational materia
 infra_lack <- IMPDAT$SC017Q07NA # A lack of physical infrastructure (e.g. building, grounds, heating/cooling, lighting and acoustic systems).
 poor_infra <- IMPDAT$SC017Q08NA # Inadequate or poor quality physical infrastructure (e.g. building, grounds, heating/cooling, lighting an.
 
-staffshort.f <- data.frame(staff_lack, poor_staff)#, ass_staff_lack, poor_ass_staff
+staffshort.f <- data.frame(staff_lack, poor_staff) #, ass_staff_lack, poor_ass_staff
 mean.staffshort <- apply(staffshort.f,FUN = mean, MARGIN = 1, na.rm = TRUE)
 staffshort_sc <- scale(mean.staffshort)[,1]
 cutoff <- quantile(staffshort_sc, probs= 5/10)

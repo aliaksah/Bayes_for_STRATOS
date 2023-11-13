@@ -14,7 +14,7 @@ load(file = file.path("IMPDAT_PISA.RData"))
 source("01data_preperation.r")
 to.rm <- objects()[!objects() %in% c("PPath","pisa18","countries")]
 rm(list = to.rm)
-head(pisa18)
+#head(pisa18)
 
 ```
 
@@ -34,35 +34,66 @@ pisa.data <- subset(pisa18, pisa18$nb.stud > 9)
 pisa18 <- pisa.data
 
 rm(pisa.data)
-summary(pisa18$nb.stud)
+#summary(pisa18$nb.stud)
 ```
 
 # Only one row per school, remove duplicated rows. The data set has one row for each school, there are 284 schools in der data set.
 
 ```{r}
 pisa18_sc <- pisa18[!duplicated(pisa18$school.id), ]
+dim(pisa18)
 rm(pisa18)
-View(pisa18_sc)
+#View(pisa18_sc)
 
 dim(pisa18_sc)
 ```
 # Plot the outcome distribution
 ```{r}
 
-#pdf("outcomeLDFRAC.pdf")
-#hist(pisa18_sc$LDFRAC, col = "darkgrey", border = F, main = "Distribution of Outcome Variable", xlab = "LDFRAC", breaks = 20, freq = F)
+pdf("outcomeLDFRAC.pdf")
 ggplot(pisa18_sc, aes(LDFRAC)) +
-  geom_histogram(alpha = 0.5, aes(y = ..density..), position = 'identity') + ggtitle("Distribution of Outcome Variable")
-#dev.off()
+  geom_histogram(alpha = 0.5, aes(y = ..density..), position = 'identity') + ggtitle("Distribution of Outcome Variable") + theme(text = element_text(size = 19), axis.text = element_text(size = 8)) + annotate(geom="text", x=0.8, y=3.5, label="n = 284 schools",
+             color="red",size=8)
+dev.off()
 
 ```
 # Desciptive summary
 
 
 
+
 ```{r}
-ggplot(pisa18_sc, aes(LDFRAC, fill = factor(DISHOME))) +
+DS <- interaction(pisa18_sc$DISHOME, pisa18_sc$STAFFLACK)
+ggplot(pisa18_sc, aes(LDFRAC, fill = factor(DS))) +
   geom_histogram(alpha = 0.5, aes(y = ..density..), position = 'identity')
+```
+
+
+```{r}
+table(pisa18_sc$DISHOME,pisa18_sc$STAFFLACK)
+```
+
+
+```{r}
+#DS <- interaction(pisa18_sc$DISHOME, pisa18_sc$STAFFLACK)
+#levels(DS)
+
+p1 <- ggplot(pisa18_sc[DS==levels(DS)[1],], aes(LDFRAC)) +
+  geom_histogram(alpha = 0.5, aes(y = ..density..), position = 'identity') + ggtitle("DISHOME = 0, STAFFLACK = 0") + theme(text = element_text(size = 11), axis.text = element_text(size = 8))+ annotate(geom="text", x=0.8, y=3.5, label="n = 106 schools",
+             color="red",size=4)
+p3 <- ggplot(pisa18_sc[DS==levels(DS)[2],], aes(LDFRAC)) +
+  geom_histogram(alpha = 0.5, aes(y = ..density..), position = 'identity') + ggtitle("DISHOME = 1, STAFFLACK = 0") + theme(text = element_text(size = 11), axis.text = element_text(size = 8)) + annotate(geom="text", x=0.8, y=3.5, label="n = 92 schools",
+             color="red",size=4)
+p2 <- ggplot(pisa18_sc[DS==levels(DS)[3],], aes(LDFRAC)) +
+  geom_histogram(alpha = 0.5, aes(y = ..density..), position = 'identity') + ggtitle("DISHOME = 0, STAFFLACK = 1") + theme(text = element_text(size = 11), axis.text = element_text(size = 8))+ annotate(geom="text", x=0.8, y=3.5, label="n = 28 schools",
+             color="red",size=4)
+p4 <- ggplot(pisa18_sc[DS==levels(DS)[4],], aes(LDFRAC)) +
+  geom_histogram(alpha = 0.5, aes(y = ..density..), position = 'identity') + ggtitle("DISHOME = 1, STAFFLACK = 1") + theme(text = element_text(size = 11), axis.text = element_text(size = 8))+ annotate(geom="text", x=0.8, y=3.5, label="n = 58 schools",
+             color="red",size=4)
+require(gridExtra)
+pdf("outcome4.pdf")
+grid.arrange(p1, p2, p3,p4, nrow=2)
+dev.off()
 ```
 
 
@@ -70,16 +101,10 @@ ggplot(pisa18_sc, aes(LDFRAC, fill = factor(DISHOME))) +
 
 
 
-```{r}
-ggplot(pisa18_sc, aes(LDFRAC, fill = factor(STAFFLACK))) +
-  geom_histogram(alpha = 0.5, aes(y = ..density..), position = 'identity')
-```
 
 
-```{r}
-ggplot(pisa18_sc[pisa18_sc$UNI01==0,], aes(LDFRAC, fill = factor(STAFFLACK))) +
-  geom_histogram(alpha = 0.5, aes(y = ..density..), position = 'identity')
-```
+
+
 
 
 
