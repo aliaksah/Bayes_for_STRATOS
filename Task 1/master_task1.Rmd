@@ -45,6 +45,17 @@ save(pisa18,file = "Files/pisa18.RData")
 ```
 
 
+# Data sets for schools: Data set contains one row for each school and only school level variables
+```{r}
+sc.level <- names(pisa18) == toupper(names(pisa18))
+sc.level[1] <- TRUE
+pisa18_sc <- pisa18[,sc.level]
+dim(pisa18_sc)
+pisa18_sc <- pisa18[!duplicated(pisa18_sc$school.id), ]
+dim(pisa18_sc)
+
+save(pisa18,file = "Files/pisa18_sc.RData")
+```
 
 
 

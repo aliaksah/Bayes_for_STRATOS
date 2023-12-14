@@ -1,15 +1,14 @@
 # Only one row per school, remove duplicated rows. The data set has one row for each school, there are 284 schools in der data set.
 
-```{r}
 pisa18_sc <- pisa18[!duplicated(pisa18$school.id), ]
 dim(pisa18)
 rm(pisa18)
 #View(pisa18_sc)
 
 dim(pisa18_sc)
-```
+
 # Plot the outcome distribution
-```{r}
+
 
 pdf("outcomeLDFRAC.pdf")
 ggplot(pisa18_sc, aes(LDFRAC)) +
@@ -21,21 +20,14 @@ dev.off()
 # Desciptive summary
 
 
-
-
-```{r}
 DS <- interaction(pisa18_sc$DISHOME, pisa18_sc$STAFFLACK)
 ggplot(pisa18_sc, aes(LDFRAC, fill = factor(DS))) +
   geom_histogram(alpha = 0.5, aes(y = ..density..), position = 'identity')
-```
 
 
-```{r}
 table(pisa18_sc$DISHOME,pisa18_sc$STAFFLACK)
-```
 
 
-```{r}
 #DS <- interaction(pisa18_sc$DISHOME, pisa18_sc$STAFFLACK)
 #levels(DS)
 
@@ -55,5 +47,5 @@ require(gridExtra)
 pdf("outcome4.pdf")
 grid.arrange(p1, p2, p3,p4, nrow=2)
 dev.off()
-```
+
 
