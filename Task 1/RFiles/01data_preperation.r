@@ -26,7 +26,7 @@ pisa18$FEMFRAC_ST <- ave(pisa18$female, school.id, FUN = function(x) mean(x, na.
 lang_home <- IMPDAT$ST022Q01TA
 pisa18$native <- rep(0,length(lang_home))
 pisa18$native[lang_home == 1] <- 1
-pisa18$native <- ave(pisa18$native, school.id, FUN = function(x) mean(x, na.rm = TRUE))
+pisa18$NATIVE <- ave(pisa18$native, school.id, FUN = function(x) mean(x, na.rm = TRUE))
 # IMMIG
 pisa18$immig <- IMPDAT$IMMIG
 pisa18$immig[IMPDAT$IMMIG == 1] <- 0
@@ -141,7 +141,7 @@ mean.staffshort <- apply(staffshort.f,FUN = mean, MARGIN = 1, na.rm = TRUE)
 staffshort <- scale(mean.staffshort)[,1]
 cutoff <- quantile(staffshort, probs= 5/10)
 pisa18$STAFFLACK <- as.numeric(staffshort > cutoff)
-
+pisa18$STAFFSHORT <- staffshort
 
 edushort.f <- data.frame(mat_lack, poor_mat, infra_lack, poor_infra)# ass_staff_lack, poor_ass_staff)
 mean.edushort <- apply(edushort.f,FUN = mean, MARGIN = 1, na.rm = TRUE)

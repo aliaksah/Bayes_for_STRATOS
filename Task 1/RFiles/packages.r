@@ -1,6 +1,6 @@
 #if (!require("haven")) install.packages("haven")
 library("stringr")
-library("dvmisc")
+#library("dvmisc")
 library("haven")
 library("foreign")
 library("ggplot2")
@@ -29,4 +29,21 @@ library("gridExtra")
 library("sjPlot")
 library("see")
 library("bayestestR")
-library("plyr")
+#library("plyr")
+
+library(tidyverse)        # ggplot, dplyr, %>%, and friends
+library(brms)             # Bayesian modeling through Stan
+library(tidybayes)        # Manipulate Stan objects in a tidy way
+library(broom)            # Convert model objects to data frames
+library(broom.mixed)      # Convert brms model objects to data frames
+#library(vdemdata)         # Use data from the Varieties of Democracy (V-Dem) project
+library(betareg)          # Run beta regression models
+library(extraDistr)       # Use extra distributions like dprop()
+library(ggdist)           # Special geoms for posterior distributions
+library(gghalves)         # Special half geoms
+library(ggbeeswarm)       # Special distribution-shaped point jittering
+library(ggrepel)          # Automatically position labels
+library(patchwork)        # Combine ggplot objects
+library(scales)           # Format numbers in nice ways
+library(marginaleffects)  # Calculate marginal effects for regression models
+library(modelsummary)     # Create side-by-side regression tables

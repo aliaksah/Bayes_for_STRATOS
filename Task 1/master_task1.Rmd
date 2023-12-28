@@ -1,11 +1,11 @@
 ---
 title: "Proportion of literacy deprived students per school"
 output:
-  html_notebook: default
+  pdf_document: default
   html_document:
     df_print: paged
-  pdf_document: default
   word_document: default
+  html_notebook: default
 ---
 # Load R packages
 ```{r}
@@ -14,14 +14,14 @@ source("RFiles/packages.r")
 
 # Load  single imputed PISA data.
 ```{r}
-load(file = file.path("Orgdata/IMPDAT_PISA.RData"))
+#load(file = file.path("Orgdata/IMPDAT_PISA.RData"))
 ```
 
 # Prepare data, thus build PISA scales, 6489 students and 70 variables
 ```{r}
-source("RFiles/01data_preperation.r")
-to.rm <- objects()[!objects() %in% c("PPath","pisa18","countries")]
-rm(list = to.rm)
+#source("RFiles/01data_preperation.r")
+#to.rm <- objects()[!objects() %in% c("PPath","pisa18","countries")]
+#rm(list = to.rm)
 # head(pisa18)
 # dim(pisa18)
 ```
@@ -30,40 +30,283 @@ rm(list = to.rm)
 # There should be at least ten students per school. Schools with fewer observations are excluded from the analysis. The variable nb.stud informs about the number of stundets per school and save final data set
 
 ```{r}
-tab.id <- table(pisa18$school.id)
-id.frame <- as.data.frame(tab.id)
+#tab.id <- table(pisa18$school.id)
+#id.frame <- as.data.frame(tab.id)
 
-nb.stud <- rep(id.frame$Freq,id.frame$Freq)
-pisa18$nb.stud <- nb.stud
-rm(tab.id,id.frame,nb.stud)
-pisa.data <- subset(pisa18, pisa18$nb.stud > 9)
-pisa18 <- pisa.data
+#nb.stud <- rep(id.frame$Freq,id.frame$Freq)
+#pisa18$nb.stud <- nb.stud
+#rm(tab.id,id.frame,nb.stud)
+#pisa.data <- subset(pisa18, pisa18$nb.stud > 9)
+#pisa18 <- pisa.data
 
-rm(pisa.data)
+#rm(pisa.data)
 #summary(pisa18$nb.stud)
-save(pisa18,file = "Files/pisa18.RData")
+#save(pisa18,file = "Files/pisa18.RData")
+load("Files/pisa18.RData")
 ```
+
 
 
 # Data sets for schools: Data set contains one row for each school and only school level variables
 ```{r}
-sc.level <- names(pisa18) == toupper(names(pisa18))
-sc.level[1] <- TRUE
-pisa18_sc <- pisa18[,sc.level]
-dim(pisa18_sc)
-pisa18_sc <- pisa18[!duplicated(pisa18_sc$school.id), ]
-dim(pisa18_sc)
+#sc.level <- names(pisa18) == toupper(names(pisa18))
+#sc.level[1] <- TRUE
+#pisa18_sc <- pisa18[,sc.level]
+#dim(pisa18_sc)
+#pisa18_sc <- pisa18_sc[!duplicated(pisa18_sc$school.id), ]
+#dim(pisa18_sc)
+#names(pisa18_sc)
+#save(pisa18_sc,file = "Files/pisa18_sc.RData")
+#load( "Files/pisa18_sc.RData")
+```
+# Cut focal cont. predictors in qurtiles, use later in PPC to ckeck model validity for certain regions of the outcome distribution
+```{r}
+pisa18$DH_QU <- as.factor(cut_number(pisa18$DISHOME,4))
+levels_DH <- levels(pisa18$DH_QU)
+ds_DH <- pisa18 %>% group_by(pisa18$DH_QU) %>% summarise(median = median(pisa18$DISHOME), Freq = n())  
+levels(pisa18$DH_QU) <- 1:4
 
-save(pisa18,file = "Files/pisa18_sc.RData")
+pisa18$BL_QU <- as.factor(cut_number(pisa18$BELONG,4))
+levels_BL <- levels(pisa18$BL_QU)
+ds_BL <- pisa18 %>% group_by(pisa18$BL_QU) %>% summarise(median = median(pisa18$BELONG), Freq = n())  
+levels(pisa18$BL_QU) <- 1:4
+
+pisa18$ATT_QU <- as.factor(cut_number(pisa18$ATT,4))
+levels_ATT <- levels(pisa18$ATT_QU)
+ds_ATT <- pisa18 %>% group_by(pisa18$ATT_QU) %>% summarise(median = median(pisa18$ATT), Freq = n())  
+levels(pisa18$ATT_QU) <- 1:4
+
+pisa18$RES_QU <- as.factor(cut_number(pisa18$RES,4))
+levels_RES <- levels(pisa18$RES_QU)
+ds_RES <- pisa18 %>% group_by(pisa18$RES_QU) %>% summarise(median = median(pisa18$RES), Freq = n())  
+levels(pisa18$RES_QU) <- 1:4
+```
+# Stack models: Use all relevant predictors, hold out some to check for predictive validity
+```{r}
+
+# core model
+corem <- as.formula(ld ~ STAFFLACK + DH_QU + (1 | school.id))# 2,4
+
+# models to stack
+# reading attitudes and learning attitudes + FEM
+stack1 <- update(corem, ~. + comp + diff  + joyread +      teachsup +
+                       mot +  goal + val +RES)# 8
+
+# difficulties, lack of resources
+stack2 <- update(corem,~ . + immig + fewbooks  +  bull + escs  + repeatclass + parent_sup +
+                        ATT)# 7
+
+
+# intrinsic to school level -> school climate and classroom discipline
+stack3 <- update(corem,~ . +  disclima + 
+                   perfeed + dirins + adaptive + enthus +fof + BELONG ) # 7
+
+
+# other relevant, and all key school in one model
+stack4 <- update(corem,~ .  +  female  + native + BELONG + ATT + RES  + UNI) # 6
+
+stack5 <- update(corem,~ .  +  FEMFRAC + NATIVE + belong + att + res  + uni) # 6
+
+
+models <- vector(mode = "list", length = 3)
+
+models[[1]] <- stack1
+models[[2]] <- stack2
+models[[3]] <- stack3
+models[[4]] <- stack4
+models[[5]] <- stack5
+
+
+```
+
+# Estimate models with stan_glmer, 
+# aim: flexible shape and low variance of the posterior estimation see e. g. https://projecteuclid.org/journals/bayesian-analysis/volume-13/issue-3/Using-Stacking-to-Average-Bayesian-Predictive-Distributions-with-Discussion/10.1214/17-BA1091.full?tab=ArticleLinkSupplemental
+
+```{r}
+a.seed <- 12345 
+a.iter <-  2000 
+a.chains <- 4  
+
+fits <- list()
+
+fits[[1]] <- stan_glmer(models[[1]], data = pisa18, seed = a.seed,
+                      iter = a.iter, chains = a.chains,family = binomial()) 
+
+fits[[2]] <- stan_glmer(models[[2]], data = pisa18, seed = a.seed,
+                      iter = a.iter, chains = a.chains,family = binomial()) 
+
+fits[[3]] <- stan_glmer(models[[3]], data = pisa18, seed = a.seed,
+                      iter = a.iter, chains = a.chains,family = binomial())
+
+fits[[4]] <- stan_glmer(models[[4]], data = pisa18, seed = a.seed,
+                      iter = a.iter, chains = a.chains,family = binomial())
+
+fits[[5]] <- stan_glmer(models[[5]], data = pisa18, seed = a.seed,
+                      iter = a.iter, chains = a.chains,family = binomial())
+
+
+save(fits, file = file.path("Files/fits.RData"))
 ```
 
 
+#load fits
+
+```{r}
+load(file.path("Results/fits.RData"))
+```
+
+
+# Model parameters
+
+```{r}
+n01.models <- length(models)
+sink(file = file.path("Results/fixed_par.txt"))
+for (i in 1:n01.models) {
+  print(kable(tidy(fits[[i]],conf.int  = T, conf.level = .95, 
+                   effects = "fixed"),"simple",digits = 4, 
+              caption = paste("model ",i," *****")))
+}
+sink(file = NULL)
+
+sink(file = file.path("Results/ran_par.txt"))
+for (i in 1:n01.models){
+  print(kable(tidy(fits[[i]],conf.int=T, conf.level=.95, effects = "ran_pars"),"simple",digits=4, caption = paste("model ",i," *****")))
+  
+  }
+sink(file = NULL)
+
+```
+
+# Intraclass correlation
+# https://lnalborczyk.github.io/post/icc/
+
+#Loo list and stacking weights
+
+```{r}
+loo_list <- list()
+# Compute loo
+
+loo_list <- lapply(fits, loo, cores = 1)
+# Save loo
+
+save("loo_list", file = file.path("Files","loo_list.RData"))
+# load(file.path(cnt.path,"loo_list.RData"))
+
+sink(file = file.path("Files","loo_info.txt"))
+for (i in 1:n01.models) {
+  print(paste("******** "))
+  print(paste("model ", i))
+  print(loo_list[[i]])
+  print(paste("******** "))
+}
+#print(loo_list[[1]])
+sink(file = NULL)
+
+wtsStacking <- list()
+
+wtsStacking <- loo_model_weights(loo_list, method = "stacking")
+print(wtsStacking)
+
+
+sink(file = file.path("Results","wtsStacking.txt"))
+print(wtsStacking)
+print(paste("******** "))
+sink(file = NULL)
+
+wtsPseudoBMA <- loo_model_weights(loo_list, method = "pseudobma")
+print(wtsPseudoBMA)
+
+
+```
+# Load functions
+```{r}
+source("02functions.r")
+```
+# Compute Brier Score
+```{r}
+set.seed(a.seed)
+ypredStack <- ypred_Stacking(fits,loo_list, method = "stacking") 
+save("ypredStack", file = file.path("Files/ypredStack.RData"))
 
 
 
+ypredCand <- list()
+for (i in 1:n01.models) {
+  set.seed(a.seed)
+  ypredCand[[i]] <- posterior_predict(fits[[i]])
+}
+save("ypredCand", file = file.path("Files/ypredCand.RData"))
+# load(file.path(cnt.path,"ypredCand.RData"))
+
+
+## Brier Score 
+
+dim(ypredStack)
+br.stackL2 <- brierS(pisa18$ld,colMeans(ypredStack))
+
+br.candL2 <- list()
+for (i in 1:n01.models) {
+  br.candL2[[i]] <- brierS(pisa18$ld,colMeans(ypredCand[[i]]))
+ 
+}
+
+# Write Brier score to file.
+sink(file = file.path("Results/brier.scores.txt"))
+
+print("stack *******")
+print(br.stackL2)
+
+
+for (i in 1:n01.models) {
+  print(paste("model ", i))
+  print(br.candL2[[i]])
+  
+}
+sink(file = NULL)
+```
+### Posterior predictive checks
+```{r}
+# hold-out predictor
+pisa18$WITHOUT  <- as.numeric(pisa18$FAILED >= 0.02) # above median
+
+# For each quartile compute the median sumDISHOME.
+sumDISHOME <- pisa18 %>%
+  group_by(DH_QU) %>%
+  summarise(mDISHOME = median(DISHOME), sd = sd(DISHOME),min = min(DISHOME),max = max(DISHOME))
+
+medDISHOME <- sumDISHOME$mDISHOME
+
+
+prev8 <- pisa18 %>%
+  group_by(STAFFLACK,DH_QU) %>%
+  summarise(mLD = mean(ld))
+
+
+sink(file = file.path("Results/prev.txt"))
+print("Prev")
+round(unlist(prev8$mLD),3)
+sink(file = NULL)
+#  
+
+# https://mc-stan.org/bayesplot/reference/available_ppc.html
+
+
+source(file = file.path("RFiles", "pppv.r"))
+
+#color_scheme_set(scheme = "purple")
 
 
 
+#color_scheme_set(scheme = "mix-teal-pink") # "brewer-Spectral"
+color_scheme_set(scheme = "gray")
+ppcStack <- visualPPC()#y.obs = pisa18$ld, yrepM = ypredStack
+pdf(file.path("Results/ppcStack.pdf"))
+ppcStack
+dev.off()
+#https://www.physicsread.com/latex-figures-side-by-side/
 
 
+save.image(file = file.path("Files/save_session.RData"))
+#load(file=file.path(cnt.path,"save_session.RData"))
 
+```
