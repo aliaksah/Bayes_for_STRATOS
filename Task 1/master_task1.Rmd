@@ -303,7 +303,7 @@ ppcStack <- visualPPC()#y.obs = pisa18$ld, yrepM = ypredStack
 pdf(file.path("Results/ppcStack.pdf"))
 ppcStack
 dev.off()
-#https://www.physicsread.com/latex-figures-side-by-side/
+
 
 
 save.image(file = file.path("Files/save_session.RData"))
