@@ -5,7 +5,7 @@
 
 pppv_Stack <- two.sided.pppv(y.obs = pisa18$ld, yrepM = ypredStack, alternative = 
                                "two.sided")
-num<-2
+num<-10
 sink(file = file.path("Results/pppv_Stack.txt"))
 for(i in 1:num){
   print(paste("Table   ",i))

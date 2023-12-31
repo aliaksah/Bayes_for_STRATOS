@@ -1,5 +1,20 @@
 # https://style.tidyverse.org/documentation.html
 
+sampleSID0 <- function(x) {
+  if (length(x) <= 1) {
+    return(x)
+  } else {
+    return(sample(x,1))
+  }
+}
+
+
+sampleSID <- function(sgr){
+  school.ids <-lapply(sgr, `[[`, 1)
+  school.id.sample <-unlist(lapply(school.ids, sampleSID0), use.names = FALSE)
+  return(school.id.sample)
+}
+
 #' @title Transforms from logit to probability
 #' @description Transforms from logit to probability
 #' @param logit The probability on the logit scale
@@ -68,20 +83,22 @@ comp.int.stack.core01.inner <- function(sgr = sgr,fits = fits,
   sgr2 <- list()
   med <- list()
   for (i in 1:l) {
-    sgr2[[i]] <- sgr[[i]][, -which(names(sgr[[i]]) %in% c("school.id","CNT","nb.stud",
-                                                          "ESCS","SES","ESCS4"))]
+    sgr2[[i]] <- sgr[[i]][, -which(names(sgr[[i]]) %in% c("school.id","CNT","nb.stud","DH_QU","BL_QU",
+                                                          "ATT_QU","RES_QU","UNI_QU"))]
     # Data frame which contains the group specific quantiles for the eight representative students
     med[[i]] <- data.frame(lapply(sgr2[[i]],quantile, probs=c(p))) 
-  }
+    }
   meds <- do.call(rbind, med)
-  f <- as.factor(c(1,2,3,4))
-  meds$SES <- rep(f,l/4)
+#  f <- as.factor(c(1,2,3,4))
+#  meds$DH_QU <- rep(f,l/4)
   pred.grc <- list()
   # number of draws from the posterior distribution
   n_draws <- 4000
   ypred <- matrix(NA, nrow = n_draws, ncol = l)
   for (d in 1:n_draws) {
     k <- sample(1:length(wts), size = 1, prob = wts)
+    s.ids <- sampleSID(sgr)
+    meds$school.id <- s.ids
     ypred[d, ] <- posterior_linpred(fits[[k]], draws = 1, newdata = meds)
     # Each row corresponds to a draw from the posterior  distribution of the probability
     # that the outcome is 1 for the eight representative student
@@ -375,38 +392,68 @@ visualPPC <- function(y.obs = pisa18$ld, yrepM = ypredStack){
 
 
 
-#' @title The conditional expectation plot of the 24 (= 3 *8) representative students.
-#' @description For each of the 24 representative students the plot informs about the median
+#' @title The conditional expectation plot of the hypothetical schools.
+#' @description For each of the hypothetical schools the plot informs about the median
 #' and the quartiles of the posterior distribution of the probability that the outcome is 1.
 #' @param gfg The numerical information that is visualized by the plot.
-plot.result <- function(gfg = df_condPr1){
-  # The error bars overlapped, so use position_dodge to move them horizontally
+plot.result <- function(gfg=df_condPr1){
+  # The errorbars overlapped, so use position_dodge to move them horizontally
   pd <- position_dodge(0.05) # move them .05 to the left and right
-  # cbp1 <- c("#D55E00" , "#E69F00", "#009E73",#,#CC79A7  F0E442
-  #          "#56B4E9", "#999999", "#F0E442", "#0072B2","#CC79A7"
-  cbp1 <- c("#D4D4D4" , "#B4B4B4", "#909090",#,#CC79A7  F0E442
-            "#000000" , "#999999", "#636363", "#494848","#999997"
-  )
-  xlab <- "SES quartile (with corres. median)"
-  tit <- tit <- "Prob. of being literacy depr. in dep. of SES quartile"
+  cbp1 <- c( "#00bb6a","#0052bb")
+  xlab <- "Quartile (with corres. median)"
+  tit <- tit <- "Prop. of literacy depr.stud. in dep. of quartile"
   
   ggplot(gfg, aes(x = x, y = mean, colour = group, group = group)) + 
-    geom_errorbar(aes(ymin = low, ymax = up), colour = "grey", width = .01, 
-                  position = pd) +
-    # geom_line(position = pd, size = 1.25, 
-    #        linetype = "solid") +
-    geom_line(position = pd, aes(linetype=group), size=1) +
+    geom_errorbar(aes(ymin = low, ymax = up), colour = "black", width = .01, position = pd) +
+    geom_line(position = pd, size = 1.25, linetype = "dashed") +
     geom_point(position = pd, size = 3, shape = 21) + # 21 is filled circle
     xlab(xlab) +
     ylab("Prob. of being literacy depr.") +
     ggtitle(tit) +
     expand_limits(y = 0.7) +    #expand_limits(x=1.52)   +                 # Expand y range
-    scale_y_continuous(breaks = seq(0,1.0,0.10)) + 
-    scale_x_continuous(breaks = seq(-3,3,0.5)) + 
+    scale_y_continuous(breaks = seq(0,0.8,0.10)) + scale_x_continuous(breaks = seq(-0.5,0.5,0.10)) + 
     theme_bw() +
     theme(legend.justification = c(1,0),#c(1,0)
-          legend.position = 'bottom') + geom_hline(yintercept = 0.3,linetype = 3,
-                                                   size = 1) + geom_hline(yintercept = 0.5,linetype = 3,size = 1) + 
+          legend.position = 'bottom') + geom_hline(yintercept = 0.3,col = "darkgreen",
+                                                   linetype = 3,
+                                                   size = 1) + geom_hline(yintercept = 0.5, col = "darkred",
+                                                                          linetype = 3,size = 1) + 
+    
+    theme(text = element_text(size = 19), #change font size of all text
+          axis.text = element_text(size = 19), #change font size of axis text
+          axis.title = element_text(size = 19), #change font size of axis titles
+          plot.title = element_text(size = 19), #change font size of plot title
+          legend.text = element_text(size = 19), #change font size of legend text
+          legend.title = element_text(size = 19)) + #change font size of legend title 
+    scale_color_manual(values =  cbp1)
+}
+
+#' @title The conditional expectation plot of the hypothetical schools.
+#' @description For each of the hypothetical schools the plot informs about the median
+#' and the quartiles of the posterior distribution of the probability that the outcome is 1.
+#' @param gfg The numerical information that is visualized by the plot.
+plot.result2 <- function(gfg=df_condPr1){
+  # The errorbars overlapped, so use position_dodge to move them horizontally
+  pd <- position_dodge(0.05) # move them .05 to the left and right
+  cbp1 <- c( "#E69F00", "#860066","#999999","#39000f")
+  xlab <- "Quartile (with corres. median)"
+  tit <- tit <- "Prop. of literacy depr.stud. in dep. of quartile"
+  
+  ggplot(gfg, aes(x = x, y = mean, colour = group, group = group)) + 
+    geom_errorbar(aes(ymin = low, ymax = up), colour = "black", width = .01, position = pd) +
+    geom_line(position = pd, size = 1.25, linetype = "dashed") +
+    geom_point(position = pd, size = 3, shape = 21) + # 21 is filled circle
+    xlab(xlab) +
+    ylab("Prob. of being literacy depr.") +
+    ggtitle(tit) +
+    expand_limits(y = 0.7) +    #expand_limits(x=1.52)   +                 # Expand y range
+    scale_y_continuous(breaks = seq(0,0.8,0.10)) + scale_x_continuous(breaks = seq(-0.5,0.5,0.10)) + 
+    theme_bw() +
+    theme(legend.justification = c(1,0),#c(1,0)
+          legend.position = 'bottom') + geom_hline(yintercept = 0.3,col = "darkgreen",
+                                                   linetype = 3,
+                                                   size = 1) + geom_hline(yintercept = 0.5, col = "darkred",
+                                                                          linetype = 3,size = 1) + 
     
     theme(text = element_text(size = 19), #change font size of all text
           axis.text = element_text(size = 19), #change font size of axis text

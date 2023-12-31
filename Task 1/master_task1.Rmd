@@ -1,23 +1,23 @@
 ---
 title: "Proportion of literacy deprived students per school"
 output:
-  pdf_document: default
+  word_document: default
   html_document:
     df_print: paged
-  word_document: default
   html_notebook: default
+  pdf_document: default
 ---
-# Load R packages
+### Load R packages
 ```{r}
 source("RFiles/packages.r")
 ```
 
-# Load  single imputed PISA data.
+### Load  single imputed PISA data.
 ```{r}
 #load(file = file.path("Orgdata/IMPDAT_PISA.RData"))
 ```
 
-# Prepare data, thus build PISA scales, 6489 students and 70 variables
+### Prepare data, thus build PISA scales, 6489 students 
 ```{r}
 #source("RFiles/01data_preperation.r")
 #to.rm <- objects()[!objects() %in% c("PPath","pisa18","countries")]
@@ -27,7 +27,7 @@ source("RFiles/packages.r")
 ```
 
 
-# There should be at least ten students per school. Schools with fewer observations are excluded from the analysis. The variable nb.stud informs about the number of stundets per school and save final data set
+### There should be at least ten students per school. Schools with fewer observations are excluded from the analysis. The variable nb.stud informs about the number of stundets per school and save final data set
 
 ```{r}
 #tab.id <- table(pisa18$school.id)
@@ -47,7 +47,7 @@ load("Files/pisa18.RData")
 
 
 
-# Data sets for schools: Data set contains one row for each school and only school level variables
+### Data sets for schools: Data set contains one row for each school and only school level variables
 ```{r}
 #sc.level <- names(pisa18) == toupper(names(pisa18))
 #sc.level[1] <- TRUE
@@ -59,7 +59,7 @@ load("Files/pisa18.RData")
 #save(pisa18_sc,file = "Files/pisa18_sc.RData")
 #load( "Files/pisa18_sc.RData")
 ```
-# Cut focal cont. predictors in qurtiles, use later in PPC to ckeck model validity for certain regions of the outcome distribution
+### Cut focal cont. predictors in qurtiles, use later in PPC to ckeck model validity for certain regions of the outcome distribution
 ```{r}
 pisa18$DH_QU <- as.factor(cut_number(pisa18$DISHOME,4))
 levels_DH <- levels(pisa18$DH_QU)
@@ -81,15 +81,18 @@ levels_RES <- levels(pisa18$RES_QU)
 ds_RES <- pisa18 %>% group_by(pisa18$RES_QU) %>% summarise(median = median(pisa18$RES), Freq = n())  
 levels(pisa18$RES_QU) <- 1:4
 ```
-# Stack models: Use all relevant predictors, hold out some to check for predictive validity
+### Stack models: Use all relevant predictors, hold out some to check for predictive validity
+### Splines: https://rpubs.com/samuelfix08/splines
 ```{r}
-
+knots <- quantile(pisa18$DISHOME, p = c(0.25, 0.5, 0.75))
+#model <- lm (medv ~ bs(lstat, knots = knots), data = train.data)
+# ESCS TEACHBAD BULL
 # core model
-corem <- as.formula(ld ~ STAFFLACK + DH_QU + (1 | school.id))# 2,4
+corem <- as.formula(ld ~ STAFFLACK + bs(DISHOME, knots = knots) + (1 | school.id))# 2,4
 
 # models to stack
 # reading attitudes and learning attitudes + FEM
-stack1 <- update(corem, ~. + comp + diff  + joyread +      teachsup +
+stack1 <- update(corem, ~. + comp + diff  + joyread + teachsup +
                        mot +  goal + val +RES)# 8
 
 # difficulties, lack of resources
@@ -119,8 +122,8 @@ models[[5]] <- stack5
 
 ```
 
-# Estimate models with stan_glmer, 
-# aim: flexible shape and low variance of the posterior estimation see e. g. https://projecteuclid.org/journals/bayesian-analysis/volume-13/issue-3/Using-Stacking-to-Average-Bayesian-Predictive-Distributions-with-Discussion/10.1214/17-BA1091.full?tab=ArticleLinkSupplemental
+### Estimate models with stan_glmer, 
+### aim: flexible shape and low variance of the posterior estimation see e. g. https://projecteuclid.org/journals/bayesian-analysis/volume-13/issue-3/Using-Stacking-to-Average-Bayesian-Predictive-Distributions-with-Discussion/10.1214/17-BA1091.full?tab=ArticleLinkSupplemental
 
 ```{r}
 a.seed <- 12345 
@@ -149,14 +152,14 @@ save(fits, file = file.path("Files/fits.RData"))
 ```
 
 
-#load fits
+###load fits
 
 ```{r}
-load(file.path("Results/fits.RData"))
+load(file.path("Files/fits.RData"))
 ```
 
 
-# Model parameters
+### Model parameters
 
 ```{r}
 n01.models <- length(models)
@@ -177,10 +180,10 @@ sink(file = NULL)
 
 ```
 
-# Intraclass correlation
-# https://lnalborczyk.github.io/post/icc/
+### Intraclass correlation
+### https://lnalborczyk.github.io/post/icc/
 
-#Loo list and stacking weights
+### Loo list and stacking weights
 
 ```{r}
 loo_list <- list()
@@ -190,7 +193,7 @@ loo_list <- lapply(fits, loo, cores = 1)
 # Save loo
 
 save("loo_list", file = file.path("Files","loo_list.RData"))
-# load(file.path(cnt.path,"loo_list.RData"))
+#load(file.path("Files","loo_list.RData"))
 
 sink(file = file.path("Files","loo_info.txt"))
 for (i in 1:n01.models) {
@@ -218,16 +221,16 @@ print(wtsPseudoBMA)
 
 
 ```
-# Load functions
+### Load functions
 ```{r}
-source("02functions.r")
+source("RFiles/02functions.r")
 ```
-# Compute Brier Score
+### Compute Brier Score
 ```{r}
 set.seed(a.seed)
 ypredStack <- ypred_Stacking(fits,loo_list, method = "stacking") 
 save("ypredStack", file = file.path("Files/ypredStack.RData"))
-
+load("Files/ypredStack.RData")
 
 
 ypredCand <- list()
@@ -236,7 +239,7 @@ for (i in 1:n01.models) {
   ypredCand[[i]] <- posterior_predict(fits[[i]])
 }
 save("ypredCand", file = file.path("Files/ypredCand.RData"))
-# load(file.path(cnt.path,"ypredCand.RData"))
+#load("Files/ypredCand.RData")
 
 
 ## Brier Score 
@@ -310,3 +313,215 @@ save.image(file = file.path("Files/save_session.RData"))
 #load(file=file.path(cnt.path,"save_session.RData"))
 
 ```
+### Compute results DH_QU
+```{r}
+sgr <- split(pisa18,f = list(pisa18$DH_QU,pisa18$STAFFLACK))
+t<-lapply(sgr, function(x) length(x[[1]]))
+pint <- comp.int.stack.core01(sgr = sgr,fits = fits,
+                                     wts = wtsStacking,
+                                     cnt.path = "Files", p = 0.5)
+```
+### Summarize results DH_QU
+```{r}
+dfDH_QU <- data.frame(x = rep(round(medDISHOME,2),2),
+                        group = c(rep("no",4),rep("yes",4)),
+                        mean =  pint[,2],low = pint[,1], 
+                        up = pint[,3])
+sink(file = file.path("Results/dfDH_QU.txt"))
+dfDH_QU
+sink(file = NULL)
+```
+
+### Plot results
+```{r}
+pdf(file.path("Results/dfDH_QU.pdf"))
+plot.result(dfDH_QU)
+dev.off()
+```
+### Compute results BL_QU
+```{r}
+sgrBL <- split(pisa18,f = list(pisa18$BL_QU,pisa18$STAFFLACK))
+#t<-lapply(sgrBL, function(x) length(x[[1]]))
+pintBL <- comp.int.stack.core01(sgr = sgrBL,fits = fits,
+                                     wts = wtsStacking,
+                                     cnt.path = "Files", p = 0.5)
+```
+### Summarize results BL_QU
+
+```{r}
+
+# For each quartile compute the median sumBELONG.
+sumBL <- pisa18 %>%
+  group_by(BL_QU) %>%
+  summarise(mBL = median(BELONG), sd = sd(BELONG),min = min(BELONG),max = max(BELONG))
+
+medBL <- sumBL$mBL
+
+dfBL_QU <- data.frame(x = rep(round(medBL,2),2),
+                        group = c(rep("no",4),rep("yes",4)),
+                        mean =  pintBL[,2],low = pintBL[,1], 
+                        up = pintBL[,3])
+sink(file = file.path("Results/dfBL_QU.txt"))
+dfBL_QU
+sink(file = NULL)
+```
+
+
+```{r}
+pdf(file.path("Results/dfBL_QU.pdf"))
+plot.result(dfBL_QU)
+dev.off()
+```
+### Compute results ATT_QU
+```{r}
+sgrATT <- split(pisa18,f = list(pisa18$ATT_QU,pisa18$STAFFLACK))
+#t<-lapply(sgrBL, function(x) length(x[[1]]))
+pintATT <- comp.int.stack.core01(sgr = sgrATT,fits = fits,
+                                     wts = wtsStacking,
+                                     cnt.path = "Files", p = 0.5)
+```
+### Summarize results ATT_QU
+```{r}
+# For each quartile compute the median sumATT.
+sumATT <- pisa18 %>%
+  group_by(ATT_QU) %>%
+  summarise(mATT = median(ATT), sd = sd(ATT),min = min(ATT),max = max(ATT))
+
+medATT <- sumATT$mATT
+
+dfATT_QU <- data.frame(x = rep(round(medATT,2),2),
+                        group = c(rep("no",4),rep("yes",4)),
+                        mean =  pintATT[,2],low = pintATT[,1], 
+                        up = pintATT[,3])
+sink(file = file.path("Results/dfATT_QU.txt"))
+dfATT_QU
+sink(file = NULL)
+```
+
+
+```{r}
+pdf(file.path("Results/dfATT_QU.pdf"))
+plot.result(dfATT_QU)
+dev.off()
+```
+
+### Compute results RES_QU
+```{r}
+sgrRES <- split(pisa18,f = list(pisa18$RES_QU,pisa18$STAFFLACK))
+#t<-lapply(sgrBL, function(x) length(x[[1]]))
+pintRES <- comp.int.stack.core01(sgr = sgrRES,fits = fits,
+                                     wts = wtsStacking,
+                                     cnt.path = "Files", p = 0.5)
+```
+### Summarize results RES_QU
+```{r}
+# For each quartile compute the median sumRES.
+sumRES <- pisa18 %>%
+  group_by(RES_QU) %>%
+  summarise(mRES = median(RES), sd = sd(RES),min = min(RES),max = max(RES))
+
+medRES <- sumRES$mRES
+
+dfRES_QU <- data.frame(x = rep(round(medRES,2),2),
+                        group = c(rep("no",4),rep("yes",4)),
+                        mean =  pintRES[,2],low = pintRES[,1], 
+                        up = pintRES[,3])
+sink(file = file.path("Results/dfRES_QU.txt"))
+dfRES_QU
+sink(file = NULL)
+```
+
+```{r}
+pdf(file.path("Results/dfRES_QU.pdf"))
+plot.result(dfRES_QU)
+dev.off()
+```
+### DISHOME and three focal predictors
+### BELONG
+```{r}
+sgrDHBL <- split(pisa18,f = list(pisa18$DH_QU,pisa18$BL_QU))
+#t<-lapply(sgrDHBL, function(x) length(x[[1]]))
+pintDHBL <- comp.int.stack.core01(sgr = sgrDHBL,fits = fits,
+                                     wts = wtsStacking,
+                                     cnt.path = "Files", p = 0.5)
+```
+
+### Summarize results DHBL
+```{r}
+dfDH_BL <- data.frame(x = rep(round(medDISHOME,2),2),
+                        group = c(rep("low",4),rep("low.m",4),rep("up.m",4),rep("up",4)),
+                        mean =  pintDHBL[,2],low = pintDHBL[,1], 
+                        up = pintDHBL[,3])
+sink(file = file.path("Results/dfDH_BL.txt"))
+dfDH_BL
+sink(file = NULL)
+```
+
+```{r}
+pdf(file.path("Results/dfDH_BL.pdf"))
+plot.result2(dfDH_BL)
+dev.off()
+```
+### ATT
+```{r}
+sgrDHATT <- split(pisa18,f = list(pisa18$DH_QU,pisa18$ATT_QU))
+#t<-lapply(sgrDHBL, function(x) length(x[[1]]))
+pintDHATT <- comp.int.stack.core01(sgr = sgrDHATT,fits = fits,
+                                     wts = wtsStacking,
+                                     cnt.path = "Files", p = 0.5)
+```
+### Summarize results DHATT
+```{r}
+dfDH_ATT <- data.frame(x = rep(round(medDISHOME,2),2),
+                        group = c(rep("low",4),rep("low.m",4),rep("up.m",4),rep("up",4)),
+                        mean =  pintDHATT[,2],low = pintDHATT[,1], 
+                        up = pintDHATT[,3])
+sink(file = file.path("Results/dfDH_ATT.txt"))
+dfDH_ATT
+sink(file = NULL)
+```
+
+```{r}
+pdf(file.path("Results/dfDH_ATT.pdf"))
+plot.result2(dfDH_ATT)
+dev.off()
+```
+### RES
+```{r}
+sgrDHRES <- split(pisa18,f = list(pisa18$DH_QU,pisa18$RES_QU))
+#t<-lapply(sgrDHRES, function(x) length(x[[1]]))
+pintDHRES <- comp.int.stack.core01(sgr = sgrRES,fits = fits,
+                                     wts = wtsStacking,
+                                     cnt.path = "Files", p = 0.5)
+```
+
+### Summarize results DHRES
+```{r}
+dfDH_RES <- data.frame(x = rep(round(medDISHOME,2),2),
+                        group = c(rep("low",4),rep("low.m",4),rep("up.m",4),rep("up",4)),
+                        mean =  pintDHRES[,2],low = pintDHRES[,1], 
+                        up = pintDHRES[,3])
+sink(file = file.path("Results/dfDH_RES.txt"))
+dfDH_RES
+sink(file = NULL)
+```
+
+```{r}
+pdf(file.path("Results/dfDH_RES.pdf"))
+plot.result2(dfDH_RES)
+dev.off()
+```
+### RES
+```{r}
+pisa18$UNI_QU <- as.factor(cut_number(pisa18$UNI,4))
+levels_UNI <- levels(pisa18$UNI_QU)
+ds_UNI <- pisa18 %>% group_by(pisa18$UNI_QU) %>% summarise(median = median(pisa18$UNI), Freq = n())  
+levels(pisa18$UNI_QU) <- 1:4
+
+sgrDHUNI <- split(pisa18,f = list(pisa18$DH_QU,pisa18$UNI_QU))
+#t<-lapply(sgrDHUNI, function(x) length(x[[1]]))
+pintDHUNI <- comp.int.stack.core01(sgr = sgrDHUNI,fits = fits,
+                                     wts = wtsStacking,
+                                     cnt.path = "Files", p = 0.5)
+```
+
