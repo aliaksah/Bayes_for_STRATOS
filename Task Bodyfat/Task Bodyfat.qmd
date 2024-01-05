@@ -1,0 +1,158 @@
+---
+title: "Task: bodyfat prediction"
+#title-block-banner: true                      # banner with color
+author:
+  - name: Georg Heinze
+    affiliation: Medical University of Vienna, Center for Medical Data Science
+date: last-modified                            # "`r Sys.Date()`" for system date
+categories: [2024, Contrast-Bayes-Frequentist, STRATOS, R]
+description: "Classification: confidential"
+editor: visual
+theme: cosmo                                   # cosmo bootswatch theme
+toc: true                                      # table of contents  
+number-sections: true
+colorlinks: true                               # ??
+highlight-style: pygments
+#bibliography: references.bib
+format:
+  html: 
+    code-fold: true
+    code-tools: true
+    html-math-method: katex
+    self-contained: true                      # html is self-contained
+  pdf:
+    geometry: 
+      - top=30mm
+      - left=30mm
+  docx: default                               
+---
+
+## Data sets
+
+Two data sets are available. The first is a data set published by [Johnson (2021)](https://doi.org/10.1080/26939169.2021.1971585) contains body fat proportion and anthropometric measures of 184 women aged 18-25. The second data set was published by [Johnson (1996)[http://jse.amstat.org/v4n1/datasets.johnson.html] and contains similar data of 252 men aged 22-81.
+
+### Data set of college women
+
+The data set of 184 college women can be downloaded from the journal website and is contained in this repository. The data set description is contained in a separate text file that is reproduced here:
+
+NAME: BodyFatInfo.txt
+
+SIZE: 184 observations, 20 variables
+
+ARTICLE TITLE: Fitting Percentage of Body Fat to Simple Body Measurements: College Women
+
+DESCRIPTIVE ABSTRACT:
+
+Percentage of body fat, age, weight, height, body mass index and fourteen circumference measurements are given for 184 college women ages 18-25. Body fat was accurately determined by an underwater weighing technique which requires special equipment and training of the individuals conducting the process. Circumference measurements were made to the nearest 0.1 cm using a cloth tape in complete contact with the skin but without compression of the soft tissues. The measurement process, described somewhat incompletely below, is described in greater detail in Slack (1997) who used the standards recommended by Lohman, Roche and Martrell (1988).
+
+SOURCES:
+
+* Lohman, T.G., Roche, A.F., Martorell, R. (1988), Anthropometric Standardization Reference Manual, Champaign, IL: Human Kinetics Books.
+* Siri, W.E. (1956), Gross Composition of the Body, in Advances in Biological and Medical Physics (vol. IV), editors J.H. Lawrence and C.A. Tobias, New York: Academic Press.
+* Slack, Jason V. (1997), Estimating Body Fat Percentage Using Circumference Measurements and Lifestyle Questionnaire Data: A Multivariate Study of 184 College Aged Females, M.S. Thesis, Department of Physical Education, Brigham Young University. An electronic copy of this thesis is available via OregonPDF in Health & Performance, https://www.oregonpdf.org/, Catalog ID: PE 3794.
+
+VARIABLE DESCRIPTIONS:
+
+* Obs: Observation number, 1-184
+* Fat: Amount of body fat expressed as a percentage of total body weight, using Siri's (1956) method
+* Weight (kg)
+* Height (m)
+* BMI: (Body Mass Index) Weight divided by the square of Height
+* Age
+* Neck: Minimal circumference perpendicular to the long axis of the neck (cm)
+* Chest: Horizontal plane measurement at the sixth rib, at the end of a normal expiration (cm)
+* Calf: Horizontal maximal calf measurement (cm)
+* Biceps: Measurement with arm extended (cm)
+* Hips: Horizontal maximal measurement around buttocks (cm)
+* Waist: Horizontal minimal measurement, at the end of a normal expiration (cm)
+* Forearm: Maximal measurement perpendicular to long axis (cm)
+* PThigh: (Proximal Thigh) Horizontal measurement immediately distal to the gluteal furrow (cm)
+* MThigh: (Middle Thigh) Measurement midway between the midpoint of the inguinal crease and the proximal border of the patella (cm)
+* DThigh: (Distal Thigh) Measurement proximal to the femoral epicondyles (cm)
+* Wrist: Measurement perpendicular to the long axis of the forearm (cm)
+* Knee: Measurement at the mid-patellar level, with the knee slightly flexed (cm)
+* Elbow: A minimal circumference measurement with the elbow extended (cm)
+* Ankle: Minimal circumference measurement perpendicular to the long axis of the calf (cm)
+
+STORY BEHIND THE DATA:
+
+Please see the JSE Datasets article.
+
+PEDAGOGICAL NOTES:
+The dataset may be used to illustrate the various components of building a predictive model for percent body fat. While the number of cases is fairly modest, the dataset is fairly rich in terms of the number of potential predictor variables. 
+
+SUBMITTED BY:
+Roger W. Johnson
+Department of Mathematics
+South Dakota School of Mines & Technology
+501 East St. Joseph Street
+Rapid City, South Dakota 57701
+roger.johnson@sdsmt.edu
+
+
+
+The variable `Fat` corresponds to the Siri formula of estimating body fat proportion in percent.
+
+```{r}
+women <- read.table("Datafiles/Bodyfat.txt", header=TRUE)
+```
+
+One observation has a recorded age of 1. It is up to the data analyst how to deal with this observation.
+
+### Data set of men
+
+The data set can be assessed via the R package `mfp`:
+
+```{r}
+library(mfp)
+
+data(bodyfat)
+```
+
+In the paper by Johnson (1996), a few corrections to the data were described. We performed them below. Moreover, we recompute the percentage of body fat given both the Siri formula (BF% = 495/density - 450) and the Brozek formula (BF% = 457/density - 414.2), rounded up to one decimal place. We also set any values lower than 0 to 0 according to Johnson (1996). Note that these recomputed values differ compared to the published ones in 33 and 43 observations, respectively.
+
+```{r}
+bodyfat_corr <- bodyfat 
+
+bodyfat_corr[42,"height"] <- 69.5       # one-digit correction of height
+bodyfat_corr[48,"density"] <- 1.0865    # one-digit correction of density
+bodyfat_corr[76,"density"] <- 1.0566    # one-digit correction of density
+bodyfat_corr[96,"density"] <- 1.0591    # one-digit correction of density
+
+# recompute siri formula based on corrected density
+
+bodyfat_corr[,"siri"]   <- pmax(round(495 / bodyfat_corr$density - 450, 1) , 0)
+bodyfat_corr[,"brozek"] <- pmax(round(457/ bodyfat_corr$density - 414.2, 1) , 0)
+```
+
+
+### Aligning the two data sets
+
+Now we transform the measurements of height and weight in `men` into m and kg for better comparability with the `women` data set. 
+
+```{r}
+bodyfat_corr$height <- bodyfat_corr$height * 2.54/100
+bodyfat_corr$weight <- bodyfat_corr$weight * 0.454592
+```
+
+
+Several variables have different names in the two data sources. The following code makes the two data sets comparable. Note that circumference of thigh is given as a single measurement in the `men` data but as three different measurements in the `women` data set. Hence, it is not aligned but only capitalized for consistency.
+
+```{r}
+library(tidyverse)
+
+men <- bodyfat_corr %>%
+  rename(Fat = siri, Age = age, Height = height, Weight = weight, Neck = neck, Chest = chest, Waist = abdomen, Hips = hip, Knee = knee, Ankle = ankle, Forearm = forearm, Biceps = biceps, Thigh = thigh)
+```
+
+## Task description
+
+*Training set:* For the task, the `women` data set should be used as training set to develop a prediction model of body fat percentage. The prediction model should contain no more than 5 predictors (originally measured anthopometrics including age and weight), but can have fewer predictors. In the final formula, the predictors may have nonlinear functional forms or interactions.   
+
+*Validation set:* A part of the `men` data set can be used as a validation data set to tune the model and to calibrate it for application in men. The remaining, hold out data set must be kept in a vault and not be used for tuning or for informing model development. All tuning must be documented. The proportion used for tuning can be chosen ad lib. 
+
+*Test set:* The remainder of the `men` data set should be used to provide an estimate of the model's performance in terms of root mean squared prediction error (RMSPE, root mean squared difference of predicted and measured body fat percentage), R-squared (squared correlation of predicted and measured body fat percentage), calibration slope (slope of regression line of observed regressed on predicted body fat percentage) and calibration intercept (intercept of regression of observed on predicted body fat percentage with the slope fixed to 1). *These measures should be accompanied by appropriate uncertainty intervals.*
+
+The goal is to find a 5-predictor model for which we can find the highest possible lower bound of prediction performance when applying the model to adult men of any age.
+
+Since the proportion  of the `men` data used for tuning and for testing can be chosen ad lib, the analyst can decide whether to put more emphasis on accurate performance evaluation (more data in test set, less variance when testing the model) or on calibrating the model for men (more data in validation set, probably better expected performance).
