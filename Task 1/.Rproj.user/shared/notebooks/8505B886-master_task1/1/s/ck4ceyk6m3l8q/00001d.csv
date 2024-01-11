@@ -1,6 +1,0 @@
-"0","source(""packages.r"")
-load(file = file.path(""IMPDAT_PISA.RData""))
-source(""01data_preperation.r"")
-"
-"2","Error in eval(ei, envir) : object 'gfofail.f' not found
-"

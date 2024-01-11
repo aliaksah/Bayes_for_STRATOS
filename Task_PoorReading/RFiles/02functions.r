@@ -84,7 +84,7 @@ comp.int.stack.core01.inner <- function(sgr = sgr,fits = fits,
   med <- list()
   for (i in 1:l) {
     sgr2[[i]] <- sgr[[i]][, -which(names(sgr[[i]]) %in% c("school.id","CNT","nb.stud","DH_QU","BL_QU",
-                                                          "ATT_QU","RES_QU","UNI_QU"))]
+                                                          "ATT_QU","RES_QU","UNI_QU"))]#,"BULL_QU"
     # Data frame which contains the group specific quantiles for the eight representative students
     med[[i]] <- data.frame(lapply(sgr2[[i]],quantile, probs=c(p))) 
     }
