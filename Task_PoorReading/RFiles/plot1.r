@@ -16,7 +16,6 @@ ggplot(pisa18_sc, aes(LDFRAC)) +
                                                                                                                                                                                                                 color="red",size=8)
 dev.off()
 
-```
 # Desciptive summary
 
 
