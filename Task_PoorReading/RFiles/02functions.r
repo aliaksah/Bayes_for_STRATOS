@@ -315,45 +315,84 @@ two.sided.pppv <- function(y.obs = pisa18$ld, yrepM = ypredStack,
 #' @param y.obs The outcome
 #' @param yrepM  Matrix with replicated data sets of the corresponding model.
 #' @return PPC plots 
-visualPPC <- function(y.obs = pisa18$att01, yrepM = ypredM, WITHOUT = 0){
+visualPPC <- function(y.obs = pisa18$attp, yrepM = ypredM, WITHOUT = 0){
   
-  num.plots <- 4
+  num.plots <- 9
   ppc.plots <- vector(num.plots, mode = 'list')
   
-  ppc.plots[[1]] <-  ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],
-                                      yrep = yrepM, stat = "mean", 
-                                      group = interaction(pisa18$DH_QU[pisa18$WITHOUT == WITHOUT], 
-                                                          pisa18$STAFFLACK[pisa18$WITHOUT == WITHOUT]),
-                                      facet_args = list(nrow = 2)) +   
-    xlab("probability of ld") + ggtitle("stat = mean, DH_QU x STAFFLACK") +
-    theme(text = element_text(size = 25), axis.text = element_text(size = 8))
-  
-  
-  ppc.plots[[2]] <-  ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = yrepM, stat = "mean", 
-                                      group = interaction(pisa18$aca[pisa18$WITHOUT == WITHOUT], 
-                                                          pisa18$female[pisa18$WITHOUT == WITHOUT]),
-                                      facet_args = list(nrow = 1, scales = "fixed")) + 
-    xlab("probability of ld") + ggtitle("stat = mean, aca x female") +#,facet_args = list(ncol = 2)
-    theme(text = element_text(size = 25), axis.text = element_text(size = 8))
-  
-  
-  
-  
-  ppc.plots[[3]] <-  ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = yrepM, stat = "mean", 
+  ppc.plots[[1]] <-  ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = yrepM, stat = "mean", 
                                       group = interaction(pisa18$aca[pisa18$WITHOUT == WITHOUT], 
                                                           pisa18$uni[pisa18$WITHOUT == WITHOUT]),
                                       facet_args = list(nrow = 1, scales = "fixed")) + 
-    xlab("probability of ld") + ggtitle("stat = mean, aca x female") +#,facet_args = list(ncol = 2)
+    xlab("probability of ld") + ggtitle("stat = mean, aca x uni") +#,facet_args = list(ncol = 2)
     theme(text = element_text(size = 25), axis.text = element_text(size = 8))
   
+  
+  
+  ppc.plots[[2]] <-  ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = yrepM, stat = "mean", 
+                                      group = interaction(pisa18$bull[pisa18$WITHOUT == WITHOUT], 
+                                                          pisa18$ld[pisa18$WITHOUT == WITHOUT]),
+                                      facet_args = list(nrow = 1, scales = "fixed")) + 
+    xlab("probability of ld") + ggtitle("stat = mean, bull x ld") +#,facet_args = list(ncol = 2)
+    theme(text = element_text(size = 25), axis.text = element_text(size = 8))
+  
+  
+  ppc.plots[[3]] <-  ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = yrepM, stat = "mean", 
+                                      group = interaction(pisa18$bull[pisa18$WITHOUT == WITHOUT], 
+                                                          pisa18$aca[pisa18$WITHOUT == WITHOUT]),
+                                      facet_args = list(nrow = 1, scales = "fixed")) + 
+    xlab("probability of ld") + ggtitle("stat = mean, bull x aca") +#,facet_args = list(ncol = 2)
+    theme(text = element_text(size = 25), axis.text = element_text(size = 8))
   
   
   ppc.plots[[4]] <-  ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = yrepM, stat = "mean", 
                                       group = interaction(pisa18$bull[pisa18$WITHOUT == WITHOUT], 
-                                                          pisa18$RUR[pisa18$WITHOUT == WITHOUT]),
+                                                          pisa18$uni[pisa18$WITHOUT == WITHOUT]),
                                       facet_args = list(nrow = 1, scales = "fixed")) + 
-    xlab("probability of ld") + ggtitle("stat = mean, bull x RUR") +#,facet_args = list(ncol = 2)
+    xlab("probability of ld") + ggtitle("stat = mean, bull x uni") +#,facet_args = list(ncol = 2)
     theme(text = element_text(size = 25), axis.text = element_text(size = 8))
+  
+  ppc.plots[[5]] <-  ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = yrepM, stat = "mean", 
+                                      group = interaction(pisa18$ld[pisa18$WITHOUT == WITHOUT], 
+                                                          pisa18$uni[pisa18$WITHOUT == WITHOUT]),
+                                      facet_args = list(nrow = 1, scales = "fixed")) + 
+    xlab("probability of ld") + ggtitle("stat = mean, ld x uni") +#,facet_args = list(ncol = 2)
+    theme(text = element_text(size = 25), axis.text = element_text(size = 8))
+  
+  ppc.plots[[6]] <-  ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = yrepM, stat = "mean", 
+                                      group = interaction(pisa18$aca[pisa18$WITHOUT == WITHOUT], 
+                                                          pisa18$ld[pisa18$WITHOUT == WITHOUT]),
+                                      facet_args = list(nrow = 1, scales = "fixed")) + 
+    xlab("probability of ld") + ggtitle("stat = mean, aca x ld") +#,facet_args = list(ncol = 2)
+    theme(text = element_text(size = 25), axis.text = element_text(size = 8))
+  
+  ###----------------------------------------------------------------------------
+  
+  ppc.plots[[7]] <-  ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],
+                                      yrep = yrepM, stat = "mean", 
+                                      group = interaction(pisa18$immig[pisa18$WITHOUT == WITHOUT], 
+                                                          pisa18$native[pisa18$WITHOUT == WITHOUT]),
+                                      facet_args = list(nrow = 2)) +   
+    xlab("probability of ld") + ggtitle("stat = mean, immig x native") +
+    theme(text = element_text(size = 25), axis.text = element_text(size = 8))
+  
+  
+  ppc.plots[[8]] <-  ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = yrepM, stat = "mean", 
+                                      group = interaction(pisa18$immig[pisa18$WITHOUT == WITHOUT], 
+                                                          pisa18$female[pisa18$WITHOUT == WITHOUT]),
+                                      facet_args = list(nrow = 1, scales = "fixed")) + 
+    xlab("probability of ld") + ggtitle("stat = mean, immig x female") +#,facet_args = list(ncol = 2)
+    theme(text = element_text(size = 25), axis.text = element_text(size = 8))
+  
+  ppc.plots[[9]] <-  ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = yrepM, stat = "mean", 
+                                      group = interaction(pisa18$native[pisa18$WITHOUT == WITHOUT], 
+                                                          pisa18$female[pisa18$WITHOUT == WITHOUT]),
+                                      facet_args = list(nrow = 1, scales = "fixed")) + 
+    xlab("probability of ld") + ggtitle("stat = mean, native x female") +#,facet_args = list(ncol = 2)
+    theme(text = element_text(size = 25), axis.text = element_text(size = 8))
+  
+  
+  
   return(ppc.plots)
 }
 

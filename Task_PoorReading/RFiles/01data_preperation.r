@@ -129,17 +129,20 @@ pisa18$belong <- scale(mean.belong)[,1]
 pisa18$BELONG <- ave(pisa18$belong, school.id, FUN = function(x) mean(x, na.rm = TRUE))
 
 # p. 79, participation
-part1  <- IMPDAT$ST062Q01TA # I <skipped> a whole school day.
-part2  <- IMPDAT$ST062Q02TA # I <skipped> some classes.
-part3  <- IMPDAT$ST062Q03TA # I arrived late for school. (not included)
+pisa18$part1  <- IMPDAT$ST062Q01TA # I <skipped> a whole school day.
+pisa18$part2  <- IMPDAT$ST062Q02TA # I <skipped> some classes.
+pisa18$part3  <- IMPDAT$ST062Q03TA # I arrived late for school. (not included)
 
-st_attendance <- data.frame(part1,part2)
+st_attendance <- data.frame(pisa18$part1,pisa18$part2)
 mean.st_attendance <- apply(st_attendance,FUN = mean, MARGIN = 1, na.rm = TRUE)
 pisa18$att <- scale(mean.st_attendance)[,1]
 pisa18$ATT <- ave(pisa18$att, school.id, FUN = function(x) mean(x, na.rm = TRUE))
 pisa18$att01 <- as.numeric(pisa18$att > 0.0)
 pisa18$ATT01 <- ave(pisa18$att01, school.id, FUN = function(x) mean(x, na.rm = TRUE))
 
+pisa18$attp <- rep(0, length(pisa18$att01))
+pisa18$attp[pisa18$part1 > 1] <- 1
+pisa18$attp[pisa18$part2 > 2] <- 1
 # enjoyment of reading, 1 = Strongly disagree, 4 = Strongly agree
 
 # enjoyment of reading, high values indicate a positive attitude towards reading
@@ -209,10 +212,23 @@ teachbad_sc <- scale(mean.teachbad)[,1]
 pisa18$TEACHBAD <- ave(teachbad_sc, school.id, FUN = function(x) mean(x, na.rm = TRUE))
 
 
+# Value of school, 1 = Strongly agree,... 4 = Strongly disagree
+value1  <- IMPDAT$ST036Q05TA  # Trying hard at school will help me get a good job. 
+value2  <- IMPDAT$ST036Q06TA  # Trying hard at school will help me get into a good <college>. 
+value3  <- IMPDAT$ST036Q08TA  # Trying hard at school is important.
 
+value.f <- data.frame(value1, value2, value3)
+mean.value <- apply(value.f ,FUN = mean, MARGIN = 1, na.rm = TRUE)
+pisa18$val <- scale(mean.value)[,1]
+pisa18$VAL <- ave(pisa18$val, school.id, FUN = function(x) mean(x, na.rm = TRUE))
 
-
-
+# S. 16, 1.1.2 Besuchte Schulart
+pisa18$school.type <- unclass(IMPDAT$PROGN)  # Schulform, Study programme indices
+# Gymnasium
+pisa18$GYM <- rep(0,length(pisa18$school.type))
+pisa18$GYM[pisa18$school.type == "00400002" ] <- 1
+pisa18$GYM[pisa18$school.type == "00400005" ] <- 1
+# by(IMPDAT$PV1READ, IMPDAT$PROGN, summary)
 # big city
 # Which of the following definitions best describes the community in which your school is located?
 pisa18$RUR <- IMPDAT$SC001Q01TA # 1 = < 3000, 2 = 3000 to 15 000, 3 = 15 000 to 100000, 4 = 100000 to 1 000 000, 5 = more than 1 000 000
