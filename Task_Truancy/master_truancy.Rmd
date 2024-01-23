@@ -1,0 +1,486 @@
+##### hold-out-PPC nur für binäre bei den beiden Modellen, bis Modell 3, dann LOO-CV und Stacking der drei Modelle, sens indem man das dritte Modell modifiziert, Ergebnisse wie bisher
+
+---
+title: "Students with attendance problems"
+author: "Mariana Nold"
+output: html_document
+---
+### Load R packages
+```{r  eval = FALSE}
+source("RFiles/packages.r")
+```
+
+### Load  single imputed PISA data.
+```{r  eval = FALSE}
+PPath <- "C:/Users/zo95yup/Documents/GitHub/Bayes_for_STRATOS/Task_Truancy"
+load(file = file.path(PPath,"Orgdata/IMPDAT_PISA.RData"))
+```
+
+### Prepare data, thus build PISA scales, 6802 students 
+```{r  eval = FALSE}
+source(file.path(PPath,"RFiles/01data_preperation.r"))
+to.rm <- objects()[!objects() %in% c("PPath","pisa18","countries")]
+rm(list = to.rm)
+ head(pisa18)
+ dim(pisa18)
+```
+
+
+### There should be at least ten students per school. Schools with fewer observations are excluded from the analysis. The variable nb.stud informs about the number of stundets per school and save final data set, 6489 students
+
+```{r  eval = FALSE}
+tab.id <- table(pisa18$school.id)
+id.frame <- as.data.frame(tab.id)
+
+nb.stud <- rep(id.frame$Freq,id.frame$Freq)
+pisa18$nb.stud <- nb.stud
+rm(tab.id,id.frame,nb.stud)
+pisa.data <- subset(pisa18, pisa18$nb.stud > 9)
+pisa18 <- pisa.data
+
+rm(pisa.data)
+summary(pisa18$nb.stud)
+save(pisa18,file = file.path(PPath,"Files/pisa18.RData")) #file = file.path(PPath,"File/fits0.RData")
+load(file.path(PPath,"Files/pisa18.RData"))
+```
+
+
+
+### Data sets for schools: Data set contains one row for each school and only school level variables
+```{r  eval = FALSE}
+sc.level <- names(pisa18) == toupper(names(pisa18))
+sc.level[1] <- TRUE
+pisa18_sc <- pisa18[,sc.level]
+dim(pisa18_sc)
+pisa18_sc <- pisa18_sc[!duplicated(pisa18_sc$school.id), ]
+dim(pisa18_sc)
+names(pisa18_sc)
+
+save(pisa18,file = file.path(PPath,"Files/pisa18_sc.RData")) 
+load(file.path(PPath,"Files/pisa18_sc.RData"))
+```
+
+### Stack models: Use all relevant predictors, hold out some to check for predictive validity
+### Splines: https://rpubs.com/samuelfix08/splines
+
+```{r  eval = FALSE}
+
+
+# models to stack
+# theoretical model
+stack1 <- as.formula(attp ~ aca + ld + uni  + bull + fewbooks + belong +  joyread + goal + mot  + DISCIPLINE + TEACHBAD + VAL + (1 | school.id))
+# composition effect
+stack2 <- as.formula(attp ~  immig + native + female + escs  + RUR + DISH 
+                     + GYM + STAFFSHORT + EDUSHORT + FEMFRAC  + SN_SC + NN_SC + (1 | school.id))
+
+models <- vector(mode = "list", length = 2)
+
+models[[1]] <- stack1
+models[[2]] <- stack2
+
+```
+##### fit model
+
+```{r  eval = FALSE}
+a.seed <- 12345 
+a.iter <-  2000 
+a.chains <- 4  
+
+#pisa18$WITHOUT  <- as.numeric(pisa18$FAILED >= 0.02) # above median
+
+fits0 <- list()
+
+fits0[[1]] <- stan_glmer(models[[1]], data = pisa18[pisa18$WITHOUT == 0,], seed = a.seed,
+                      iter = a.iter, chains = a.chains, family = binomial()) 
+
+fits0[[2]] <- stan_glmer(models[[2]], data = pisa18[pisa18$WITHOUT == 0,], seed = a.seed,
+                      iter = a.iter, chains = a.chains, family = binomial()) 
+
+fits1 <- list()
+
+fits1[[1]] <- stan_glmer(models[[1]], data = pisa18[pisa18$WITHOUT == 1,], seed = a.seed,
+                      iter = a.iter, chains = a.chains, family = binomial()) 
+
+fits1[[2]] <- stan_glmer(models[[2]], data = pisa18[pisa18$WITHOUT == 1,], seed = a.seed,
+                      iter = a.iter, chains = a.chains, family = binomial()) 
+
+
+save(fits0, file = file.path(PPath,"Files/fits0.RData"))
+save(fits1, file = file.path(PPath,"Files/fits1.RData"))
+```
+
+
+###load fits
+
+```{r  eval = FALSE}
+load(file.path(PPath, "Files/fits0.RData"))
+load(file.path(PPath, "Files/fits1.RData"))
+```
+
+
+##### Study model parameters
+
+```{r  eval = FALSE}
+n01.models <- length(models)
+sink(file = file.path(PPath, "Results/fixed_par0.txt"))
+for (i in 1:n01.models) {
+  print(kable(tidy(fits0[[i]],conf.int  = T, conf.level = .95, 
+                   effects = "fixed"),"simple",digits = 4, 
+              caption = paste("model ",i," *****")))
+}
+sink(file = NULL)
+
+sink(file = file.path(PPath, "Results/ran_par0.txt"))
+for (i in 1:n01.models){
+  print(kable(tidy(fits0[[i]],conf.int=T, conf.level=.95, effects = "ran_pars"),"simple",digits=4, caption = paste("model ",i," *****")))
+  
+  }
+sink(file = NULL)
+
+
+n01.models <- length(models)
+sink(file = file.path(PPath, "Results/fixed_par1.txt"))
+for (i in 1:n01.models) {
+  print(kable(tidy(fits1[[i]],conf.int  = T, conf.level = .95, 
+                   effects = "fixed"),"simple",digits = 4, 
+              caption = paste("model ",i," *****")))
+}
+sink(file = NULL)
+
+sink(file = file.path(PPath, "Results/ran_par1.txt"))
+for (i in 1:n01.models){
+  print(kable(tidy(fits1[[i]],conf.int=T, conf.level=.95, effects = "ran_pars"),"simple",digits=4, caption = paste("model ",i," *****")))
+  
+  }
+sink(file = NULL)
+
+```
+### Load functions
+```{r  eval = FALSE}
+source(file.path(PPath, "RFiles/02functions.r"))
+```
+### Compute Predictions and Brier Score
+```{r  eval = FALSE}
+#n01.models <- length(models)-1
+ypredCand0 <- list()
+for (i in 1:n01.models) {
+  set.seed(a.seed)
+  ypredCand0[[i]] <- posterior_predict(fits0[[i]])
+}
+save("ypredCand0", file = file.path(PPath, "Files/ypredCand0.RData"))
+
+
+br.candL20 <- list()
+for (i in 1:n01.models) {
+  br.candL20[[i]] <- brierS(pisa18$attp[pisa18$WITHOUT == 0],colMeans(ypredCand0[[i]]))
+ 
+}
+
+# Write Brier score to file.
+sink(file = file.path(PPath, "Results/brier.scores0.txt"))
+
+for (i in 1:n01.models) {
+  print(paste("model ", i))
+  print(br.candL20[[i]])
+  
+}
+sink(file = NULL)
+
+
+ypredCand1 <- list()
+for (i in 1:n01.models) {
+  set.seed(a.seed)
+  ypredCand1[[i]] <- posterior_predict(fits1[[i]])
+}
+save("ypredCand1", file = file.path(PPath, "Files/ypredCand1.RData"))
+
+## Brier Score 
+
+br.candL21 <- list()
+for (i in 1:n01.models) {
+  br.candL21[[i]] <- brierS(pisa18$attp[pisa18$WITHOUT == 1],colMeans(ypredCand1[[i]]))
+ 
+}
+
+# Write Brier score to file.
+sink(file = file.path(PPath, "Results/brier.scores1.txt"))
+
+for (i in 1:n01.models) {
+  print(paste("model ", i))
+  print(br.candL21[[i]])
+  
+}
+sink(file = NULL)
+```
+
+### Posterior predictive checks, use hold-out predictors
+```{r  eval = FALSE}
+
+color_scheme_set(scheme = "teal")
+ppcCand10 <- visualPPC(yrepM = ypredCand0[[1]])
+pdf(file.path(PPath, "Results/ppcCand1W0.pdf"))
+ppcCand10
+dev.off()
+
+pppv_ypredCandW0M1 <- two.sided.pppv(y.obs = pisa18$attp[pisa18$WITHOUT==0], yrepM = ypredCand0[[1]], alternative = "two.sided")
+
+color_scheme_set(scheme = "green")
+ppcCand20 <- visualPPC(yrepM = ypredCand0[[2]])
+pdf(file.path(PPath, "Results/ppcCand2W0.pdf"))
+ppcCand20
+dev.off()
+
+pppv_ypredCandW0M2 <- two.sided.pppv(y.obs = pisa18$attp[pisa18$WITHOUT==0], yrepM = ypredCand0[[2]], alternative = "two.sided")
+
+color_scheme_set(scheme = "brightblue")
+ppcCand11 <- visualPPC(yrepM = ypredCand1[[1]], WITHOUT = 1)
+pdf(file.path(PPath, "Results/ppcCand1W1.pdf"))
+ppcCand11
+dev.off()
+
+pppv_ypredCandW1M1 <- two.sided.pppv(y.obs = pisa18$attp[pisa18$WITHOUT==1], yrepM = ypredCand1[[1]], alternative = "two.sided", WITHOUT = 1)
+
+color_scheme_set(scheme = "blue")
+ppcCand21 <- visualPPC(yrepM = ypredCand1[[2]], WITHOUT = 1)
+pdf(file.path(PPath, "Results/ppcCand2W1.pdf"))
+ppcCand21
+dev.off()
+
+pppv_ypredCandW1M2 <- two.sided.pppv(y.obs = pisa18$attp[pisa18$WITHOUT==1], yrepM = ypredCand1[[2]], alternative = "two.sided", WITHOUT = 1)
+
+save.image(file = file.path(PPath,"Files/save_session.RData"))
+#load(file=file.path(cnt.path,"save_session.RData"))
+
+num<-11
+sink(file = file.path(PPath,"Results/candW0M1.txt"))
+for(i in 1:num){
+  print(paste("Table   ",i))
+  print(kable(pppv_ypredCandW0M1[[i]], format = "simple", digits = 2))
+  print("                 ")
+}
+sink(file=NULL)
+
+
+sink(file = file.path(PPath,"Results/candW0M2.txt"))
+for(i in 1:num){
+  print(paste("Table   ",i))
+  print(kable(pppv_ypredCandW0M2[[i]], format = "simple", digits = 2))
+  print("                 ")
+}
+sink(file=NULL)
+
+
+sink(file = file.path(PPath,"Results/candW1M1.txt"))
+for(i in 1:num){
+  print(paste("Table   ",i))
+  print(kable(pppv_ypredCandW1M1[[i]], format = "simple", digits = 2))
+  print("                 ")
+}
+sink(file=NULL)
+
+
+sink(file = file.path(PPath,"Results/candW1M2.txt"))
+for(i in 1:num){
+  print(paste("Table   ",i))
+  print(kable(pppv_ypredCandW1M2[[i]], format = "simple", digits = 2))
+  print("                 ")
+}
+sink(file=NULL)
+
+```
+
+#### add a model to the stack, bpppv < 0.015 must be included
+```{r  eval = FALSE}
+
+# models to stack
+# theoretical model
+stack30 <- as.formula(attp ~ immig + native + bull + ld + uni + goal + VAL   + RUR + GYM + FEMFRAC +  NN_SC + bull:FEMFRAC + (1 + bull| school.id))
+# composition effect
+stack31 <- as.formula(attp ~ fewbooks + bull  + ld + native +  goal   + FEMFRAC  + GYM  + RUR + bull:goal + (1 + bull| school.id))
+
+
+models[[3]] <- stack30
+models[[4]] <- stack31
+
+```
+#### Fit added models
+
+```{r  eval = FALSE}
+a.seed <- 12345 
+a.iter <-  2000 
+a.chains <- 4  
+
+fits0[[3]] <- stan_glmer(models[[3]], data = pisa18[pisa18$WITHOUT == 0,], seed = a.seed,
+                      iter = a.iter, chains = a.chains, family = binomial()) 
+
+
+
+fits1[[3]] <- stan_glmer(models[[4]], data = pisa18[pisa18$WITHOUT == 1,], seed = a.seed,
+                      iter = a.iter, chains = a.chains, family = binomial()) 
+
+
+save(fits0, file = file.path(PPath,"Files/fits0.RData"))
+save(fits1, file = file.path(PPath,"Files/fits1.RData"))
+```
+#### Compute brier score again, n01.models <- length(models)-1
+
+#### LOO-CV and Stacking
+```{r  eval = FALSE}
+n01.models <- length(models)-1
+# Compute loo
+
+loo_list0 <- lapply(fits0, loo, cores = 1)
+loo_compare(loo_list0)
+
+save("loo_list0", file = file.path(PPath, "Files","loo_list0.RData"))
+#load(file.path("Files2","loo_list.RData"))
+
+sink(file = file.path(PPath, "Files","loo_info0.txt"))
+for (i in 1:n01.models) {
+  print(paste("******** "))
+  print(paste("model ", i))
+  print(loo_list0[[i]])
+  print(paste("******** "))
+}
+#print(loo_list[[1]])
+sink(file = NULL)
+
+wtsStacking0 <- list()
+
+wtsStacking0 <- loo_model_weights(loo_list0, method = "stacking")
+print(wtsStacking0)
+
+
+sink(file = file.path(PPath, "Results","wtsStacking0.txt"))
+print(wtsStacking0)
+print(paste("******** "))
+sink(file = NULL)
+
+
+
+loo_list1 <- list()
+# Compute loo
+
+loo_list1 <- lapply(fits1, loo, cores = 1)
+
+loo_compare(loo_list1)
+
+# Save loo
+
+save("loo_list1", file = file.path(PPath, "Files","loo_list1.RData"))
+#load(file.path("Files2","loo_list.RData"))
+
+sink(file = file.path(PPath, "Files","loo_info1.txt"))
+for (i in 1:n01.models) {
+  print(paste("******** "))
+  print(paste("model ", i))
+  print(loo_list1[[i]])
+  print(paste("******** "))
+}
+#print(loo_list[[1]])
+sink(file = NULL)
+
+wtsStacking1 <- list()
+
+wtsStacking1 <- loo_model_weights(loo_list1, method = "stacking")
+print(wtsStacking1)
+
+
+sink(file = file.path(PPath, "Results","wtsStacking1.txt"))
+print(wtsStacking1)
+print(paste("******** "))
+sink(file = NULL)
+
+
+```
+#### PPC stack for stack
+
+```{r  eval = FALSE}
+set.seed(a.seed)
+ypredStack0 <- ypred_Stacking(fits0,loo_list0, method = "stacking") 
+save("ypredStack0", file = file.path("Files/ypredStack0.RData"))
+
+
+color_scheme_set(scheme = "red")
+ppcStack0 <- visualPPC(y.obs = pisa18$attp, yrepM = ypredStack0)
+pdf(file.path(PPath, "Result/ppcStack0.pdf"))
+ppcStack0
+dev.off()
+
+set.seed(a.seed)
+ypredStack1 <- ypred_Stacking(fits1,loo_list1, method = "stacking") 
+save("ypredStack1", file = file.path("Files/ypredStack1.RData"))
+
+color_scheme_set(scheme = "pink")
+ppcStack1 <- visualPPC(y.obs = pisa18$attp,yrepM = ypredStack1, WITHOUT = 1)
+pdf(file.path(PPath, "Result/ppcStack1.pdf"))
+ppcStack1
+dev.off()
+```
+
+
+### Compute results, WITHOUT == 0
+```{r  eval = FALSE}
+
+pisa18_W0 <- pisa18[pisa18$WITHOUT == 0,]
+
+pisa18_W0$DP_QU <- as.factor(cut_number(pisa18_W0$FEMFRAC,4))
+levels_DP_W0 <- levels(pisa18_W0$DP_QU)
+ds_DP_W0 <- pisa18_W0 %>% group_by(DP_QU) %>% summarise(median = median(FEMFRAC), Freq = n())
+levels(pisa18_W0$DP_QU) <- 1:4
+
+sgr <- split(pisa18_W0 ,f = list(pisa18_W0$DP_QU,pisa18_W0$bull))
+t<-lapply(sgr, function(x) length(x[[1]]))
+pint0 <- comp.int.stack.core01(sgr = sgr,fits = fits0,
+                                     wts = wtsStacking0,
+                                     cnt.path = file.path(PPath,"File"), p = 0.5)
+```
+### Summarize results DH_QU
+```{r  eval = FALSE}
+dfDH_QU_W0 <- data.frame(x = rep(round(ds_DP_W0$median,2),2),
+                        group = c(rep("no",4),rep("yes",4)),
+                        mean =  pint0[,2],low = pint0[,1], 
+                        up = pint0[,3])
+sink(file = file.path(PPath,"Results/dfDH_QU_W0.txt"))
+dfDH_QU_W0
+sink(file = NULL)
+```
+
+### Compute results, WITHOUT == 1
+```{r  eval = FALSE}
+
+pisa18_W1 <- pisa18[pisa18$WITHOUT == 1,]
+
+pisa18_W1$DP_QU <- as.factor(cut_number(pisa18_W1$goal,4))
+levels_DP_W1 <- levels(pisa18_W1$DP_QU)
+ds_DP_W1 <- pisa18_W1 %>% group_by(DP_QU) %>% summarise(median = median(goal), Freq = n())
+levels(pisa18_W1$DP_QU) <- 1:4
+
+sgr1 <- split(pisa18_W1 ,f = list(pisa18_W1$DP_QU,pisa18_W1$bull))
+t1<-lapply(sgr1, function(x) length(x[[1]]))
+pint1 <- comp.int.stack.core01(sgr = sgr1,fits = fits1,
+                                     wts = wtsStacking1,
+                                     cnt.path = file.path(PPath,"File"), p = 0.5)
+```
+### Summarize results DH_QU
+```{r  eval = FALSE}
+dfDH_QU_W1 <- data.frame(x = rep(round(ds_DP_W1$median,2),2),
+                        group = c(rep("no",4),rep("yes",4)),
+                        mean =  pint1[,2],low = pint1[,1], 
+                        up = pint1[,3])
+sink(file = file.path(PPath,"Results/dfDH_QU_W1.txt"))
+dfDH_QU_W1
+sink(file = NULL)
+```
+
+### Plot results
+```{r  eval = FALSE}
+
+pdf(file.path(PPath,"Results/dfDH_QU_W0.pdf"))
+plot.result(dfDH_QU_W0)
+dev.off()
+
+pdf(file.path(PPath,"Results/dfDH_QU_W1.pdf"))
+plot.result(dfDH_QU_W1)
+dev.off()
+`
