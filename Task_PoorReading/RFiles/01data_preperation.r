@@ -1,18 +1,8 @@
-# Follow example in Yao 2018, do a repeated regression for rural and urban
-# schools to explore if the association between variables that reflect identification,
-# integration, participation or motivation relate differs in the rural and urban context.
-# First, a descriptive analysis will be carried out to determine whether different 
-# patterns can be identified. Variables that affect the composition of the school (e. g.
-# fraction of non-natives) will not be taken into account. This task refers only to the first step.
-
-# Not exactly like Yao, but seven key predictors, each key predictor has
-# a own model in the stack and contains the other predictors in the same form.
-# Logistic regression is non-collapsible and therefore the combination matters for
-# the power to predict certain regions of the outcome.
-
-# Todo: decide if a certain predictor based on student or-school-level,
-# use similar predictors and use one on each level, maybe also escs
-# create data frame
+# planned checks, define the region of the outcome distribution before,
+# specify the models so that you can learn from the shortcomings,
+# keep in mind that each model-modification risks overfitting and 
+# one can get lost in the garden of forking paths
+# use LooCV to investigate model improvement
 IMPDAT <- subset(IMPDAT,IMPDAT$CNT == "AUT")
 school.id <- IMPDAT$CNTSCHID
 pisa18 <- data.frame(school.id)
@@ -25,7 +15,7 @@ pisa18$LD <- ave(pisa18$ld, school.id, FUN = function(x) mean(x, na.rm = TRUE))
 gender_pisa <- IMPDAT$ST004D01T
 pisa18$female <- rep(0, length(gender_pisa))
 pisa18$female[gender_pisa == 1] <- 1
-pisa18$FEMFRAC_ST <- ave(pisa18$female, school.id, FUN = function(x) mean(x, na.rm = TRUE))
+#pisa18$FEMFRAC_ST <- ave(pisa18$female, school.id, FUN = function(x) mean(x, na.rm = TRUE))
 # NATIVE
 lang_home <- IMPDAT$ST022Q01TA
 pisa18$native <- rep(0,length(lang_home))
@@ -129,20 +119,20 @@ pisa18$belong <- scale(mean.belong)[,1]
 pisa18$BELONG <- ave(pisa18$belong, school.id, FUN = function(x) mean(x, na.rm = TRUE))
 
 # p. 79, participation
-pisa18$part1  <- IMPDAT$ST062Q01TA # I <skipped> a whole school day.
-pisa18$part2  <- IMPDAT$ST062Q02TA # I <skipped> some classes.
-pisa18$part3  <- IMPDAT$ST062Q03TA # I arrived late for school. (not included)
+part1  <- IMPDAT$ST062Q01TA # I <skipped> a whole school day.
+part2  <- IMPDAT$ST062Q02TA # I <skipped> some classes.
+part3  <- IMPDAT$ST062Q03TA # I arrived late for school. (not included)
 
-st_attendance <- data.frame(pisa18$part1,pisa18$part2)
+st_attendance <- data.frame(part1,part2)
 mean.st_attendance <- apply(st_attendance,FUN = mean, MARGIN = 1, na.rm = TRUE)
-pisa18$att <- scale(mean.st_attendance)[,1]
-pisa18$ATT <- ave(pisa18$att, school.id, FUN = function(x) mean(x, na.rm = TRUE))
-pisa18$att01 <- as.numeric(pisa18$att > 0.0)
-pisa18$ATT01 <- ave(pisa18$att01, school.id, FUN = function(x) mean(x, na.rm = TRUE))
+att <- scale(mean.st_attendance)[,1]
+ATT <- ave(att, school.id, FUN = function(x) mean(x, na.rm = TRUE))
+att01 <- as.numeric(att > 0.0)
+ATT01 <- ave(att01, school.id, FUN = function(x) mean(x, na.rm = TRUE))
 
-pisa18$attp <- rep(0, length(pisa18$att01))
-pisa18$attp[pisa18$part1 > 1] <- 1
-pisa18$attp[pisa18$part2 > 2] <- 1
+pisa18$attp <- rep(0, length(att01))
+pisa18$attp[part1 > 1] <- 1
+pisa18$attp[part2 > 2] <- 1
 # enjoyment of reading, 1 = Strongly disagree, 4 = Strongly agree
 
 # enjoyment of reading, high values indicate a positive attitude towards reading
@@ -223,11 +213,11 @@ pisa18$val <- scale(mean.value)[,1]
 pisa18$VAL <- ave(pisa18$val, school.id, FUN = function(x) mean(x, na.rm = TRUE))
 
 # S. 16, 1.1.2 Besuchte Schulart
-pisa18$school.type <- unclass(IMPDAT$PROGN)  # Schulform, Study programme indices
+school.type <- unclass(IMPDAT$PROGN)  # Schulform, Study programme indices
 # Gymnasium
-pisa18$GYM <- rep(0,length(pisa18$school.type))
-pisa18$GYM[pisa18$school.type == "00400002" ] <- 1
-pisa18$GYM[pisa18$school.type == "00400005" ] <- 1
+pisa18$GYM <- rep(0,length(school.type))
+pisa18$GYM[school.type == "00400002" ] <- 1
+pisa18$GYM[school.type == "00400005" ] <- 1
 # by(IMPDAT$PV1READ, IMPDAT$PROGN, summary)
 # big city
 # Which of the following definitions best describes the community in which your school is located?
