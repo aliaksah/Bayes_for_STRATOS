@@ -400,7 +400,6 @@ set.seed(a.seed)
 ypredStack0 <- ypred_Stacking(fits0,loo_list0, method = "stacking") 
 save("ypredStack0", file = file.path("Files/ypredStack0.RData"))
 
-
 color_scheme_set(scheme = "red")
 ppcStack0 <- visualPPC(y.obs = pisa18$attp, yrepM = ypredStack0)
 pdf(file.path(PPath, "Result/ppcStack0.pdf"))
