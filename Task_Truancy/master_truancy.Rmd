@@ -1,4 +1,6 @@
-##### hold-out-PPC nur für binäre bei den beiden Modellen, bis Modell 3, dann LOO-CV und Stacking der drei Modelle, sens indem man das dritte Modell modifiziert, Ergebnisse wie bisher
+##### Ergebnisse für ld x bull, wichtige Prädiktoren sollen mehr Flixiblität haben,
+##### im ersten Schritt, inhaltlich begründet im zweiten Schritt mit Blick auf die Daten,
+##### zweiter Schritt muss noch mit Sensitivität überprüft werden
 
 ---
 title: "Students with attendance problems"
@@ -319,8 +321,11 @@ fits1[[3]] <- stan_glmer(models[[4]], data = pisa18[pisa18$WITHOUT == 1,], seed 
                       iter = a.iter, chains = a.chains, family = binomial()) 
 
 
-save(fits0, file = file.path(PPath,"Files/fits0.RData"))
-save(fits1, file = file.path(PPath,"Files/fits1.RData"))
+#save(fits0, file = file.path(PPath,"Files/fits0.RData"))
+#save(fits1, file = file.path(PPath,"Files/fits1.RData"))
+
+load(file.path(PPath,"Files/fits0.RData"))
+load(file.path(PPath,"Files/fits1.RData"))
 ```
 #### Compute brier score again, n01.models <- length(models)-1
 
@@ -333,7 +338,7 @@ loo_list0 <- lapply(fits0, loo, cores = 1)
 loo_compare(loo_list0)
 
 save("loo_list0", file = file.path(PPath, "Files","loo_list0.RData"))
-#load(file.path("Files2","loo_list.RData"))
+#load(file.path(PPath, "Files","loo_list0.RData"))
 
 sink(file = file.path(PPath, "Files","loo_info0.txt"))
 for (i in 1:n01.models) {
@@ -368,7 +373,7 @@ loo_compare(loo_list1)
 # Save loo
 
 save("loo_list1", file = file.path(PPath, "Files","loo_list1.RData"))
-#load(file.path("Files2","loo_list.RData"))
+#load(file.path(PPath, "Files","loo_list1.RData"))
 
 sink(file = file.path(PPath, "Files","loo_info1.txt"))
 for (i in 1:n01.models) {
@@ -402,7 +407,7 @@ save("ypredStack0", file = file.path("Files/ypredStack0.RData"))
 
 color_scheme_set(scheme = "red")
 ppcStack0 <- visualPPC(y.obs = pisa18$attp, yrepM = ypredStack0)
-pdf(file.path(PPath, "Result/ppcStack0.pdf"))
+pdf(file.path(PPath, "Results/ppcStack0.pdf"))
 ppcStack0
 dev.off()
 
@@ -412,7 +417,7 @@ save("ypredStack1", file = file.path("Files/ypredStack1.RData"))
 
 color_scheme_set(scheme = "pink")
 ppcStack1 <- visualPPC(y.obs = pisa18$attp,yrepM = ypredStack1, WITHOUT = 1)
-pdf(file.path(PPath, "Result/ppcStack1.pdf"))
+pdf(file.path(PPath, "Results/ppcStack1.pdf"))
 ppcStack1
 dev.off()
 ```
@@ -423,16 +428,16 @@ dev.off()
 
 pisa18_W0 <- pisa18[pisa18$WITHOUT == 0,]
 
-pisa18_W0$DP_QU <- as.factor(cut_number(pisa18_W0$FEMFRAC,4))
+pisa18_W0$DP_QU <- as.factor(cut_number(pisa18_W0$goal,4))
 levels_DP_W0 <- levels(pisa18_W0$DP_QU)
-ds_DP_W0 <- pisa18_W0 %>% group_by(DP_QU) %>% summarise(median = median(FEMFRAC), Freq = n())
+ds_DP_W0 <- pisa18_W0 %>% group_by(DP_QU) %>% summarise(median = median(goal), Freq = n())
 levels(pisa18_W0$DP_QU) <- 1:4
 
 sgr <- split(pisa18_W0 ,f = list(pisa18_W0$DP_QU,pisa18_W0$bull))
 t<-lapply(sgr, function(x) length(x[[1]]))
 pint0 <- comp.int.stack.core01(sgr = sgr,fits = fits0,
                                      wts = wtsStacking0,
-                                     cnt.path = file.path(PPath,"File"), p = 0.5)
+                                     cnt.path = file.path(PPath,"Files"), p = 0.5)
 ```
 ### Summarize results DH_QU
 ```{r  eval = FALSE}
@@ -459,7 +464,7 @@ sgr1 <- split(pisa18_W1 ,f = list(pisa18_W1$DP_QU,pisa18_W1$bull))
 t1<-lapply(sgr1, function(x) length(x[[1]]))
 pint1 <- comp.int.stack.core01(sgr = sgr1,fits = fits1,
                                      wts = wtsStacking1,
-                                     cnt.path = file.path(PPath,"File"), p = 0.5)
+                                     cnt.path = file.path(PPath,"Files"), p = 0.5)
 ```
 ### Summarize results DH_QU
 ```{r  eval = FALSE}
