@@ -215,97 +215,72 @@ for (i in 1:n01.models) {
 sink(file = NULL)
 ```
 
-### Posterior predictive checks, use hold-out predictors
+### Posterior predictive checks, predictors of candidate model 1
 ```{r  eval = FALSE}
 ## hold out ppc
 color_scheme_set(scheme = "blue")
 ppcCand20 <- visualPPC1(yrepM = ypredCand0[[2]])
 pdf(file.path(PPath, "Results/ppcCand2W0_out.pdf"))
-ppcCand20
+ppcCand20$ppc.plots
 dev.off()
 
 color_scheme_set(scheme = "green")
 ppcCand21 <- visualPPC1(yrepM = ypredCand1[[2]], WITHOUT = 1)
 pdf(file.path(PPath, "Results/ppcCand2W1_out.pdf"))
-ppcCand21
+ppcCand21$ppc.plots
 dev.off()
+
+
 
 color_scheme_set(scheme = "yellow")
 ppcCand10 <- visualPPC1(yrepM = ypredCand0[[1]])
 pdf(file.path(PPath, "Results/ppcCand2W0_in.pdf"))
-ppcCand10
+ppcCand10$ppc.plots
 dev.off()
+
+
 
 color_scheme_set(scheme = "red")
 ppcCand11 <- visualPPC1(yrepM = ypredCand1[[1]], WITHOUT = 1)
 pdf(file.path(PPath, "Results/ppcCand2W1_in.pdf"))
-ppcCand11
+ppcCand11$ppc.plots
 dev.off()
 
-pppv_ypredCandW0M1 <- two.sided.pppv(y.obs = pisa18$attp[pisa18$WITHOUT==0], yrepM = ypredCand0[[1]], alternative = "two.sided")
+num <- length(ppcCand20$ppc.plots)
 
-color_scheme_set(scheme = "green")
-ppcCand20 <- visualPPC(yrepM = ypredCand0[[2]])
-pdf(file.path(PPath, "Results/ppcCand2W0.pdf"))
-ppcCand20
-dev.off()
-
-pppv_ypredCandW0M2 <- two.sided.pppv(y.obs = pisa18$attp[pisa18$WITHOUT==0], yrepM = ypredCand0[[2]], alternative = "two.sided")
-
-color_scheme_set(scheme = "brightblue")
-ppcCand11 <- visualPPC(yrepM = ypredCand1[[1]], WITHOUT = 1)
-pdf(file.path(PPath, "Results/ppcCand1W1.pdf"))
-ppcCand11
-dev.off()
-
-pppv_ypredCandW1M1 <- two.sided.pppv(y.obs = pisa18$attp[pisa18$WITHOUT==1], yrepM = ypredCand1[[1]], alternative = "two.sided", WITHOUT = 1)
-
-color_scheme_set(scheme = "blue")
-ppcCand21 <- visualPPC(yrepM = ypredCand1[[2]], WITHOUT = 1)
-pdf(file.path(PPath, "Results/ppcCand2W1.pdf"))
-ppcCand21
-dev.off()
-
-pppv_ypredCandW1M2 <- two.sided.pppv(y.obs = pisa18$attp[pisa18$WITHOUT==1], yrepM = ypredCand1[[2]], alternative = "two.sided", WITHOUT = 1)
-
-save.image(file = file.path(PPath,"Files/save_session.RData"))
-#load(file=file.path(cnt.path,"save_session.RData"))
-
-num<-11
-sink(file = file.path(PPath,"Results/candW0M1.txt"))
+sink(file = file.path(PPath,"Results/ppcCand2W0_out.txt"))
 for(i in 1:num){
   print(paste("Table   ",i))
-  print(kable(pppv_ypredCandW0M1[[i]], format = "simple", digits = 2))
+  print(kable(ppcCand20$pppvals[i], format = "simple", digits = 2))
+  print("                 ")
+}
+sink(file=NULL)
+
+sink(file = file.path(PPath,"Results/ppcCand2W1_out.txt"))
+for(i in 1:num){
+  print(paste("Table   ",i))
+  print(kable(ppcCand21$pppvals[i], format = "simple", digits = 2))
+  print("                 ")
+}
+sink(file=NULL)
+
+sink(file = file.path(PPath,"Results/ppcCand2W0_in.txt"))
+for(i in 1:num){
+  print(paste("Table   ",i))
+  print(kable(ppcCand10$pppvals[i], format = "simple", digits = 2))
   print("                 ")
 }
 sink(file=NULL)
 
 
-sink(file = file.path(PPath,"Results/candW0M2.txt"))
+sink(file = file.path(PPath,"Results/ppcCand2W1_in.txt"))
 for(i in 1:num){
   print(paste("Table   ",i))
-  print(kable(pppv_ypredCandW0M2[[i]], format = "simple", digits = 2))
+  print(kable(ppcCand11$pppvals[i], format = "simple", digits = 2))
   print("                 ")
 }
 sink(file=NULL)
 
-
-sink(file = file.path(PPath,"Results/candW1M1.txt"))
-for(i in 1:num){
-  print(paste("Table   ",i))
-  print(kable(pppv_ypredCandW1M1[[i]], format = "simple", digits = 2))
-  print("                 ")
-}
-sink(file=NULL)
-
-
-sink(file = file.path(PPath,"Results/candW1M2.txt"))
-for(i in 1:num){
-  print(paste("Table   ",i))
-  print(kable(pppv_ypredCandW1M2[[i]], format = "simple", digits = 2))
-  print("                 ")
-}
-sink(file=NULL)
 
 ```
 
