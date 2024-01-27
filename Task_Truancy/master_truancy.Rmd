@@ -217,11 +217,29 @@ sink(file = NULL)
 
 ### Posterior predictive checks, use hold-out predictors
 ```{r  eval = FALSE}
+## hold out ppc
+color_scheme_set(scheme = "blue")
+ppcCand20 <- visualPPC1(yrepM = ypredCand0[[2]])
+pdf(file.path(PPath, "Results/ppcCand2W0_out.pdf"))
+ppcCand20
+dev.off()
 
-color_scheme_set(scheme = "teal")
-ppcCand10 <- visualPPC1(yrepM = ypredCand0[[2]])
-pdf(file.path(PPath, "Results/ppcCand1W0.pdf"))
+color_scheme_set(scheme = "green")
+ppcCand21 <- visualPPC1(yrepM = ypredCand1[[2]], WITHOUT = 1)
+pdf(file.path(PPath, "Results/ppcCand2W1_out.pdf"))
+ppcCand21
+dev.off()
+
+color_scheme_set(scheme = "yellow")
+ppcCand10 <- visualPPC1(yrepM = ypredCand0[[1]])
+pdf(file.path(PPath, "Results/ppcCand2W0_in.pdf"))
 ppcCand10
+dev.off()
+
+color_scheme_set(scheme = "red")
+ppcCand11 <- visualPPC1(yrepM = ypredCand1[[1]], WITHOUT = 1)
+pdf(file.path(PPath, "Results/ppcCand2W1_in.pdf"))
+ppcCand11
 dev.off()
 
 pppv_ypredCandW0M1 <- two.sided.pppv(y.obs = pisa18$attp[pisa18$WITHOUT==0], yrepM = ypredCand0[[1]], alternative = "two.sided")
