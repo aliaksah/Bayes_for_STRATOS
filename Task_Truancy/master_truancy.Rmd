@@ -23,8 +23,8 @@ load(file = file.path(PPath,"Orgdata/IMPDAT_PISA.RData"))
 source(file.path(PPath,"RFiles/01data_preperation.r"))
 to.rm <- objects()[!objects() %in% c("PPath","pisa18","countries")]
 rm(list = to.rm)
- head(pisa18)
- dim(pisa18)
+ #head(pisa18)
+# dim(pisa18)
 ```
 
 
@@ -43,7 +43,7 @@ pisa18 <- pisa.data
 rm(pisa.data)
 summary(pisa18$nb.stud)
 save(pisa18,file = file.path(PPath,"Files/pisa18.RData")) #file = file.path(PPath,"File/fits0.RData")
-load(file.path(PPath,"Files/pisa18.RData"))
+#load(file.path(PPath,"Files/pisa18.RData"))
 ```
 
 
@@ -174,9 +174,9 @@ save("ypredCand0", file = file.path(PPath, "Files/ypredCand0.RData"))
 
 br.candL20 <- list()
 for (i in 1:n01.models) {
-  br.candL20[[i]] <- brierS(pisa18$attp[pisa18$WITHOUT == 0],colMeans(ypredCand0[[i]]))
- 
-}
+  colMeansM <- colMeans(ypredCand0[[i]])
+  br.candL20[[i]] <- brierS(pisa18$attp[pisa18$WITHOUT == 0],colMeansM)
+ }
 
 # Write Brier score to file.
 sink(file = file.path(PPath, "Results/brier.scores0.txt"))
@@ -219,7 +219,7 @@ sink(file = NULL)
 ```{r  eval = FALSE}
 
 color_scheme_set(scheme = "teal")
-ppcCand10 <- visualPPC(yrepM = ypredCand0[[1]])
+ppcCand10 <- visualPPC1(yrepM = ypredCand0[[2]])
 pdf(file.path(PPath, "Results/ppcCand1W0.pdf"))
 ppcCand10
 dev.off()

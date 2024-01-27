@@ -295,7 +295,7 @@ two.sided.pppv <- function(y.obs = pisa18$ld, yrepM = ypredStack,
                             y.obs, yrepM, alternative = alternative)
   }
   
-  ppc.pppv[[11]] <- unlist(pppv)
+  ppc.pppv[[10]] <- unlist(pppv)
   
   ng <-length(levels(interaction(pisa18$DISH[pisa18$WITHOUT == WITHOUT])))
   pppv <- rep(-1,ng)
@@ -305,7 +305,7 @@ two.sided.pppv <- function(y.obs = pisa18$ld, yrepM = ypredStack,
                             y.obs, yrepM, alternative = alternative)
   }
   
-  ppc.pppv[[10]] <- unlist(pppv)
+  ppc.pppv[[11]] <- unlist(pppv)
   
   pppv <- list()
   for(i in 1:num.plots){
@@ -317,6 +317,15 @@ two.sided.pppv <- function(y.obs = pisa18$ld, yrepM = ypredStack,
   return(pppv)
 }
 
+visualPPC <- function(y.obs = y.obs, foc = foc, title = "stat = mean, var.name",yrepM = yrepM,WITHOUT = 0){
+  ppc.plot <-  ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = yrepM, stat = "mean", 
+                                      group = interaction(foc[pisa18$WITHOUT == WITHOUT]),
+                                      facet_args = list(nrow = 2, scales = "fixed")) + 
+    xlab("probability of attp") + ggtitle(title) +#,facet_args = list(ncol = 2)
+    theme(text = element_text(size = 25), axis.text = element_text(size = 8))
+  return(ppc.plot)
+}
+
 
 
 #' @title Returns a series of visual PPCs.
@@ -325,88 +334,59 @@ two.sided.pppv <- function(y.obs = pisa18$ld, yrepM = ypredStack,
 #' @param y.obs The outcome
 #' @param yrepM  Matrix with replicated data sets of the corresponding model.
 #' @return PPC plots 
-visualPPC <- function(y.obs = pisa18$attp, yrepM = ypredM, WITHOUT = 0){
+visualPPC1 <- function(y.obs = pisa18$attp, yrepM = yrepM, WITHOUT = 0){
   
   num.plots <- 12
   ppc.plots <- vector(num.plots, mode = 'list')
   
-  ppc.plots[[1]] <-  ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = yrepM, stat = "mean", 
-                                      group = interaction(pisa18$aca[pisa18$WITHOUT == WITHOUT]),
-                                      facet_args = list(nrow = 2, scales = "fixed")) + 
-    xlab("probability of attp") + ggtitle("stat = mean, aca") +#,facet_args = list(ncol = 2)
-    theme(text = element_text(size = 25), axis.text = element_text(size = 8))
+  ppc.plots[[1]] <- visualPPC(y.obs = pisa18$attp, foc = pisa18$aca, 
+                               title = "stat = mean, aca",
+                               yrep = yrepM, WITHOUT)
   
+  ppc.plots[[2]] <- visualPPC(y.obs = pisa18$attp, foc = pisa18$ld, 
+                               title = "stat = mean, ld",
+                               yrep = yrepM, WITHOUT)
   
+  ppc.plots[[3]] <- visualPPC(y.obs = pisa18$attp, foc = pisa18$uni, 
+                               title = "stat = mean, uni",
+                               yrep = yrepM, WITHOUT)
   
-  ppc.plots[[2]] <-  ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = yrepM, stat = "mean", 
-                                      group = interaction(pisa18$bull[pisa18$WITHOUT == WITHOUT]),
-                                      facet_args = list(nrow = 2, scales = "fixed")) + 
-    xlab("probability of attp") + ggtitle("stat = mean, bull") +#,facet_args = list(ncol = 2)
-    theme(text = element_text(size = 25), axis.text = element_text(size = 8))
+  ppc.plots[[4]] <- visualPPC(y.obs = pisa18$attp, foc = pisa18$bull, 
+                               title = "stat = mean, bull",
+                               yrep = yrepM, WITHOUT)
   
+  ppc.plots[[5]] <- visualPPC(y.obs = pisa18$attp, foc = pisa18$fewbooks, 
+                               title = "stat = mean, fewbooks",
+                               yrep = yrepM, WITHOUT)
+  belong4 <- cut_number(pisa18$belong,4)
+  ppc.plots[[6]] <- visualPPC(y.obs = pisa18$attp, foc = belong4, 
+                               title = "stat = mean, belong",
+                               yrep = yrepM, WITHOUT)
+  joyread4 <- cut_number(pisa18$joyread,4)
+  ppc.plots[[7]] <- visualPPC(y.obs = pisa18$attp, foc = joyread4, 
+                               title = "stat = mean, joyread",
+                               yrep = yrepM, WITHOUT)
+  goal4 <- cut_number(pisa18$goal,4)
+  ppc.plots[[8]] <- visualPPC(y.obs = pisa18$attp, foc = goal4, 
+                               title = "stat = mean, goal",
+                               yrep = yrepM, WITHOUT)
+  mot4 <- cut_number(pisa18$mot,4)
+  ppc.plots[[9]] <- visualPPC(y.obs = pisa18$attp, foc = mot4, 
+                               title = "stat = mean, mot",
+                               yrep = yrepM, WITHOUT)
   
-  ppc.plots[[3]] <-  ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = yrepM, stat = "mean", 
-                                      group = interaction(pisa18$ld[pisa18$WITHOUT == WITHOUT]),
-                                      facet_args = list(nrow = 2, scales = "fixed")) + 
-    xlab("probability of attp") + ggtitle("stat = mean, ld") +#,facet_args = list(ncol = 2)
-    theme(text = element_text(size = 25), axis.text = element_text(size = 8))
-  
-  
-  ppc.plots[[4]] <-  ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = yrepM, stat = "mean", 
-                                      group = interaction(pisa18$uni[pisa18$WITHOUT == WITHOUT]),
-                                      facet_args = list(nrow = 2, scales = "fixed")) + 
-    xlab("probability of attp") + ggtitle("stat = mean, uni") +#,facet_args = list(ncol = 2)
-    theme(text = element_text(size = 25), axis.text = element_text(size = 8))
-  
-  ppc.plots[[5]] <-  ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = yrepM, stat = "mean", 
-                                      group = interaction(pisa18$fewbooks [pisa18$WITHOUT == WITHOUT]),
-                                      facet_args = list(nrow = 2, scales = "fixed")) + 
-    xlab("probability of attp") + ggtitle("stat = mean, fewbooks ") +#,facet_args = list(ncol = 2)
-    theme(text = element_text(size = 25), axis.text = element_text(size = 8))
-  ###----------------------------------------------------------------------------
-  
-  ppc.plots[[6]] <-  ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = yrepM, stat = "mean", 
-                                      group = interaction(pisa18$RUR[pisa18$WITHOUT == WITHOUT]),
-                                      facet_args = list(nrow = 2, scales = "fixed")) + 
-    xlab("probability of attp") + ggtitle("stat = mean, RUR") +#,facet_args = list(ncol = 2)
-    theme(text = element_text(size = 25), axis.text = element_text(size = 8))
-  
- 
-  
-  ppc.plots[[7]] <-  ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],
-                                      yrep = yrepM, stat = "mean", 
-                                      group = interaction(pisa18$immig[pisa18$WITHOUT == WITHOUT]),
-                                      facet_args = list(nrow = 2)) +   
-    xlab("probability of attp") + ggtitle("stat = mean, immig") +
-    theme(text = element_text(size = 25), axis.text = element_text(size = 8))
-  
-  
-  ppc.plots[[8]] <-  ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = yrepM, stat = "mean", 
-                                      group = interaction(pisa18$female[pisa18$WITHOUT == WITHOUT]),
-                                      facet_args = list(nrow = 2, scales = "fixed")) + 
-    xlab("probability of attp") + ggtitle("stat = mean, female") +#,facet_args = list(ncol = 2)
-    theme(text = element_text(size = 25), axis.text = element_text(size = 8))
-  
-  ppc.plots[[9]] <-  ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = yrepM, stat = "mean", 
-                                      group = interaction(pisa18$native[pisa18$WITHOUT == WITHOUT]),
-                                      facet_args = list(nrow = 2, scales = "fixed")) + 
-    xlab("probability of attp") + ggtitle("stat = mean, native") +#,facet_args = list(ncol = 2)
-    theme(text = element_text(size = 25), axis.text = element_text(size = 8))
-  
-  ppc.plots[[10]] <-  ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],
-                                      yrep = yrepM, stat = "mean", 
-                                      group = interaction(pisa18$GYM[pisa18$WITHOUT == WITHOUT]),
-                                      facet_args = list(nrow = 2)) +   
-    xlab("probability of attp") + ggtitle("stat = mean, GYM") +
-    theme(text = element_text(size = 25), axis.text = element_text(size = 8))
-  
-  
-  ppc.plots[[11]] <-  ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = yrepM, stat = "mean", 
-                                      group = interaction(pisa18$DISH[pisa18$WITHOUT == WITHOUT]),
-                                      facet_args = list(nrow = 2, scales = "fixed")) + 
-    xlab("probability of attp") + ggtitle("stat = mean, DISH") +#,facet_args = list(ncol = 2)
-    theme(text = element_text(size = 25), axis.text = element_text(size = 8))
-  
+  DISCIPLINE4 <- cut_number(pisa18$DISCIPLINE,4)
+  ppc.plots[[10]] <- visualPPC(y.obs = pisa18$attp, foc = DISCIPLINE4, 
+                               title = "stat = mean, DISCIPLINE",
+                               yrep = yrepM, WITHOUT)
+  TEACHBAD4 <- cut_number(pisa18$TEACHBAD,4)
+  ppc.plots[[11]] <- visualPPC(y.obs = pisa18$attp, foc = TEACHBAD4, 
+                               title = "stat = mean, TEACHBAD",
+                               yrep = yrepM, WITHOUT)
+  VAL4 <- cut_number(pisa18$mot,4)
+  ppc.plots[[12]] <- visualPPC(y.obs = pisa18$attp, foc = VAL4, 
+                               title = "stat = mean, VAL",
+                               yrep = yrepM, WITHOUT)
   
   return(ppc.plots)
 }
