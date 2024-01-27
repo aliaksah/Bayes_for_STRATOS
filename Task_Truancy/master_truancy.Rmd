@@ -63,7 +63,7 @@ load(file.path(PPath,"Files/pisa18_sc.RData"))
 ```
 
 ### Stack models: Use all relevant predictors, hold out some to check for predictive validity
-### Splines: https://rpubs.com/samuelfix08/splines
+
 
 ```{r  eval = FALSE}
 
@@ -73,7 +73,7 @@ load(file.path(PPath,"Files/pisa18_sc.RData"))
 stack1 <- as.formula(attp ~ aca + ld + uni  + bull + fewbooks + belong +  joyread + goal + mot  + DISCIPLINE + TEACHBAD + VAL + (1 | school.id))
 # composition effect
 stack2 <- as.formula(attp ~  immig + native + female + escs  + RUR + DISH 
-                     + GYM + STAFFSHORT + EDUSHORT + FEMFRAC  + SN_SC + NN_SC + (1 | school.id))
+                     + GYM + STAFFSHORT + EDUSHORT + FEMFRAC + SN_SC + NN_SC + (1 | school.id))
 
 models <- vector(mode = "list", length = 2)
 
@@ -219,31 +219,27 @@ sink(file = NULL)
 ```{r  eval = FALSE}
 ## hold out ppc
 color_scheme_set(scheme = "blue")
-ppcCand20 <- visualPPC1(yrepM = ypredCand0[[2]])
+ppcCand20_out <- visualPPC1(yrepM = ypredCand0[[2]])
 pdf(file.path(PPath, "Results/ppcCand2W0_out.pdf"))
-ppcCand20$ppc.plots
+ppcCand20_out$ppc.plots
 dev.off()
 
 color_scheme_set(scheme = "green")
-ppcCand21 <- visualPPC1(yrepM = ypredCand1[[2]], WITHOUT = 1)
+ppcCand21_out <- visualPPC1(yrepM = ypredCand1[[2]], WITHOUT = 1)
 pdf(file.path(PPath, "Results/ppcCand2W1_out.pdf"))
-ppcCand21$ppc.plots
+ppcCand21_out$ppc.plots
 dev.off()
-
-
 
 color_scheme_set(scheme = "yellow")
-ppcCand10 <- visualPPC1(yrepM = ypredCand0[[1]])
-pdf(file.path(PPath, "Results/ppcCand2W0_in.pdf"))
-ppcCand10$ppc.plots
+ppcCand10_in <- visualPPC1(yrepM = ypredCand0[[1]])
+pdf(file.path(PPath, "Results/ppcCand1W0_in.pdf"))
+ppcCand10_in$ppc.plots
 dev.off()
 
-
-
 color_scheme_set(scheme = "red")
-ppcCand11 <- visualPPC1(yrepM = ypredCand1[[1]], WITHOUT = 1)
-pdf(file.path(PPath, "Results/ppcCand2W1_in.pdf"))
-ppcCand11$ppc.plots
+ppcCand11_in <- visualPPC1(yrepM = ypredCand1[[1]], WITHOUT = 1)
+pdf(file.path(PPath, "Results/ppcCand1W1_in.pdf"))
+ppcCand11_in$ppc.plots
 dev.off()
 
 num <- length(ppcCand20$ppc.plots)
@@ -251,7 +247,7 @@ num <- length(ppcCand20$ppc.plots)
 sink(file = file.path(PPath,"Results/ppcCand2W0_out.txt"))
 for(i in 1:num){
   print(paste("Table   ",i))
-  print(kable(ppcCand20$pppvals[i], format = "simple", digits = 2))
+  print(kable(ppcCand20_out$pppvals[i], format = "simple", digits = 2))
   print("                 ")
 }
 sink(file=NULL)
@@ -259,7 +255,72 @@ sink(file=NULL)
 sink(file = file.path(PPath,"Results/ppcCand2W1_out.txt"))
 for(i in 1:num){
   print(paste("Table   ",i))
-  print(kable(ppcCand21$pppvals[i], format = "simple", digits = 2))
+  print(kable(ppcCand21_out$pppvals[i], format = "simple", digits = 2))
+  print("                 ")
+}
+sink(file=NULL)
+
+sink(file = file.path(PPath,"Results/ppcCand1W0_in.txt"))
+for(i in 1:num){
+  print(paste("Table   ",i))
+  print(kable(ppcCand10_in$pppvals[i], format = "simple", digits = 2))
+  print("                 ")
+}
+sink(file=NULL)
+
+
+sink(file = file.path(PPath,"Results/ppcCand1W1_in.txt"))
+for(i in 1:num){
+  print(paste("Table   ",i))
+  print(kable(ppcCand11_in$pppvals[i], format = "simple", digits = 2))
+  print("                 ")
+}
+sink(file=NULL)
+
+
+```
+#### Posterior predictive checks, predictors of candidate model 2
+```{r}
+
+## hold out ppc
+color_scheme_set(scheme = "blue")
+ppcCand10_out <- visualPPC2(yrepM = ypredCand0[[1]])
+pdf(file.path(PPath, "Results/ppcCand1W0_out.pdf"))
+ppcCand10_out$ppc.plots
+dev.off()
+
+color_scheme_set(scheme = "green")
+ppcCand11_out <- visualPPC2(yrepM = ypredCand1[[1]], WITHOUT = 1)
+pdf(file.path(PPath, "Results/ppcCand1W1_out.pdf"))
+ppcCand11_out$ppc.plots
+dev.off()
+
+color_scheme_set(scheme = "yellow")
+ppcCand20_in <- visualPPC2(yrepM = ypredCand0[[2]])
+pdf(file.path(PPath, "Results/ppcCand2W0_in.pdf"))
+ppcCand20_in$ppc.plots
+dev.off()
+
+color_scheme_set(scheme = "red")
+ppcCand21_in <- visualPPC2(yrepM = ypredCand1[[2]], WITHOUT = 1)
+pdf(file.path(PPath, "Results/ppcCand2W1_in.pdf"))
+ppcCand21_in$ppc.plots
+dev.off()
+
+num <- length(ppcCand21_in$ppc.plots)
+
+sink(file = file.path(PPath,"Results/ppcCand1W0_out.txt"))
+for(i in 1:num){
+  print(paste("Table   ",i))
+  print(kable(ppcCand10_out$pppvals[i], format = "simple", digits = 2))
+  print("                 ")
+}
+sink(file=NULL)
+
+sink(file = file.path(PPath,"Results/ppcCand1W1_out.txt"))
+for(i in 1:num){
+  print(paste("Table   ",i))
+  print(kable(ppcCand11_out$pppvals[i], format = "simple", digits = 2))
   print("                 ")
 }
 sink(file=NULL)
@@ -267,7 +328,7 @@ sink(file=NULL)
 sink(file = file.path(PPath,"Results/ppcCand2W0_in.txt"))
 for(i in 1:num){
   print(paste("Table   ",i))
-  print(kable(ppcCand10$pppvals[i], format = "simple", digits = 2))
+  print(kable(ppcCand20_in$pppvals[i], format = "simple", digits = 2))
   print("                 ")
 }
 sink(file=NULL)
@@ -276,13 +337,14 @@ sink(file=NULL)
 sink(file = file.path(PPath,"Results/ppcCand2W1_in.txt"))
 for(i in 1:num){
   print(paste("Table   ",i))
-  print(kable(ppcCand11$pppvals[i], format = "simple", digits = 2))
+  print(kable(ppcCand21_in$pppvals[i], format = "simple", digits = 2))
   print("                 ")
 }
 sink(file=NULL)
 
-
 ```
+
+
 
 #### add a model to the stack, bpppv < 0.015 must be included
 ```{r  eval = FALSE}

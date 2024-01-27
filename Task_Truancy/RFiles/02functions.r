@@ -180,142 +180,8 @@ pppval_group <- function(group_nr = 1, groups = my.groups, y,
 }
 
 
-#' @title Returns a series of (two sided) posterior predictive p-values
-#' @description The function contains all the PPCs that are of substantive 
-#' interest. The summary statistic is the mean. It computes the corresponding
-#' (two sided) p-value.
-#' @param y.obs The outcome
-#' @param yrepM  Matrix with replicated data sets of the corresponding model.
-#' @alternative  alternative = c("two.sided", "less", "greater")
-#' @return Two sided posterior predictive p values 
-two.sided.pppv <- function(y.obs = pisa18$ld, yrepM = ypredStack, 
-                           alternative = alternative, WITHOUT = 0){
-  
-  num.plots <- 11
-  
-  ppc.pppv <- vector(num.plots, mode = 'list')
 
-  ng <-length(levels(interaction(pisa18$aca[pisa18$WITHOUT == WITHOUT])))
-  pppv <- rep(-1,ng)
-  for (i in 1:ng){
-    pppv[i] <- pppval_group(group_nr = i, 
-                            groups = interaction(pisa18$aca[pisa18$WITHOUT == WITHOUT]), 
-                            y.obs, yrepM, alternative = alternative)
-  }
-  
-  ppc.pppv[[1]] <- unlist(pppv)
-  
-  
-  ng <-length(levels(interaction(pisa18$bull[pisa18$WITHOUT == WITHOUT])))
-  pppv <- rep(-1,ng)
-  for (i in 1:ng){
-    pppv[i] <- pppval_group(group_nr = i, 
-                            groups = interaction(pisa18$bull[pisa18$WITHOUT == WITHOUT]), 
-                            y.obs, yrepM, alternative = alternative)
-  }
-  
-  ppc.pppv[[2]] <- unlist(pppv)
-  
-  
-  ng <-length(levels(interaction(pisa18$ld[pisa18$WITHOUT == WITHOUT])))
-  pppv <- rep(-1,ng)
-  for (i in 1:ng){
-    pppv[i] <- pppval_group(group_nr = i, 
-                            groups = interaction(pisa18$ld[pisa18$WITHOUT == WITHOUT]), 
-                            y.obs, yrepM, alternative = alternative)
-  }
-  
-  ppc.pppv[[3]] <- unlist(pppv)
-  
-  ng <-length(levels(interaction(pisa18$uni[pisa18$WITHOUT == WITHOUT])))
-  pppv <- rep(-1,ng)
-  for (i in 1:ng){
-    pppv[i] <- pppval_group(group_nr = i, 
-                            groups = interaction(pisa18$uni[pisa18$WITHOUT == WITHOUT]), 
-                            y.obs, yrepM, alternative = alternative)
-  }
-  
-  ppc.pppv[[4]] <- unlist(pppv)
-  
-  ng <-length(levels(interaction(pisa18$fewbooks[pisa18$WITHOUT == WITHOUT])))
-  pppv <- rep(-1,ng)
-  for (i in 1:ng){
-    pppv[i] <- pppval_group(group_nr = i, 
-                            groups = interaction(pisa18$fewbooks[pisa18$WITHOUT == WITHOUT]), 
-                            y.obs, yrepM, alternative = alternative)
-  }
-  
-  ppc.pppv[[5]] <- unlist(pppv)
-  
-  ng <-length(levels(interaction(pisa18$RUR[pisa18$WITHOUT == WITHOUT])))
-  pppv <- rep(-1,ng)
-  for (i in 1:ng){
-    pppv[i] <- pppval_group(group_nr = i, 
-                            groups = interaction(pisa18$RUR[pisa18$WITHOUT == WITHOUT]), 
-                            y.obs, yrepM, alternative = alternative)
-  }
-  
-  ppc.pppv[[6]] <- unlist(pppv)
-  
-  ng <-length(levels(interaction(pisa18$immig[pisa18$WITHOUT == WITHOUT])))
-  pppv <- rep(-1,ng)
-  for (i in 1:ng){
-    pppv[i] <- pppval_group(group_nr = i, 
-                            groups = interaction(pisa18$immig[pisa18$WITHOUT == WITHOUT]), 
-                            y.obs, yrepM, alternative = alternative)
-  }
-  
-  ppc.pppv[[7]] <- unlist(pppv)
-  
-  ng <-length(levels(interaction(pisa18$female[pisa18$WITHOUT == WITHOUT])))
-  pppv <- rep(-1,ng)
-  for (i in 1:ng){
-    pppv[i] <- pppval_group(group_nr = i, 
-                            groups = interaction(pisa18$female[pisa18$WITHOUT == WITHOUT]), 
-                            y.obs, yrepM, alternative = alternative)
-  }
-  
-  ppc.pppv[[8]] <- unlist(pppv)
-  
-  ng <-length(levels(interaction(pisa18$native[pisa18$WITHOUT == WITHOUT])))
-  pppv <- rep(-1,ng)
-  for (i in 1:ng){
-    pppv[i] <- pppval_group(group_nr = i, 
-                            groups = interaction(pisa18$native[pisa18$WITHOUT == WITHOUT]), 
-                            y.obs, yrepM, alternative = alternative)
-  }
-  
-  ppc.pppv[[9]] <- unlist(pppv)
-  
-  ng <-length(levels(interaction(pisa18$GYM[pisa18$WITHOUT == WITHOUT])))
-  pppv <- rep(-1,ng)
-  for (i in 1:ng){
-    pppv[i] <- pppval_group(group_nr = i, 
-                            groups = interaction(pisa18$GYM[pisa18$WITHOUT == WITHOUT]), 
-                            y.obs, yrepM, alternative = alternative)
-  }
-  
-  ppc.pppv[[10]] <- unlist(pppv)
-  
-  ng <-length(levels(interaction(pisa18$DISH[pisa18$WITHOUT == WITHOUT])))
-  pppv <- rep(-1,ng)
-  for (i in 1:ng){
-    pppv[i] <- pppval_group(group_nr = i, 
-                            groups = interaction(pisa18$DISH[pisa18$WITHOUT == WITHOUT]), 
-                            y.obs, yrepM, alternative = alternative)
-  }
-  
-  ppc.pppv[[11]] <- unlist(pppv)
-  
-  pppv <- list()
-  for(i in 1:num.plots){
-    pppv[[i]] <- matrix(ppc.pppv[[i]], nrow = 2, byrow = TRUE)
-    
-  }
-  
-  
-  return(pppv)
-}
+
 
 visualPPC <- function(y.obs = y.obs, foc = foc, title = "stat = mean, var.name",
                       yrepM = yrepM,WITHOUT = 0){
@@ -340,9 +206,9 @@ visualPPC <- function(y.obs = y.obs, foc = foc, title = "stat = mean, var.name",
 
 
 
-#' @title Returns a series of visual PPCs.
-#' @description The function contains all the PPCs that are of substantive 
-#' interest. The summary statistic is the mean. 
+#' @title Returns a series of visual PPCs, predictors of model 1
+#' @description The function contains all the PPCs that are included in
+#' candidate model 1. The summary statistic is the mean. 
 #' @param y.obs The outcome
 #' @param yrepM  Matrix with replicated data sets of the corresponding model.
 #' @return PPC plots 
@@ -428,7 +294,7 @@ visualPPC1 <- function(y.obs = pisa18$attp, yrepM = yrepM, WITHOUT = 0){
   ppc.plots[[11]] <- vppc[[1]]
   pppvals[[11]]  <- vppc[[2]]
   
-  VAL4 <- cut_number(pisa18$mot,4)
+  VAL4 <- cut_number(pisa18$VAL,4)
   vppc <- visualPPC(y.obs = pisa18$attp, foc = VAL4, 
                                title = "stat = mean, VAL",
                                yrep = yrepM, WITHOUT)
@@ -439,6 +305,107 @@ visualPPC1 <- function(y.obs = pisa18$attp, yrepM = yrepM, WITHOUT = 0){
   return(list(ppc.plots=ppc.plots,pppvals=pppvals))
 }
 
+
+
+
+#' @title Returns a series of visual PPCs, predictors of model 2
+#' @description The function contains all the PPCs that are included in
+#' candidate model 2. The summary statistic is the mean. 
+#' @param y.obs The outcome
+#' @param yrepM  Matrix with replicated data sets of the corresponding model.
+#' @return PPC plots 
+visualPPC2 <- function(y.obs = pisa18$attp, yrepM = yrepM, WITHOUT = 0){
+  
+  num.plots <- 12
+  ppc.plots <- vector(num.plots, mode = 'list')
+  pppvals <- vector(num.plots, mode = 'list')
+  
+  vppc <- visualPPC(y.obs = pisa18$attp, foc = pisa18$immig, 
+                    title = "stat = mean, immig",
+                    yrep = yrepM, WITHOUT)
+  ppc.plots[[1]] <- vppc[[1]]
+  pppvals[[1]]  <- vppc[[2]]
+  
+  vppc <- visualPPC(y.obs = pisa18$attp, foc = pisa18$native, 
+                    title = "stat = mean, native",
+                    yrep = yrepM, WITHOUT)
+  ppc.plots[[2]] <- vppc[[1]]
+  pppvals[[2]]  <- vppc[[2]]
+  
+  vppc <- visualPPC(y.obs = pisa18$attp, foc = pisa18$female, 
+                    title = "stat = mean, female",
+                    yrep = yrepM, WITHOUT)
+  ppc.plots[[3]] <- vppc[[1]]
+  pppvals[[3]]  <- vppc[[2]]
+  
+  escs4 <- cut_number(pisa18$escs,4)
+  vppc <- visualPPC(y.obs = pisa18$attp, foc = escs4, 
+                    title = "stat = mean, escs",
+                    yrep = yrepM, WITHOUT)
+  ppc.plots[[4]] <- vppc[[1]]
+  pppvals[[4]]  <- vppc[[2]]
+  
+  vppc <- visualPPC(y.obs = pisa18$attp, foc = pisa18$RUR, 
+                    title = "stat = mean, RUR",
+                    yrep = yrepM, WITHOUT)
+  ppc.plots[[5]] <- vppc[[1]]
+  pppvals[[5]]  <- vppc[[2]]
+  
+  vppc  <- visualPPC(y.obs = pisa18$attp, foc = pisa18$DISH, 
+                     title = "stat = mean, DISH",
+                     yrep = yrepM, WITHOUT)
+  ppc.plots[[6]] <- vppc[[1]]
+  pppvals[[6]]  <- vppc[[2]]
+  
+  vppc  <- visualPPC(y.obs = pisa18$attp, foc = pisa18$GYM, 
+                     title = "stat = mean, GYM",
+                     yrep = yrepM, WITHOUT)
+  
+  ppc.plots[[7]] <- vppc[[1]]
+  pppvals[[7]]  <- vppc[[2]]
+  
+  STAFFSHORT4 <- cut_number(pisa18$STAFFSHORT,4)
+  vppc  <- visualPPC(y.obs = pisa18$attp, foc = STAFFSHORT4, 
+                     title = "stat = mean, STAFFSHORT",
+                     yrep = yrepM, WITHOUT)
+  
+  ppc.plots[[8]] <- vppc[[1]]
+  pppvals[[8]]  <- vppc[[2]]
+  
+  EDUSHORT2 <- cut_number(pisa18$EDUSHORT,2)
+  vppc  <- visualPPC(y.obs = pisa18$attp, foc = EDUSHORT2, 
+                     title = "stat = mean, EDUSHORT",
+                     yrep = yrepM, WITHOUT)
+  
+  ppc.plots[[9]] <- vppc[[1]]
+  pppvals[[9]]  <- vppc[[2]]
+  
+  FEMFRAC4 <- cut_number(pisa18$FEMFRAC,4)
+  vppc <- visualPPC(y.obs = pisa18$attp, foc = FEMFRAC4, 
+                    title = "stat = mean, FEMFRAC",
+                    yrep = yrepM, WITHOUT)
+  
+  
+  ppc.plots[[10]] <- vppc[[1]]
+  pppvals[[10]]  <- vppc[[2]]
+  
+  SN_SC4 <- cut_number(pisa18$SN_SC,4)
+  vppc  <- visualPPC(y.obs = pisa18$attp, foc = SN_SC4, 
+                     title = "stat = mean, SN_SC",
+                     yrep = yrepM, WITHOUT)
+  ppc.plots[[11]] <- vppc[[1]]
+  pppvals[[11]]  <- vppc[[2]]
+  
+  NN_SC4 <- cut_number(pisa18$NN_SC,4)
+  vppc <- visualPPC(y.obs = pisa18$attp, foc = NN_SC4, 
+                    title = "stat = mean, NN_SC",
+                    yrep = yrepM, WITHOUT)
+  
+  ppc.plots[[12]] <- vppc[[1]]
+  pppvals[[12]]  <- vppc[[2]]
+  
+ return(list(ppc.plots=ppc.plots,pppvals=pppvals))
+}
 
 ##### Plot results ###########################################################
 
