@@ -469,67 +469,43 @@ ppcStack0
 dev.off()
 
 ```
-#### final model
-```{r}
-final <- as.formula(attp ~ native + immig + aca + ld + uni  + bull + fewbooks + belong +  joyread + goal + mot  + DISCIPLINE + TEACHBAD + VAL + NN_SC  + (1| school.id))
 
-final.fit0 <- stan_glmer(final, data = pisa18[pisa18$WITHOUT == 0,], seed = a.seed,iter = a.iter, chains = a.chains, family = binomial())
-
-save(final.fit0, file = file.path(PPath,"Files/final.fit0.RData"))
-
-final.fit1 <- stan_glmer(final, data = pisa18[pisa18$WITHOUT == 1,], seed = a.seed,iter = a.iter, chains = a.chains, family = binomial())
-
-save(final.fit1, file = file.path(PPath,"Files/final.fit1.RData"))
-```
-##### PPCs again
+##### Details PPCs
 ```{r}
 set.seed(a.seed)
-ypredfinal0 <- posterior_predict(final.fit0) 
-save("ypredfinal0", file = file.path("Files/ypredfinal0.RData"))
-
 color_scheme_set(scheme = "purple")
-ypredfinal0 <- visualPPC2(y.obs = pisa18$attp, yrepM = ypredfinal0)
-pdf(file.path(PPath, "Results/ypredfinal0.pdf"))
-ypredfinal0
-dev.off()
+WITHOUT = 0
+NN_SC4 <- cut_number(pisa18$NN_SC,4)
+pdf(file.path(PPath, "Results/ppc_detail.pdf"))
+ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = ypredStack0, stat = "mean", 
+                                      group = interaction(NN_SC4[pisa18$WITHOUT ==WITHOUT], pisa18$immig[pisa18$WITHOUT == WITHOUT]),facet_args = list(nrow = 2, scales = "fixed")) + 
+    xlab("probability of ld") + ggtitle("stat = mean, NN_SC x immig") + theme(text = element_text(size = 12), axis.text = element_text(size = 8))
+#dev.off()
 
-set.seed(a.seed)
-ypredfinal1 <- posterior_predict(final.fit1) 
-save("ypredfinal1", file = file.path("Files/ypredfinal1.RData"))
 
 color_scheme_set(scheme = "darkgray")
-ypredfinal1 <- visualPPC2(y.obs = pisa18$attp, yrepM = ypredfinal1, WITHOUT = 1)
-pdf(file.path(PPath, "Results/ypredfinal1.pdf"))
-ypredfinal1
+#pdf(file.path(PPath, "Results/ppc_native.pdf"))
+ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = ypredStack0, stat = "mean", 
+                                      group = interaction(NN_SC4[pisa18$WITHOUT ==WITHOUT], pisa18$native[pisa18$WITHOUT == WITHOUT]),facet_args = list(nrow = 2, scales = "fixed")) + 
+    xlab("probability of ld") + ggtitle("stat = mean, NN_SC x native") + theme(text = element_text(size = 12), axis.text = element_text(size = 8))
+#dev.off()
+
+color_scheme_set(scheme = "teal")
+#pdf(file.path(PPath, "Results/ppc_immig_native.pdf"))
+ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = ypredStack0, stat = "mean", 
+                                      group = interaction(pisa18$immig[pisa18$WITHOUT ==WITHOUT], pisa18$native[pisa18$WITHOUT == WITHOUT]),facet_args = list(nrow = 2, scales = "fixed")) + 
+    xlab("probability of ld") + ggtitle("stat = mean, immig x native") + theme(text = element_text(size = 12), axis.text = element_text(size = 8))
+
+DISHOME4 <- cut_number(pisa18$DISHOME,4)
+color_scheme_set(scheme = "mix-teal-pink")
+ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = ypredStack0, stat = "mean", 
+                                      group = interaction(DISHOME4[pisa18$WITHOUT ==WITHOUT], pisa18$native[pisa18$WITHOUT == WITHOUT]),facet_args = list(nrow = 2, scales = "fixed")) + 
+    xlab("probability of ld") + ggtitle("stat = mean, DISHOME x native") + theme(text = element_text(size = 12), axis.text = element_text(size = 8))
+
 dev.off()
+
 ```
 
 
-###### Use marginaleffects to have a high flexiblity to summarize the ###### results
-```{r}
-plot.cap0 <- plot_predictions(final.fit0, condition = c("NN_SC","bull","ld"))
-plot.cap1 <- plot_predictions(final.fit1, condition = c("NN_SC","bull","ld"))
 
-pdf(file.path(PPath,"Results/plot.cap0.pdf"))
-plot.cap0
-dev.off()
-
-pdf(file.path(PPath,"Results/plot.cap1.pdf"))
-plot.cap1
-dev.off()
-```
-
-
-```{r}
-plot.cap0b <- plot_predictions(final.fit0, condition = c("goal","ld","aca"))
-plot.cap1b <- plot_predictions(final.fit1, condition = c("goal","ld","aca"))
-
-pdf(file.path(PPath,"Results/plot.cap0b.pdf"))
-plot.cap0b
-dev.off()
-
-pdf(file.path(PPath,"Results/plot.cap1b.pdf"))
-plot.cap1b
-dev.off()
-```
 
