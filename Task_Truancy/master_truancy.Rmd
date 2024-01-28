@@ -344,52 +344,90 @@ sink(file=NULL)
 
 ```
 
-
-
-#### add a model to the stack, bpppv < 0.015 must be included
+#### improve theoretical model
 ```{r  eval = FALSE}
 
-# models to stack
-# theoretical model
-stack30 <- as.formula(attp ~ immig + native + bull + ld + uni + goal + VAL   + RUR + GYM + FEMFRAC +  NN_SC + bull:FEMFRAC + (1 + bull| school.id))
-# composition effect
-stack31 <- as.formula(attp ~ fewbooks + bull  + ld + native +  goal   + FEMFRAC  + GYM  + RUR + bull:goal + (1 + bull| school.id))
 
+# theoretical model, immig
+imp1 <- as.formula(immig ~ aca + ld + uni  + bull + fewbooks + belong +  joyread + goal + mot  + DISCIPLINE + TEACHBAD + VAL + (1 | school.id))
+# theoretical model, native
+imp2 <- as.formula(native ~ aca + ld + uni  + bull + fewbooks + belong +  joyread + goal + mot  + DISCIPLINE + TEACHBAD + VAL + (1 | school.id))
 
-models[[3]] <- stack30
-models[[4]] <- stack31
+# theoretical model, native
+imp3 <- as.formula(NN_SC ~ aca + ld + uni  + bull + fewbooks + belong +  joyread + goal + mot  + DISCIPLINE + TEACHBAD + VAL + (1 | school.id))
+
+models.imp <- vector(mode = "list", length = 3)
+
+models.imp[[1]] <- imp1
+models.imp[[2]] <- imp2
+models.imp[[3]] <- imp3
 
 ```
-#### Fit added models
+##### Fit new models
 
 ```{r  eval = FALSE}
+fits.imp0 <- vector(mode = "list", length = 3)
 a.seed <- 12345 
 a.iter <-  2000 
 a.chains <- 4  
 
-fits0[[3]] <- stan_glmer(models[[3]], data = pisa18[pisa18$WITHOUT == 0,], seed = a.seed,
+fits.imp0[[1]] <- stan_glmer(models.imp[[1]], data = pisa18[pisa18$WITHOUT == 0,], seed = a.seed,
                       iter = a.iter, chains = a.chains, family = binomial()) 
 
-
-
-fits1[[3]] <- stan_glmer(models[[4]], data = pisa18[pisa18$WITHOUT == 1,], seed = a.seed,
+fits.imp0[[2]] <- stan_glmer(models.imp[[2]], data = pisa18[pisa18$WITHOUT == 0,], seed = a.seed,
                       iter = a.iter, chains = a.chains, family = binomial()) 
 
+fits.imp0[[3]] <- stan_glmer(models.imp[[3]], data = pisa18[pisa18$WITHOUT == 0,], seed = a.seed,
+                      iter = a.iter, chains = a.chains, family = binomial())
 
-#save(fits0, file = file.path(PPath,"Files/fits0.RData"))
-#save(fits1, file = file.path(PPath,"Files/fits1.RData"))
 
-load(file.path(PPath,"Files/fits0.RData"))
-load(file.path(PPath,"Files/fits1.RData"))
+save(fits.imp0, file = file.path(PPath,"Files/fits.imp0.RData"))
+
+
+#load(file.path(PPath,"Files/fits.imp0.RData"))
+
 ```
-#### Compute brier score again, n01.models <- length(models)-1
+#### ld and fewbooks are very important, moreover aca, bul and uni
+```{r}
+# theoretical model, immig
+imp_post1 <- as.formula(attp ~ aca + ld + uni  + bull + fewbooks + belong +  joyread + goal + mot  + DISCIPLINE + TEACHBAD + VAL + ld:fewbooks + uni:aca + goal:ld +(1 + fewbooks| school.id))
 
-#### LOO-CV and Stacking
+imp_post2 <- as.formula(attp ~ aca + ld + uni  + bull + fewbooks + belong +  joyread + goal + mot  + DISCIPLINE + TEACHBAD + VAL + ld:uni + fewbooks:aca + belong:fewbooks +(1 + ld| school.id))
+
+knots <- quantile(pisa18$goal, p = c(0.25, 0.5, 0.75))
+imp_post3 <- as.formula(attp ~ aca + ld + uni  + bull + fewbooks + joyread +  mot  +  bs(goal, knots = knots) + (1 | school.id))
+
+models.imp_post <- vector(mode = "list", length = 2)
+
+models.imp_post[[1]] <- imp_post1
+models.imp_post[[2]] <- imp_post2
+models.imp_post[[3]] <- imp_post3
+```
+##### fit improved models
+```{r}
+fits.imp0_post <- vector(mode = "list", length = 2)
+a.seed <- 12345 
+a.iter <-  2000 
+a.chains <- 4  
+
+fits.imp0_post[[1]] <- stan_glmer(models.imp_post[[1]], data = pisa18[pisa18$WITHOUT == 0,], seed = a.seed, iter = a.iter, chains = a.chains, family = binomial()) 
+
+fits.imp0_post[[2]] <- stan_glmer(models.imp_post[[2]], data = pisa18[pisa18$WITHOUT == 0,], seed = a.seed,iter = a.iter, chains = a.chains, family = binomial()) 
+
+fits.imp0_post[[3]] <- stan_glmer(models.imp_post[[3]], data = pisa18[pisa18$WITHOUT == 0,], seed = a.seed,iter = a.iter, chains = a.chains, family = binomial())
+
+
+save(fits.imp0_post, file = file.path(PPath,"Files/fits.imp0_post.RData"))
+```
+
+
+##### Stacking, only if continous model extension is not possible
+##### https://jrnold.github.io/bayesian_notes/model-comparison.html
 ```{r  eval = FALSE}
-n01.models <- length(models)-1
+n01.models <- length(fits.imp0_post)
 # Compute loo
 
-loo_list0 <- lapply(fits0, loo, cores = 1)
+loo_list0 <- lapply(fits.imp0_post, loo, cores = 1)
 loo_compare(loo_list0)
 
 save("loo_list0", file = file.path(PPath, "Files","loo_list0.RData"))
@@ -416,64 +454,53 @@ print(wtsStacking0)
 print(paste("******** "))
 sink(file = NULL)
 
-
-
-loo_list1 <- list()
-# Compute loo
-
-loo_list1 <- lapply(fits1, loo, cores = 1)
-
-loo_compare(loo_list1)
-
-# Save loo
-
-save("loo_list1", file = file.path(PPath, "Files","loo_list1.RData"))
-#load(file.path(PPath, "Files","loo_list1.RData"))
-
-sink(file = file.path(PPath, "Files","loo_info1.txt"))
-for (i in 1:n01.models) {
-  print(paste("******** "))
-  print(paste("model ", i))
-  print(loo_list1[[i]])
-  print(paste("******** "))
-}
-#print(loo_list[[1]])
-sink(file = NULL)
-
-wtsStacking1 <- list()
-
-wtsStacking1 <- loo_model_weights(loo_list1, method = "stacking")
-print(wtsStacking1)
-
-
-sink(file = file.path(PPath, "Results","wtsStacking1.txt"))
-print(wtsStacking1)
-print(paste("******** "))
-sink(file = NULL)
-
-
 ```
-#### PPC stack for stack
-
+#### PPC stack for stack, indicates that the information is missing, thus 
+#### the theoretical model cannot prdict the outcom region of model 2
 ```{r  eval = FALSE}
 set.seed(a.seed)
-ypredStack0 <- ypred_Stacking(fits0,loo_list0, method = "stacking") 
+ypredStack0 <- ypred_Stacking(fits.imp0_post,loo_list0, method = "stacking") 
 save("ypredStack0", file = file.path("Files/ypredStack0.RData"))
 
-color_scheme_set(scheme = "red")
-ppcStack0 <- visualPPC(y.obs = pisa18$attp, yrepM = ypredStack0)
+color_scheme_set(scheme = "pink")
+ppcStack0 <- visualPPC2(y.obs = pisa18$attp, yrepM = ypredStack0)
 pdf(file.path(PPath, "Results/ppcStack0.pdf"))
 ppcStack0
 dev.off()
 
-set.seed(a.seed)
-ypredStack1 <- ypred_Stacking(fits1,loo_list1, method = "stacking") 
-save("ypredStack1", file = file.path("Files/ypredStack1.RData"))
+```
+#### final model
+```{r}
+final <- as.formula(attp ~ native + immig + aca + ld + uni  + bull + fewbooks + belong +  joyread + goal + mot  + DISCIPLINE + TEACHBAD + VAL + NN_SC  + (1| school.id))
 
-color_scheme_set(scheme = "pink")
-ppcStack1 <- visualPPC(y.obs = pisa18$attp,yrepM = ypredStack1, WITHOUT = 1)
-pdf(file.path(PPath, "Results/ppcStack1.pdf"))
-ppcStack1
+final.fit0 <- stan_glmer(final, data = pisa18[pisa18$WITHOUT == 0,], seed = a.seed,iter = a.iter, chains = a.chains, family = binomial())
+
+save(final.fit0, file = file.path(PPath,"Files/final.fit0.RData"))
+
+final.fit1 <- stan_glmer(final, data = pisa18[pisa18$WITHOUT == 1,], seed = a.seed,iter = a.iter, chains = a.chains, family = binomial())
+
+save(final.fit1, file = file.path(PPath,"Files/final.fit1.RData"))
+```
+##### PPCs again
+```{r}
+set.seed(a.seed)
+ypredfinal0 <- posterior_predict(final.fit0) 
+save("ypredfinal0", file = file.path("Files/ypredfinal0.RData"))
+
+color_scheme_set(scheme = "purple")
+ypredfinal0 <- visualPPC2(y.obs = pisa18$attp, yrepM = ypredfinal0)
+pdf(file.path(PPath, "Results/ypredfinal0.pdf"))
+ypredfinal0
+dev.off()
+
+set.seed(a.seed)
+ypredfinal1 <- posterior_predict(final.fit1) 
+save("ypredfinal1", file = file.path("Files/ypredfinal1.RData"))
+
+color_scheme_set(scheme = "darkgray")
+ypredfinal1 <- visualPPC2(y.obs = pisa18$attp, yrepM = ypredfinal1, WITHOUT = 1)
+pdf(file.path(PPath, "Results/ypredfinal1.pdf"))
+ypredfinal1
 dev.off()
 ```
 
