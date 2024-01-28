@@ -470,12 +470,13 @@ dev.off()
 
 ```
 
-##### Details PPCs
+##### Details PPCs, hold-out
 ```{r}
 set.seed(a.seed)
 color_scheme_set(scheme = "purple")
 WITHOUT = 0
 NN_SC4 <- cut_number(pisa18$NN_SC,4)
+DISHOME4 <- cut_number(pisa18$DISHOME,4)
 pdf(file.path(PPath, "Results/ppc_detail.pdf"))
 ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = ypredStack0, stat = "mean", 
                                       group = interaction(NN_SC4[pisa18$WITHOUT ==WITHOUT], pisa18$immig[pisa18$WITHOUT == WITHOUT]),facet_args = list(nrow = 2, scales = "fixed")) + 
@@ -496,7 +497,7 @@ ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = ypredStack0, stat =
                                       group = interaction(pisa18$immig[pisa18$WITHOUT ==WITHOUT], pisa18$native[pisa18$WITHOUT == WITHOUT]),facet_args = list(nrow = 2, scales = "fixed")) + 
     xlab("probability of ld") + ggtitle("stat = mean, immig x native") + theme(text = element_text(size = 12), axis.text = element_text(size = 8))
 
-DISHOME4 <- cut_number(pisa18$DISHOME,4)
+
 color_scheme_set(scheme = "mix-teal-pink")
 ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = ypredStack0, stat = "mean", 
                                       group = interaction(DISHOME4[pisa18$WITHOUT ==WITHOUT], pisa18$native[pisa18$WITHOUT == WITHOUT]),facet_args = list(nrow = 2, scales = "fixed")) + 
@@ -505,7 +506,45 @@ ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = ypredStack0, stat =
 dev.off()
 
 ```
+##### mixed PPC
+
+```{r}
+set.seed(a.seed)
+color_scheme_set(scheme = "purple")
+WITHOUT = 0
+NN_SC4 <- cut_number(pisa18$NN_SC,4)
+DISHOME4 <- cut_number(pisa18$DISHOME,4)
+pdf(file.path(PPath, "Results/ppc_mixed.pdf"))
+ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = ypredStack0, stat = "mean", 
+                                      group = interaction(NN_SC4[pisa18$WITHOUT ==WITHOUT], pisa18$bull[pisa18$WITHOUT == WITHOUT]),facet_args = list(nrow = 2, scales = "fixed")) + 
+    xlab("probability of ld") + ggtitle("stat = mean, NN_SC x bull") + theme(text = element_text(size = 12), axis.text = element_text(size = 8))
 
 
+color_scheme_set(scheme = "darkgray")
+#pdf(file.path(PPath, "Results/ppc_native.pdf"))
+ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = ypredStack0, stat = "mean", 
+                                      group = interaction(NN_SC4[pisa18$WITHOUT ==WITHOUT], pisa18$fewbooks[pisa18$WITHOUT == WITHOUT]),facet_args = list(nrow = 2, scales = "fixed")) + xlab("probability of ld") + ggtitle("stat = mean, NN_SC x fewbooks") + theme(text = element_text(size = 12), axis.text = element_text(size = 8))
+#dev.off()
+
+color_scheme_set(scheme = "teal")
+#pdf(file.path(PPath, "Results/ppc_immig_native.pdf"))
+ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = ypredStack0, stat = "mean", 
+                                      group = interaction(pisa18$ld[pisa18$WITHOUT ==WITHOUT], pisa18$native[pisa18$WITHOUT == WITHOUT]),facet_args = list(nrow = 2, scales = "fixed")) + 
+    xlab("probability of ld") + ggtitle("stat = mean, ld x native") + theme(text = element_text(size = 12), axis.text = element_text(size = 8))
+
+DISHOME4 <- cut_number(pisa18$DISHOME,4)
+color_scheme_set(scheme = "mix-teal-pink")
+ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = ypredStack0, stat = "mean", 
+                                      group = interaction(DISHOME4[pisa18$WITHOUT ==WITHOUT], pisa18$aca[pisa18$WITHOUT == WITHOUT]),facet_args = list(nrow = 2, scales = "fixed")) + 
+    xlab("probability of ld") + ggtitle("stat = mean, DISHOME x aca") + theme(text = element_text(size = 12), axis.text = element_text(size = 8))
+
+color_scheme_set(scheme = "mix-teal-pink")
+#pdf(file.path(PPath, "Results/ppc_immig_native.pdf"))
+ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = ypredStack0, stat = "mean", 
+                                      group = interaction(pisa18$immig[pisa18$WITHOUT ==WITHOUT], pisa18$bull[pisa18$WITHOUT == WITHOUT]),facet_args = list(nrow = 2, scales = "fixed")) + 
+    xlab("probability of ld") + ggtitle("stat = mean, immig x bull") + theme(text = element_text(size = 12), axis.text = element_text(size = 8))
+
+dev.off()
+```
 
 
