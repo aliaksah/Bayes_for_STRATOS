@@ -1,6 +1,6 @@
-##### Ergebnisse für ld x bull, wichtige Prädiktoren sollen mehr Flixiblität haben,
-##### im ersten Schritt, inhaltlich begründet im zweiten Schritt mit Blick auf die Daten,
-##### zweiter Schritt muss noch mit Sensitivität überprüft werden
+##### Von Interesse: ppcCand1W0_out und ppcCand1W1_out, Modell 2 ist die
+##### Messlatte für Modell 1, es soll die Outcome-Region von Modell 1 voerhersagen.
+##### 
 
 ---
 title: "Students with attendance problems"
@@ -279,7 +279,7 @@ sink(file=NULL)
 
 
 ```
-#### Posterior predictive checks, predictors of candidate model 2
+#### Posterior predictive checks, predictors of candidate model 2, this is of focal #### interest
 ```{r}
 
 ## hold out ppc
