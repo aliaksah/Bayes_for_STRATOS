@@ -505,68 +505,31 @@ dev.off()
 ```
 
 
-### Compute results, WITHOUT == 0
-```{r  eval = FALSE}
+###### Use marginaleffects to have a high flexiblity to summarize the ###### results
+```{r}
+plot.cap0 <- plot_predictions(final.fit0, condition = c("NN_SC","bull","ld"))
+plot.cap1 <- plot_predictions(final.fit1, condition = c("NN_SC","bull","ld"))
 
-pisa18_W0 <- pisa18[pisa18$WITHOUT == 0,]
-
-pisa18_W0$DP_QU <- as.factor(cut_number(pisa18_W0$goal,4))
-levels_DP_W0 <- levels(pisa18_W0$DP_QU)
-ds_DP_W0 <- pisa18_W0 %>% group_by(DP_QU) %>% summarise(median = median(goal), Freq = n())
-levels(pisa18_W0$DP_QU) <- 1:4
-
-sgr <- split(pisa18_W0 ,f = list(pisa18_W0$DP_QU,pisa18_W0$bull))
-t<-lapply(sgr, function(x) length(x[[1]]))
-pint0 <- comp.int.stack.core01(sgr = sgr,fits = fits0,
-                                     wts = wtsStacking0,
-                                     cnt.path = file.path(PPath,"Files"), p = 0.5)
-```
-### Summarize results DH_QU
-```{r  eval = FALSE}
-dfDH_QU_W0 <- data.frame(x = rep(round(ds_DP_W0$median,2),2),
-                        group = c(rep("no",4),rep("yes",4)),
-                        mean =  pint0[,2],low = pint0[,1], 
-                        up = pint0[,3])
-sink(file = file.path(PPath,"Results/dfDH_QU_W0.txt"))
-dfDH_QU_W0
-sink(file = NULL)
-```
-
-### Compute results, WITHOUT == 1
-```{r  eval = FALSE}
-
-pisa18_W1 <- pisa18[pisa18$WITHOUT == 1,]
-
-pisa18_W1$DP_QU <- as.factor(cut_number(pisa18_W1$goal,4))
-levels_DP_W1 <- levels(pisa18_W1$DP_QU)
-ds_DP_W1 <- pisa18_W1 %>% group_by(DP_QU) %>% summarise(median = median(goal), Freq = n())
-levels(pisa18_W1$DP_QU) <- 1:4
-
-sgr1 <- split(pisa18_W1 ,f = list(pisa18_W1$DP_QU,pisa18_W1$bull))
-t1<-lapply(sgr1, function(x) length(x[[1]]))
-pint1 <- comp.int.stack.core01(sgr = sgr1,fits = fits1,
-                                     wts = wtsStacking1,
-                                     cnt.path = file.path(PPath,"Files"), p = 0.5)
-```
-### Summarize results DH_QU
-```{r  eval = FALSE}
-dfDH_QU_W1 <- data.frame(x = rep(round(ds_DP_W1$median,2),2),
-                        group = c(rep("no",4),rep("yes",4)),
-                        mean =  pint1[,2],low = pint1[,1], 
-                        up = pint1[,3])
-sink(file = file.path(PPath,"Results/dfDH_QU_W1.txt"))
-dfDH_QU_W1
-sink(file = NULL)
-```
-
-### Plot results
-```{r  eval = FALSE}
-
-pdf(file.path(PPath,"Results/dfDH_QU_W0.pdf"))
-plot.result(dfDH_QU_W0)
+pdf(file.path(PPath,"Results/plot.cap0.pdf"))
+plot.cap0
 dev.off()
 
-pdf(file.path(PPath,"Results/dfDH_QU_W1.pdf"))
-plot.result(dfDH_QU_W1)
+pdf(file.path(PPath,"Results/plot.cap1.pdf"))
+plot.cap1
 dev.off()
-`
+```
+
+
+```{r}
+plot.cap0b <- plot_predictions(final.fit0, condition = c("goal","ld","aca"))
+plot.cap1b <- plot_predictions(final.fit1, condition = c("goal","ld","aca"))
+
+pdf(file.path(PPath,"Results/plot.cap0b.pdf"))
+plot.cap0b
+dev.off()
+
+pdf(file.path(PPath,"Results/plot.cap1b.pdf"))
+plot.cap1b
+dev.off()
+```
+
