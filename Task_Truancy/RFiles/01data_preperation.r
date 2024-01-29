@@ -203,14 +203,26 @@ pisa18$TEACHBAD <- ave(teachbad_sc, school.id, FUN = function(x) mean(x, na.rm =
 
 
 # Value of school, 1 = Strongly agree,... 4 = Strongly disagree
-value1  <- IMPDAT$ST036Q05TA  # Trying hard at school will help me get a good job. 
-value2  <- IMPDAT$ST036Q06TA  # Trying hard at school will help me get into a good <college>. 
-value3  <- IMPDAT$ST036Q08TA  # Trying hard at school is important.
+value1  <- 4 - IMPDAT$ST036Q05TA  # Trying hard at school will help me get a good job. 
+value2  <- 4 - IMPDAT$ST036Q06TA  # Trying hard at school will help me get into a good <college>. 
+value3  <- 4 - IMPDAT$ST036Q08TA  # Trying hard at school is important.
 
 value.f <- data.frame(value1, value2, value3)
 mean.value <- apply(value.f ,FUN = mean, MARGIN = 1, na.rm = TRUE)
 pisa18$val <- scale(mean.value)[,1]
 pisa18$VAL <- ave(pisa18$val, school.id, FUN = function(x) mean(x, na.rm = TRUE))
+
+# self-efficacy, 1  Strongly disagree, 4  Strongly agree
+self_eff1  <- IMPDAT$ST188Q01HA  # I usually manage one way or another.
+self_eff2  <- IMPDAT$ST188Q02HA  # I feel proud that I have accomplished things.
+self_eff3  <- IMPDAT$ST188Q03HA  # I feel that I can handle many things at a time.
+self_eff4  <- IMPDAT$ST188Q06HA  # My belief in myself gets me through hard times.
+self_eff5  <- IMPDAT$ST188Q07HA  # When I'm in a difficult situation, I can usually find my way out of it.
+
+self_eff <- data.frame(self_eff1,self_eff2,self_eff3,self_eff4,self_eff5)
+mean.self_eff <- apply(self_eff,FUN = mean, MARGIN = 1, na.rm = TRUE)
+pisa18$res <- scale(mean.self_eff)[,1]
+pisa18$RES <- ave(pisa18$res, school.id, FUN = function(x) mean(x, na.rm = TRUE))
 
 # S. 16, 1.1.2 Besuchte Schulart
 school.type <- unclass(IMPDAT$PROGN)  # Schulform, Study programme indices

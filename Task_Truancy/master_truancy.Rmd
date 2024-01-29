@@ -1,6 +1,5 @@
-##### Von Interesse: ppcCand1W0_out und ppcCand1W1_out, Modell 2 ist die
-##### Messlatte für Modell 1, es soll die Outcome-Region von Modell 1 voerhersagen.
-##### 
+### https://www.andrewheiss.com/blog/2022/11/29/conditional-marginal-marginaleffects/
+ 
 
 ---
 title: "Students with attendance problems"
@@ -62,23 +61,21 @@ save(pisa18,file = file.path(PPath,"Files/pisa18_sc.RData"))
 load(file.path(PPath,"Files/pisa18_sc.RData"))
 ```
 
-### Stack models: Use all relevant predictors, hold out some to check for predictive validity
+### Two model, one to check the other, model 2 to check model 1
 
 
 ```{r  eval = FALSE}
-
-
-# models to stack
+#
 # theoretical model
-stack1 <- as.formula(attp ~ aca + ld + uni  + bull + fewbooks + belong +  joyread + goal + mot  + DISCIPLINE + TEACHBAD + VAL + (1 | school.id))
-# composition effect
-stack2 <- as.formula(attp ~  immig + native + female + escs  + RUR + DISH 
+model1 <- as.formula(attp ~ aca + ld + uni  + bull + fewbooks + belong +  joyread + goal + mot  + DISCIPLINE + RES + VAL + (1 | school.id))
+# composition effect model
+model2 <- as.formula(attp ~  immig + native + female + escs  + RUR + DISH 
                      + GYM + STAFFSHORT + EDUSHORT + FEMFRAC + SN_SC + NN_SC + (1 | school.id))
 
 models <- vector(mode = "list", length = 2)
 
-models[[1]] <- stack1
-models[[2]] <- stack2
+models[[1]] <- model1
+models[[2]] <- model2
 
 ```
 ##### fit model
@@ -242,7 +239,7 @@ pdf(file.path(PPath, "Results/ppcCand1W1_in.pdf"))
 ppcCand11_in$ppc.plots
 dev.off()
 
-num <- length(ppcCand20$ppc.plots)
+num <- length(ppcCand10_in$ppc.plots)
 
 sink(file = file.path(PPath,"Results/ppcCand2W0_out.txt"))
 for(i in 1:num){
@@ -280,7 +277,7 @@ sink(file=NULL)
 
 ```
 #### Posterior predictive checks, predictors of candidate model 2, this is of focal #### interest
-```{r}
+```{r  eval = FALSE}
 
 ## hold out ppc
 color_scheme_set(scheme = "blue")
@@ -344,23 +341,24 @@ sink(file=NULL)
 
 ```
 
-#### improve theoretical model
+#### improve theoretical model, TODO inhaltlich und für beide Modelle
 ```{r  eval = FALSE}
+fits.imp1 <- vector(mode = "list", length = 3)
+a.seed <- 12345 
+a.iter <-  2000 
+a.chains <- 4  
+
+fits.imp1[[1]] <- stan_glmer(models.imp[[1]], data = pisa18[pisa18$WITHOUT == 0,], seed = a.seed,
+                      iter = a.iter, chains = a.chains, family = binomial()) 
+
+fits.imp1[[2]] <- stan_glmer(models.imp[[2]], data = pisa18[pisa18$WITHOUT == 0,], seed = a.seed,
+                      iter = a.iter, chains = a.chains, family = binomial()) 
+
+fits.imp1[[3]] <- stan_glmer(models.imp[[3]], data = pisa18[pisa18$WITHOUT == 0,], seed = a.seed,
+                      iter = a.iter, chains = a.chains, family = binomial())
 
 
-# theoretical model, immig
-imp1 <- as.formula(immig ~ aca + ld + uni  + bull + fewbooks + belong +  joyread + goal + mot  + DISCIPLINE + TEACHBAD + VAL + (1 | school.id))
-# theoretical model, native
-imp2 <- as.formula(native ~ aca + ld + uni  + bull + fewbooks + belong +  joyread + goal + mot  + DISCIPLINE + TEACHBAD + VAL + (1 | school.id))
-
-# theoretical model, native
-imp3 <- as.formula(NN_SC ~ aca + ld + uni  + bull + fewbooks + belong +  joyread + goal + mot  + DISCIPLINE + TEACHBAD + VAL + (1 | school.id))
-
-models.imp <- vector(mode = "list", length = 3)
-
-models.imp[[1]] <- imp1
-models.imp[[2]] <- imp2
-models.imp[[3]] <- imp3
+save(fits.imp1, file = file.path(PPath,"Files/fits.imp0.RData"))
 
 ```
 ##### Fit new models
@@ -388,7 +386,7 @@ save(fits.imp0, file = file.path(PPath,"Files/fits.imp0.RData"))
 
 ```
 #### ld and fewbooks are very important, moreover aca, bul and uni
-```{r}
+```{r  eval = FALSE}
 # theoretical model, immig
 imp_post1 <- as.formula(attp ~ aca + ld + uni  + bull + fewbooks + belong +  joyread + goal + mot  + DISCIPLINE + TEACHBAD + VAL + ld:fewbooks + uni:aca + goal:ld +(1 + fewbooks| school.id))
 
@@ -404,7 +402,7 @@ models.imp_post[[2]] <- imp_post2
 models.imp_post[[3]] <- imp_post3
 ```
 ##### fit improved models
-```{r}
+```{r  eval = FALSE}
 fits.imp0_post <- vector(mode = "list", length = 2)
 a.seed <- 12345 
 a.iter <-  2000 
@@ -471,7 +469,7 @@ dev.off()
 ```
 
 ##### Details PPCs, hold-out
-```{r}
+```{r  eval = FALSE}
 set.seed(a.seed)
 color_scheme_set(scheme = "purple")
 WITHOUT = 0
@@ -508,7 +506,7 @@ dev.off()
 ```
 ##### mixed PPC
 
-```{r}
+```{r  eval = FALSE}
 set.seed(a.seed)
 color_scheme_set(scheme = "purple")
 WITHOUT = 0
@@ -547,4 +545,65 @@ ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = ypredStack0, stat =
 dev.off()
 ```
 
+```{r  eval = FALSE}
+fits.imp0_post[[4]] <- fits0[[2]]
+n01.models <- length(fits.imp0_post)
+# Compute loo
+
+loo_list0_4 <- lapply(fits.imp0_post, loo, cores = 1)
+loo_compare(loo_list0_4)
+
+save("loo_list0_4", file = file.path(PPath, "Files","loo_list0_4.RData"))
+#load(file.path(PPath, "Files","loo_list0.RData"))
+
+sink(file = file.path(PPath, "Files","loo_info0_4.txt"))
+for (i in 1:n01.models) {
+  print(paste("******** "))
+  print(paste("model ", i))
+  print(loo_list0_4[[i]])
+  print(paste("******** "))
+}
+sink(file = NULL)
+
+sink(file = file.path(PPath, "Files","loo_compare.txt"))
+loo_compare(loo_list0_4)
+sink(file = NULL)
+
+wtsStacking0_4 <- list()
+
+wtsStacking0_4 <- loo_model_weights(loo_list0_4, method = "stacking")
+print(wtsStacking0_4)
+
+
+sink(file = file.path(PPath, "Results","wtsStacking0_4.txt"))
+print(wtsStacking0_4)
+print(paste("******** "))
+sink(file = NULL)
+```
+
+
+###### marginaeffects code
+###### https://www.andrewheiss.com/blog/2022/11/29/conditional-marginal-marginaleffects/
+```{r  eval = FALSE}
+pdf(file.path(PPath, "Results/result0.pdf"))
+plot_predictions(fits.imp0_post[[1]], condition = c("goal","bull","ld"))
+plot_predictions(fits.imp0_post[[1]], condition = c("goal","fewbooks","ld"))
+plot_predictions(fits.imp0_post[[1]], condition = c("goal","bull","fewbooks"))
+dev.off()
+```
+
+```{r}
+pdf(file.path(PPath, "Results/result1.pdf"))
+plot_predictions(fits1[[1]], condition = c("goal","bull","ld"))
+plot_predictions(fits1[[1]], condition = c("goal","fewbooks","ld"))
+plot_predictions(fits1[[1]], condition = c("goal","bull","fewbooks"))
+dev.off()
+```
+
+
+
+
+
+
+```
 

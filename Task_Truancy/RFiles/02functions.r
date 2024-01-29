@@ -286,9 +286,9 @@ visualPPC1 <- function(y.obs = pisa18$attp, yrepM = yrepM, WITHOUT = 0){
   ppc.plots[[10]] <- vppc[[1]]
   pppvals[[10]]  <- vppc[[2]]
   
-  TEACHBAD4 <- cut_number(pisa18$TEACHBAD,4)
-  vppc <- visualPPC(y.obs = pisa18$attp, foc = TEACHBAD4, 
-                               title = "stat = mean, TEACHBAD",
+  RES4 <- cut_number(pisa18$RES,4)
+  vppc <- visualPPC(y.obs = pisa18$attp, foc = RES4, 
+                               title = "stat = mean, RES",
                                yrep = yrepM, WITHOUT)
   
   ppc.plots[[11]] <- vppc[[1]]
