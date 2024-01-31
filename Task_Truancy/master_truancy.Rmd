@@ -1,23 +1,22 @@
-### https://www.andrewheiss.com/blog/2022/11/29/conditional-marginal-marginaleffects/
- 
+
 
 ---
 title: "Students with attendance problems"
 author: "Mariana Nold"
 output: html_document
 ---
-### Load R packages
+##### Load R packages
 ```{r  eval = FALSE}
 source("RFiles/packages.r")
 ```
 
-### Load  single imputed PISA data.
+##### Load single imputed PISA data.
 ```{r  eval = FALSE}
 PPath <- "C:/Users/zo95yup/Documents/GitHub/Bayes_for_STRATOS/Task_Truancy"
 load(file = file.path(PPath,"Orgdata/IMPDAT_PISA.RData"))
 ```
 
-### Prepare data, thus build PISA scales, 6802 students 
+##### Prepare data, thus build PISA scales 
 ```{r  eval = FALSE}
 source(file.path(PPath,"RFiles/01data_preperation.r"))
 to.rm <- objects()[!objects() %in% c("PPath","pisa18","countries")]
@@ -27,7 +26,7 @@ rm(list = to.rm)
 ```
 
 
-### There should be at least ten students per school. Schools with fewer observations are excluded from the analysis. The variable nb.stud informs about the number of stundets per school and save final data set, 6489 students
+##### There should be at least ten students per school. Schools with fewer observations are excluded from the analysis. The variable nb.stud informs about the number of stundets per school and save final data set
 
 ```{r  eval = FALSE}
 tab.id <- table(pisa18$school.id)
@@ -47,7 +46,7 @@ save(pisa18,file = file.path(PPath,"Files/pisa18.RData")) #file = file.path(PPat
 
 
 
-### Data sets for schools: Data set contains one row for each school and only school level variables
+##### Data sets for schools: Data set contains one row for each school and only school level variables
 ```{r  eval = FALSE}
 sc.level <- names(pisa18) == toupper(names(pisa18))
 sc.level[1] <- TRUE
@@ -61,15 +60,15 @@ save(pisa18,file = file.path(PPath,"Files/pisa18_sc.RData"))
 load(file.path(PPath,"Files/pisa18_sc.RData"))
 ```
 
-### Two model, one to check the other, model 2 to check model 1
+##### Two models, one to check the other, model 2 to check model 1
 
 
 ```{r  eval = FALSE}
 #
 # theoretical model
-model1 <- as.formula(attp ~ aca + ld + uni  + bull + fewbooks + belong +  joyread + goal + mot  + DISCIPLINE + RES + VAL + (1 | school.id))
+model1 <- as.formula(attp ~ aca + native + ld + uni  + bull + fewbooks + belong +  joyread + goal + mot + RES + VAL  + (1 | school.id))
 # composition effect model
-model2 <- as.formula(attp ~  immig + native + female + escs  + RUR + DISH 
+model2 <- as.formula(attp ~  immig  + female + escs  + RUR + DISH 
                      + GYM + STAFFSHORT + EDUSHORT + FEMFRAC + SN_SC + NN_SC + (1 | school.id))
 
 models <- vector(mode = "list", length = 2)
@@ -78,30 +77,27 @@ models[[1]] <- model1
 models[[2]] <- model2
 
 ```
-##### fit model
+##### fit models
 
 ```{r  eval = FALSE}
 a.seed <- 12345 
-a.iter <-  2000 
+a.iter <-  1000 
 a.chains <- 4  
+warmup <- 1000
 
 #pisa18$WITHOUT  <- as.numeric(pisa18$FAILED >= 0.02) # above median
 
 fits0 <- list()
 
-fits0[[1]] <- stan_glmer(models[[1]], data = pisa18[pisa18$WITHOUT == 0,], seed = a.seed,
-                      iter = a.iter, chains = a.chains, family = binomial()) 
+fits0[[1]] <- brm(bf(models[[1]]), data = pisa18[pisa18$WITHOUT == 0,], seed = a.seed, iter = a.iter, chains = a.chains, warmup = warmup, bernoulli(link="logit")) 
 
-fits0[[2]] <- stan_glmer(models[[2]], data = pisa18[pisa18$WITHOUT == 0,], seed = a.seed,
-                      iter = a.iter, chains = a.chains, family = binomial()) 
+fits0[[2]] <- brm(bf(models[[2]]), data = pisa18[pisa18$WITHOUT == 0,], seed = a.seed, iter = a.iter, chains = a.chains, warmup = warmup, bernoulli(link="logit")) 
 
 fits1 <- list()
 
-fits1[[1]] <- stan_glmer(models[[1]], data = pisa18[pisa18$WITHOUT == 1,], seed = a.seed,
-                      iter = a.iter, chains = a.chains, family = binomial()) 
+fits1[[1]] <- brm(bf(models[[1]]), data = pisa18[pisa18$WITHOUT == 1,], seed = a.seed, iter = a.iter, chains = a.chains, warmup = warmup, bernoulli(link="logit")) 
 
-fits1[[2]] <- stan_glmer(models[[2]], data = pisa18[pisa18$WITHOUT == 1,], seed = a.seed,
-                      iter = a.iter, chains = a.chains, family = binomial()) 
+fits1[[2]] <- brm(bf(models[[2]]), data = pisa18[pisa18$WITHOUT == 1,], seed = a.seed, iter = a.iter, chains = a.chains, warmup = warmup, bernoulli(link="logit")) 
 
 
 save(fits0, file = file.path(PPath,"Files/fits0.RData"))
@@ -109,7 +105,7 @@ save(fits1, file = file.path(PPath,"Files/fits1.RData"))
 ```
 
 
-###load fits
+##### load fits
 
 ```{r  eval = FALSE}
 load(file.path(PPath, "Files/fits0.RData"))
@@ -154,11 +150,11 @@ for (i in 1:n01.models){
 sink(file = NULL)
 
 ```
-### Load functions
+##### load functions
 ```{r  eval = FALSE}
 source(file.path(PPath, "RFiles/02functions.r"))
 ```
-### Compute Predictions and Brier Score
+##### compute predictions and Brier score
 ```{r  eval = FALSE}
 #n01.models <- length(models)-1
 ypredCand0 <- list()
@@ -212,7 +208,7 @@ for (i in 1:n01.models) {
 sink(file = NULL)
 ```
 
-### Posterior predictive checks, predictors of candidate model 1
+##### Posterior predictive checks, predictors of candidate model 1, not of key interest
 ```{r  eval = FALSE}
 ## hold out ppc
 color_scheme_set(scheme = "blue")
@@ -276,7 +272,9 @@ sink(file=NULL)
 
 
 ```
-#### Posterior predictive checks, predictors of candidate model 2, this is of focal #### interest
+##### Posterior predictive checks, predictors of candidate model 2, this is of focal interest, if the model doas not pass this check, we need to include further predictors, or if not possible the stop and rethink the theoretical model
+
+
 ```{r  eval = FALSE}
 
 ## hold out ppc
@@ -341,91 +339,96 @@ sink(file=NULL)
 
 ```
 
-#### improve theoretical model, TODO inhaltlich und für beide Modelle
+
+##### more flexibility for important predictors, each model is of substantive interest, improve theoretical model, more flexibility for important predictors,
+###### interaction based plausibility
 ```{r  eval = FALSE}
-fits.imp1 <- vector(mode = "list", length = 3)
-a.seed <- 12345 
-a.iter <-  2000 
-a.chains <- 4  
-
-fits.imp1[[1]] <- stan_glmer(models.imp[[1]], data = pisa18[pisa18$WITHOUT == 0,], seed = a.seed,
-                      iter = a.iter, chains = a.chains, family = binomial()) 
-
-fits.imp1[[2]] <- stan_glmer(models.imp[[2]], data = pisa18[pisa18$WITHOUT == 0,], seed = a.seed,
-                      iter = a.iter, chains = a.chains, family = binomial()) 
-
-fits.imp1[[3]] <- stan_glmer(models.imp[[3]], data = pisa18[pisa18$WITHOUT == 0,], seed = a.seed,
-                      iter = a.iter, chains = a.chains, family = binomial())
+# theoretical model, possible improvements, WITHOUT = 0
+imp0 <- as.formula(attp ~ aca + native + ld + uni  + bull + fewbooks + belong +  joyread + goal + mot + RES + VAL + ld:goal + native:ld  + (1 + bull| school.id))
+# theoretical model, possible improvements, WITHOUT = 0
+imp1 <- as.formula(attp ~ aca + native + ld + uni  + bull + fewbooks + belong +  joyread + goal + mot + RES + VAL + ld:fewbooks + native:fewbooks + goal:ld + (1 + bull| school.id))
 
 
-save(fits.imp1, file = file.path(PPath,"Files/fits.imp0.RData"))
+models.imp<- vector(mode = "list", length = 2)
+
+models.imp[[1]] <- imp0
+models.imp[[2]] <- imp1
 
 ```
-##### Fit new models
+##### fit improved models, for pisa18$WITHOUT == 1
 
 ```{r  eval = FALSE}
-fits.imp0 <- vector(mode = "list", length = 3)
+fits.imp1 <- vector(mode = "list", length = 1)
 a.seed <- 12345 
-a.iter <-  2000 
+a.iter <-  3000 
 a.chains <- 4  
 
-fits.imp0[[1]] <- stan_glmer(models.imp[[1]], data = pisa18[pisa18$WITHOUT == 0,], seed = a.seed,
-                      iter = a.iter, chains = a.chains, family = binomial()) 
+fits.imp1[[1]] <- brm(bf(models.imp[[2]]), data = pisa18[pisa18$WITHOUT == 1,], seed = a.seed, iter = a.iter, chains = a.chains, warmup = warmup, bernoulli(link="logit"))
 
-fits.imp0[[2]] <- stan_glmer(models.imp[[2]], data = pisa18[pisa18$WITHOUT == 0,], seed = a.seed,
-                      iter = a.iter, chains = a.chains, family = binomial()) 
+save(fits.imp1, file = file.path(PPath,"Files/fits.imp1.RData"))
 
-fits.imp0[[3]] <- stan_glmer(models.imp[[3]], data = pisa18[pisa18$WITHOUT == 0,], seed = a.seed,
-                      iter = a.iter, chains = a.chains, family = binomial())
+```
+##### fit improved models, for pisa18$WITHOUT == 0
 
+```{r  eval = FALSE}
+ 
+fits.imp0 <- vector(mode = "list", length = 1)
+a.seed <- 12345 
+a.iter <-  3000 
+a.chains <- 4  
+
+fits.imp0[[1]] <- brm(bf(models.imp[[1]]), data = pisa18[pisa18$WITHOUT == 0,], seed = a.seed, iter = a.iter, chains = a.chains, warmup = warmup, bernoulli(link="logit"))
 
 save(fits.imp0, file = file.path(PPath,"Files/fits.imp0.RData"))
-
 
 #load(file.path(PPath,"Files/fits.imp0.RData"))
 
 ```
-#### ld and fewbooks are very important, moreover aca, bul and uni
+
+##### loo-compare for the improved theoretical model, WITHOUT == 1
 ```{r  eval = FALSE}
-# theoretical model, immig
-imp_post1 <- as.formula(attp ~ aca + ld + uni  + bull + fewbooks + belong +  joyread + goal + mot  + DISCIPLINE + TEACHBAD + VAL + ld:fewbooks + uni:aca + goal:ld +(1 + fewbooks| school.id))
 
-imp_post2 <- as.formula(attp ~ aca + ld + uni  + bull + fewbooks + belong +  joyread + goal + mot  + DISCIPLINE + TEACHBAD + VAL + ld:uni + fewbooks:aca + belong:fewbooks +(1 + ld| school.id))
+fits.imp1[[2]] <- fits1[[1]]
+n01.models <- length(fits.imp1)
+# Compute loo
 
-knots <- quantile(pisa18$goal, p = c(0.25, 0.5, 0.75))
-imp_post3 <- as.formula(attp ~ aca + ld + uni  + bull + fewbooks + joyread +  mot  +  bs(goal, knots = knots) + (1 | school.id))
+loo_list1 <- lapply(fits.imp1, loo, cores = 1)
+loo_compare(loo_list1)
 
-models.imp_post <- vector(mode = "list", length = 2)
+save("loo_list1", file = file.path(PPath, "Files","loo_list1.RData"))
+#load(file.path(PPath, "Files","loo_list0.RData"))
 
-models.imp_post[[1]] <- imp_post1
-models.imp_post[[2]] <- imp_post2
-models.imp_post[[3]] <- imp_post3
+sink(file = file.path(PPath, "Files","loo_info1.txt"))
+for (i in 1:n01.models) {
+  print(paste("******** "))
+  print(paste("model ", i))
+  print(loo_list1[[i]])
+  print(paste("******** "))
+}
+#print(loo_list[[1]])
+sink(file = NULL) # All models are similar, first model is best
+
+#wtsStacking1 <- list()
+
+#wtsStacking1 <- loo_model_weights(loo_list1, method = "stacking")
+#print(wtsStacking1)
+
+
+#sink(file = file.path(PPath, "Results","wtsStacking1.txt"))
+#print(wtsStacking1)
+#print(paste("******** "))
+#sink(file = NULL)
+
 ```
-##### fit improved models
-```{r  eval = FALSE}
-fits.imp0_post <- vector(mode = "list", length = 2)
-a.seed <- 12345 
-a.iter <-  2000 
-a.chains <- 4  
-
-fits.imp0_post[[1]] <- stan_glmer(models.imp_post[[1]], data = pisa18[pisa18$WITHOUT == 0,], seed = a.seed, iter = a.iter, chains = a.chains, family = binomial()) 
-
-fits.imp0_post[[2]] <- stan_glmer(models.imp_post[[2]], data = pisa18[pisa18$WITHOUT == 0,], seed = a.seed,iter = a.iter, chains = a.chains, family = binomial()) 
-
-fits.imp0_post[[3]] <- stan_glmer(models.imp_post[[3]], data = pisa18[pisa18$WITHOUT == 0,], seed = a.seed,iter = a.iter, chains = a.chains, family = binomial())
-
-
-save(fits.imp0_post, file = file.path(PPath,"Files/fits.imp0_post.RData"))
-```
-
 
 ##### Stacking, only if continous model extension is not possible
 ##### https://jrnold.github.io/bayesian_notes/model-comparison.html
+##### loo-compare for the improved theoretical model, WITHOUT == 0
 ```{r  eval = FALSE}
-n01.models <- length(fits.imp0_post)
-# Compute loo
+fits.imp0[[2]] <- fits0[[1]]
+n01.models <- length(fits.imp0)
 
-loo_list0 <- lapply(fits.imp0_post, loo, cores = 1)
+loo_list0 <- lapply(fits.imp0, loo, cores = 1)
 loo_compare(loo_list0)
 
 save("loo_list0", file = file.path(PPath, "Files","loo_list0.RData"))
@@ -441,169 +444,99 @@ for (i in 1:n01.models) {
 #print(loo_list[[1]])
 sink(file = NULL)
 
-wtsStacking0 <- list()
+#wtsStacking0 <- list()
 
-wtsStacking0 <- loo_model_weights(loo_list0, method = "stacking")
-print(wtsStacking0)
+#wtsStacking0 <- loo_model_weights(loo_list0, method = "stacking")
+#print(wtsStacking0)
 
 
-sink(file = file.path(PPath, "Results","wtsStacking0.txt"))
-print(wtsStacking0)
-print(paste("******** "))
-sink(file = NULL)
+#sink(file = file.path(PPath, "Results","wtsStacking0.txt"))
+#print(wtsStacking0)
+#print(paste("******** "))
+#sink(file = NULL)
 
 ```
-#### PPC stack for stack, indicates that the information is missing, thus 
-#### the theoretical model cannot prdict the outcom region of model 2
+
+
+
+
+##### PPC for improved model, WITHOUT = 0
 ```{r  eval = FALSE}
 set.seed(a.seed)
-ypredStack0 <- ypred_Stacking(fits.imp0_post,loo_list0, method = "stacking") 
-save("ypredStack0", file = file.path("Files/ypredStack0.RData"))
+ypred0 <- posterior_predict(fits.imp0[[1]]) 
+save("ypred0", file = file.path("Files/ypred0.RData"))
 
 color_scheme_set(scheme = "pink")
-ppcStack0 <- visualPPC2(y.obs = pisa18$attp, yrepM = ypredStack0)
-pdf(file.path(PPath, "Results/ppcStack0.pdf"))
-ppcStack0
+ppc0 <- visualPPC2(y.obs = pisa18$attp, yrepM = ypred0)
+pdf(file.path(PPath, "Results/ppc0.pdf"))
+ppc0
 dev.off()
 
 ```
 
-##### Details PPCs, hold-out
+##### PPC for improved model, WITHOUT = 0
 ```{r  eval = FALSE}
 set.seed(a.seed)
+
+ypred1 <- posterior_predict(fits.imp1[[1]]) 
+save("ypred1", file = file.path("Files/ypred1.RData"))
+
 color_scheme_set(scheme = "purple")
-WITHOUT = 0
-NN_SC4 <- cut_number(pisa18$NN_SC,4)
-DISHOME4 <- cut_number(pisa18$DISHOME,4)
-pdf(file.path(PPath, "Results/ppc_detail.pdf"))
-ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = ypredStack0, stat = "mean", 
-                                      group = interaction(NN_SC4[pisa18$WITHOUT ==WITHOUT], pisa18$immig[pisa18$WITHOUT == WITHOUT]),facet_args = list(nrow = 2, scales = "fixed")) + 
-    xlab("probability of ld") + ggtitle("stat = mean, NN_SC x immig") + theme(text = element_text(size = 12), axis.text = element_text(size = 8))
-#dev.off()
-
-
-color_scheme_set(scheme = "darkgray")
-#pdf(file.path(PPath, "Results/ppc_native.pdf"))
-ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = ypredStack0, stat = "mean", 
-                                      group = interaction(NN_SC4[pisa18$WITHOUT ==WITHOUT], pisa18$native[pisa18$WITHOUT == WITHOUT]),facet_args = list(nrow = 2, scales = "fixed")) + 
-    xlab("probability of ld") + ggtitle("stat = mean, NN_SC x native") + theme(text = element_text(size = 12), axis.text = element_text(size = 8))
-#dev.off()
-
-color_scheme_set(scheme = "teal")
-#pdf(file.path(PPath, "Results/ppc_immig_native.pdf"))
-ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = ypredStack0, stat = "mean", 
-                                      group = interaction(pisa18$immig[pisa18$WITHOUT ==WITHOUT], pisa18$native[pisa18$WITHOUT == WITHOUT]),facet_args = list(nrow = 2, scales = "fixed")) + 
-    xlab("probability of ld") + ggtitle("stat = mean, immig x native") + theme(text = element_text(size = 12), axis.text = element_text(size = 8))
-
-
-color_scheme_set(scheme = "mix-teal-pink")
-ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = ypredStack0, stat = "mean", 
-                                      group = interaction(DISHOME4[pisa18$WITHOUT ==WITHOUT], pisa18$native[pisa18$WITHOUT == WITHOUT]),facet_args = list(nrow = 2, scales = "fixed")) + 
-    xlab("probability of ld") + ggtitle("stat = mean, DISHOME x native") + theme(text = element_text(size = 12), axis.text = element_text(size = 8))
-
+ppc0 <- visualPPC2(y.obs = pisa18$attp, yrepM = ypred1, WITHOUT = 1)
+pdf(file.path(PPath, "Results/ppc1.pdf"))
+ppc0
 dev.off()
 
-```
-##### mixed PPC
-
-```{r  eval = FALSE}
-set.seed(a.seed)
-color_scheme_set(scheme = "purple")
-WITHOUT = 0
-NN_SC4 <- cut_number(pisa18$NN_SC,4)
-DISHOME4 <- cut_number(pisa18$DISHOME,4)
-pdf(file.path(PPath, "Results/ppc_mixed.pdf"))
-ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = ypredStack0, stat = "mean", 
-                                      group = interaction(NN_SC4[pisa18$WITHOUT ==WITHOUT], pisa18$bull[pisa18$WITHOUT == WITHOUT]),facet_args = list(nrow = 2, scales = "fixed")) + 
-    xlab("probability of ld") + ggtitle("stat = mean, NN_SC x bull") + theme(text = element_text(size = 12), axis.text = element_text(size = 8))
 
 
-color_scheme_set(scheme = "darkgray")
-#pdf(file.path(PPath, "Results/ppc_native.pdf"))
-ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = ypredStack0, stat = "mean", 
-                                      group = interaction(NN_SC4[pisa18$WITHOUT ==WITHOUT], pisa18$fewbooks[pisa18$WITHOUT == WITHOUT]),facet_args = list(nrow = 2, scales = "fixed")) + xlab("probability of ld") + ggtitle("stat = mean, NN_SC x fewbooks") + theme(text = element_text(size = 12), axis.text = element_text(size = 8))
-#dev.off()
-
-color_scheme_set(scheme = "teal")
-#pdf(file.path(PPath, "Results/ppc_immig_native.pdf"))
-ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = ypredStack0, stat = "mean", 
-                                      group = interaction(pisa18$ld[pisa18$WITHOUT ==WITHOUT], pisa18$native[pisa18$WITHOUT == WITHOUT]),facet_args = list(nrow = 2, scales = "fixed")) + 
-    xlab("probability of ld") + ggtitle("stat = mean, ld x native") + theme(text = element_text(size = 12), axis.text = element_text(size = 8))
-
-DISHOME4 <- cut_number(pisa18$DISHOME,4)
-color_scheme_set(scheme = "mix-teal-pink")
-ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = ypredStack0, stat = "mean", 
-                                      group = interaction(DISHOME4[pisa18$WITHOUT ==WITHOUT], pisa18$aca[pisa18$WITHOUT == WITHOUT]),facet_args = list(nrow = 2, scales = "fixed")) + 
-    xlab("probability of ld") + ggtitle("stat = mean, DISHOME x aca") + theme(text = element_text(size = 12), axis.text = element_text(size = 8))
-
-color_scheme_set(scheme = "mix-teal-pink")
-#pdf(file.path(PPath, "Results/ppc_immig_native.pdf"))
-ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],yrep = ypredStack0, stat = "mean", 
-                                      group = interaction(pisa18$immig[pisa18$WITHOUT ==WITHOUT], pisa18$bull[pisa18$WITHOUT == WITHOUT]),facet_args = list(nrow = 2, scales = "fixed")) + 
-    xlab("probability of ld") + ggtitle("stat = mean, immig x bull") + theme(text = element_text(size = 12), axis.text = element_text(size = 8))
-
-dev.off()
-```
-
-```{r  eval = FALSE}
-fits.imp0_post[[4]] <- fits0[[2]]
-n01.models <- length(fits.imp0_post)
-# Compute loo
-
-loo_list0_4 <- lapply(fits.imp0_post, loo, cores = 1)
-loo_compare(loo_list0_4)
-
-save("loo_list0_4", file = file.path(PPath, "Files","loo_list0_4.RData"))
-#load(file.path(PPath, "Files","loo_list0.RData"))
-
-sink(file = file.path(PPath, "Files","loo_info0_4.txt"))
-for (i in 1:n01.models) {
-  print(paste("******** "))
-  print(paste("model ", i))
-  print(loo_list0_4[[i]])
-  print(paste("******** "))
-}
-sink(file = NULL)
-
-sink(file = file.path(PPath, "Files","loo_compare.txt"))
-loo_compare(loo_list0_4)
-sink(file = NULL)
-
-wtsStacking0_4 <- list()
-
-wtsStacking0_4 <- loo_model_weights(loo_list0_4, method = "stacking")
-print(wtsStacking0_4)
-
-
-sink(file = file.path(PPath, "Results","wtsStacking0_4.txt"))
-print(wtsStacking0_4)
-print(paste("******** "))
-sink(file = NULL)
 ```
 
 
 ###### marginaeffects code
 ###### https://www.andrewheiss.com/blog/2022/11/29/conditional-marginal-marginaleffects/
+###### not of focal interest
 ```{r  eval = FALSE}
 pdf(file.path(PPath, "Results/result0.pdf"))
-plot_predictions(fits.imp0_post[[1]], condition = c("goal","bull","ld"))
-plot_predictions(fits.imp0_post[[1]], condition = c("goal","fewbooks","ld"))
-plot_predictions(fits.imp0_post[[1]], condition = c("goal","bull","fewbooks"))
+plot_predictions(fits.imp0[[1]], condition = c("goal","bull","ld"))
+plot_predictions(fits.imp0[[1]], condition = c("goal","native","ld"))
+plot_predictions(fits.imp0[[1]], condition = c("goal","bull","native"))
 dev.off()
 ```
-
-```{r}
+###### not of focal interest
+```{r eval = FALSE}
 pdf(file.path(PPath, "Results/result1.pdf"))
-plot_predictions(fits1[[1]], condition = c("goal","bull","ld"))
-plot_predictions(fits1[[1]], condition = c("goal","fewbooks","ld"))
-plot_predictions(fits1[[1]], condition = c("goal","bull","fewbooks"))
+plot_predictions(fits.imp1[[1]], condition = c("goal","bull","ld"))
+plot_predictions(fits.imp1[[1]], condition = c("goal","native","ld"))
+plot_predictions(fits.imp1[[1]], condition = c("goal","bull","native"))
+dev.off()
+```
+
+##### result of focal interest, WITHOUT = 0
+```{r eval = FALSE}
+conditional_preds0 <- predictions(
+  fits.imp0[[1]], 
+  newdata = datagrid(ld = c(0, 1)), 
+  by = "ld", 
+  re_formula = NA
+) %>% 
+  posteriordraws()
+```
+
+##### result of focal interest, WITHOUT = 0, plot
+```{r eval = FALSE}
+clrs <- NatParksPalettes::natparks.pals("BryceCanyon")
+p_conditional_preds0 <- conditional_preds0 %>% 
+  ggplot(aes(x = draw, fill = factor(ld))) +
+  stat_halfeye() +
+  scale_fill_manual(values = c(clrs[5], clrs[1])) +
+  labs(x = "Attendance problem", y = "Density", fill = "ld",
+       title = "Conditional cluster-specific means",
+       subtitle = "Typical cluster where school intercept = 0") +
+  coord_cartesian(xlim = c(0, 0.4)) 
+pdf(file.path(PPath, "Results/result0_ld.pdf"))
+p_conditional_preds0
 dev.off()
 ```
 
 
-
-
-
-
-```
 

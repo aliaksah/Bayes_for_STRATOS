@@ -223,68 +223,69 @@ visualPPC1 <- function(y.obs = pisa18$attp, yrepM = yrepM, WITHOUT = 0){
                                yrep = yrepM, WITHOUT)
   ppc.plots[[1]] <- vppc[[1]]
   pppvals[[1]]  <- vppc[[2]]
+  
+  vppc <- visualPPC(y.obs = pisa18$attp, foc = pisa18$native, 
+                    title = "stat = mean, native",
+                    yrep = yrepM, WITHOUT)
+  ppc.plots[[2]] <- vppc[[1]]
+  pppvals[[2]]  <- vppc[[2]]
 
   vppc <- visualPPC(y.obs = pisa18$attp, foc = pisa18$ld, 
                                title = "stat = mean, ld",
                                yrep = yrepM, WITHOUT)
-  ppc.plots[[2]] <- vppc[[1]]
-  pppvals[[2]]  <- vppc[[2]]
+  ppc.plots[[3]] <- vppc[[1]]
+  pppvals[[3]]  <- vppc[[2]]
   
   vppc <- visualPPC(y.obs = pisa18$attp, foc = pisa18$uni, 
                                title = "stat = mean, uni",
                                yrep = yrepM, WITHOUT)
-  ppc.plots[[3]] <- vppc[[1]]
-  pppvals[[3]]  <- vppc[[2]]
+  ppc.plots[[4]] <- vppc[[1]]
+  pppvals[[4]]  <- vppc[[2]]
   
   vppc <- visualPPC(y.obs = pisa18$attp, foc = pisa18$bull, 
                                title = "stat = mean, bull",
                                yrep = yrepM, WITHOUT)
-  ppc.plots[[4]] <- vppc[[1]]
-  pppvals[[4]]  <- vppc[[2]]
+  ppc.plots[[5]] <- vppc[[1]]
+  pppvals[[5]]  <- vppc[[2]]
   
   vppc <- visualPPC(y.obs = pisa18$attp, foc = pisa18$fewbooks, 
                                title = "stat = mean, fewbooks",
                                yrep = yrepM, WITHOUT)
-  ppc.plots[[5]] <- vppc[[1]]
-  pppvals[[5]]  <- vppc[[2]]
+  ppc.plots[[6]] <- vppc[[1]]
+  pppvals[[6]]  <- vppc[[2]]
   
   belong4 <- cut_number(pisa18$belong,4)
   vppc  <- visualPPC(y.obs = pisa18$attp, foc = belong4, 
                                title = "stat = mean, belong",
                                yrep = yrepM, WITHOUT)
-  ppc.plots[[6]] <- vppc[[1]]
-  pppvals[[6]]  <- vppc[[2]]
+  ppc.plots[[7]] <- vppc[[1]]
+  pppvals[[7]]  <- vppc[[2]]
   
   joyread4 <- cut_number(pisa18$joyread,4)
   vppc  <- visualPPC(y.obs = pisa18$attp, foc = joyread4, 
                                title = "stat = mean, joyread",
                                yrep = yrepM, WITHOUT)
   
-  ppc.plots[[7]] <- vppc[[1]]
-  pppvals[[7]]  <- vppc[[2]]
+  ppc.plots[[8]] <- vppc[[1]]
+  pppvals[[8]]  <- vppc[[2]]
   
   goal4 <- cut_number(pisa18$goal,4)
   vppc  <- visualPPC(y.obs = pisa18$attp, foc = goal4, 
                                title = "stat = mean, goal",
                                yrep = yrepM, WITHOUT)
   
-  ppc.plots[[8]] <- vppc[[1]]
-  pppvals[[8]]  <- vppc[[2]]
+  ppc.plots[[9]] <- vppc[[1]]
+  pppvals[[9]]  <- vppc[[2]]
   
   mot4 <- cut_number(pisa18$mot,4)
   vppc  <- visualPPC(y.obs = pisa18$attp, foc = mot4, 
                                title = "stat = mean, mot",
                                yrep = yrepM, WITHOUT)
   
-  ppc.plots[[9]] <- vppc[[1]]
-  pppvals[[9]]  <- vppc[[2]]
-  
-  DISCIPLINE4 <- cut_number(pisa18$DISCIPLINE,4)
-  vppc  <- visualPPC(y.obs = pisa18$attp, foc = DISCIPLINE4, 
-                               title = "stat = mean, DISCIPLINE",
-                               yrep = yrepM, WITHOUT)
   ppc.plots[[10]] <- vppc[[1]]
   pppvals[[10]]  <- vppc[[2]]
+  
+
   
   RES4 <- cut_number(pisa18$RES,4)
   vppc <- visualPPC(y.obs = pisa18$attp, foc = RES4, 
@@ -316,7 +317,7 @@ visualPPC1 <- function(y.obs = pisa18$attp, yrepM = yrepM, WITHOUT = 0){
 #' @return PPC plots 
 visualPPC2 <- function(y.obs = pisa18$attp, yrepM = yrepM, WITHOUT = 0){
   
-  num.plots <- 12
+  num.plots <- 11
   ppc.plots <- vector(num.plots, mode = 'list')
   pppvals <- vector(num.plots, mode = 'list')
   
@@ -326,59 +327,55 @@ visualPPC2 <- function(y.obs = pisa18$attp, yrepM = yrepM, WITHOUT = 0){
   ppc.plots[[1]] <- vppc[[1]]
   pppvals[[1]]  <- vppc[[2]]
   
-  vppc <- visualPPC(y.obs = pisa18$attp, foc = pisa18$native, 
-                    title = "stat = mean, native",
-                    yrep = yrepM, WITHOUT)
-  ppc.plots[[2]] <- vppc[[1]]
-  pppvals[[2]]  <- vppc[[2]]
+
   
   vppc <- visualPPC(y.obs = pisa18$attp, foc = pisa18$female, 
                     title = "stat = mean, female",
                     yrep = yrepM, WITHOUT)
-  ppc.plots[[3]] <- vppc[[1]]
-  pppvals[[3]]  <- vppc[[2]]
+  ppc.plots[[2]] <- vppc[[1]]
+  pppvals[[2]]  <- vppc[[2]]
   
   escs4 <- cut_number(pisa18$escs,4)
   vppc <- visualPPC(y.obs = pisa18$attp, foc = escs4, 
                     title = "stat = mean, escs",
                     yrep = yrepM, WITHOUT)
-  ppc.plots[[4]] <- vppc[[1]]
-  pppvals[[4]]  <- vppc[[2]]
+  ppc.plots[[3]] <- vppc[[1]]
+  pppvals[[3]]  <- vppc[[2]]
   
   vppc <- visualPPC(y.obs = pisa18$attp, foc = pisa18$RUR, 
                     title = "stat = mean, RUR",
                     yrep = yrepM, WITHOUT)
-  ppc.plots[[5]] <- vppc[[1]]
-  pppvals[[5]]  <- vppc[[2]]
+  ppc.plots[[4]] <- vppc[[1]]
+  pppvals[[4]]  <- vppc[[2]]
   
   vppc  <- visualPPC(y.obs = pisa18$attp, foc = pisa18$DISH, 
                      title = "stat = mean, DISH",
                      yrep = yrepM, WITHOUT)
-  ppc.plots[[6]] <- vppc[[1]]
-  pppvals[[6]]  <- vppc[[2]]
+  ppc.plots[[5]] <- vppc[[1]]
+  pppvals[[5]]  <- vppc[[2]]
   
   vppc  <- visualPPC(y.obs = pisa18$attp, foc = pisa18$GYM, 
                      title = "stat = mean, GYM",
                      yrep = yrepM, WITHOUT)
   
-  ppc.plots[[7]] <- vppc[[1]]
-  pppvals[[7]]  <- vppc[[2]]
+  ppc.plots[[6]] <- vppc[[1]]
+  pppvals[[6]]  <- vppc[[2]]
   
   STAFFSHORT4 <- cut_number(pisa18$STAFFSHORT,4)
   vppc  <- visualPPC(y.obs = pisa18$attp, foc = STAFFSHORT4, 
                      title = "stat = mean, STAFFSHORT",
                      yrep = yrepM, WITHOUT)
   
-  ppc.plots[[8]] <- vppc[[1]]
-  pppvals[[8]]  <- vppc[[2]]
+  ppc.plots[[7]] <- vppc[[1]]
+  pppvals[[7]]  <- vppc[[2]]
   
   EDUSHORT2 <- cut_number(pisa18$EDUSHORT,2)
   vppc  <- visualPPC(y.obs = pisa18$attp, foc = EDUSHORT2, 
                      title = "stat = mean, EDUSHORT",
                      yrep = yrepM, WITHOUT)
   
-  ppc.plots[[9]] <- vppc[[1]]
-  pppvals[[9]]  <- vppc[[2]]
+  ppc.plots[[8]] <- vppc[[1]]
+  pppvals[[8]]  <- vppc[[2]]
   
   FEMFRAC4 <- cut_number(pisa18$FEMFRAC,4)
   vppc <- visualPPC(y.obs = pisa18$attp, foc = FEMFRAC4, 
@@ -386,23 +383,23 @@ visualPPC2 <- function(y.obs = pisa18$attp, yrepM = yrepM, WITHOUT = 0){
                     yrep = yrepM, WITHOUT)
   
   
-  ppc.plots[[10]] <- vppc[[1]]
-  pppvals[[10]]  <- vppc[[2]]
+  ppc.plots[[9]] <- vppc[[1]]
+  pppvals[[9]]  <- vppc[[2]]
   
   SN_SC4 <- cut_number(pisa18$SN_SC,4)
   vppc  <- visualPPC(y.obs = pisa18$attp, foc = SN_SC4, 
                      title = "stat = mean, SN_SC",
                      yrep = yrepM, WITHOUT)
-  ppc.plots[[11]] <- vppc[[1]]
-  pppvals[[11]]  <- vppc[[2]]
+  ppc.plots[[10]] <- vppc[[1]]
+  pppvals[[10]]  <- vppc[[2]]
   
   NN_SC4 <- cut_number(pisa18$NN_SC,4)
   vppc <- visualPPC(y.obs = pisa18$attp, foc = NN_SC4, 
                     title = "stat = mean, NN_SC",
                     yrep = yrepM, WITHOUT)
   
-  ppc.plots[[12]] <- vppc[[1]]
-  pppvals[[12]]  <- vppc[[2]]
+  ppc.plots[[11]] <- vppc[[1]]
+  pppvals[[11]]  <- vppc[[2]]
   
  return(list(ppc.plots=ppc.plots,pppvals=pppvals))
 }
