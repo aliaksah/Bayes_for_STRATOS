@@ -531,12 +531,87 @@ p_conditional_preds0 <- conditional_preds0 %>%
   scale_fill_manual(values = c(clrs[5], clrs[1])) +
   labs(x = "Attendance problem", y = "Density", fill = "ld",
        title = "Conditional cluster-specific means",
-       subtitle = "Typical cluster where school intercept = 0") +
+       subtitle = "Typical cluster where school intercept, slope bull = 0") +
   coord_cartesian(xlim = c(0, 0.4)) 
 pdf(file.path(PPath, "Results/result0_ld.pdf"))
 p_conditional_preds0
 dev.off()
 ```
+#####  Cluster-specific average treatment effect (when intercept is 0)
+```{r eval = FALSE}
+conditional_ate0 <- comparisons(
+   fits.imp0[[1]], 
+  variables = "ld",
+  re_formula = NA
+) %>% 
+  posteriordraws()
+```
 
+```{r eval = FALSE}
+p_conditional_ate0 <- conditional_ate0 %>% 
+  ggplot(aes(x = draw)) +
+  stat_halfeye(fill = clrs[3]) +
+ # scale_x_continuous(labels = label_dollar(style_negative = "minus")) +
+  labs(x = "(ld = 1) − (ld = 0)", y = "Density", 
+       title = "Conditional cluster-specific ATE",
+       subtitle = "Typical cluster where school intercept, slope bull = 0") +
+  coord_cartesian(xlim = c(-0.2,0.3)) #+
+  #theme_nice() #+
+  #theme(plot.subtitle = element_markdown())
+pdf(file.path(PPath, "Results/result0_ld_ate.pdf"))
+p_conditional_ate0
+dev.off()
+```
 
+##### result of focal interest, WITHOUT = 1
+```{r eval = FALSE}
+conditional_preds1 <- predictions(
+  fits.imp1[[1]], 
+  newdata = datagrid(ld = c(0, 1)), 
+  by = "ld", 
+  re_formula = NA
+) %>% 
+  posteriordraws()
+```
+
+##### result of focal interest, WITHOUT = 1, plot
+```{r eval = FALSE}
+
+p_conditional_preds1 <- conditional_preds1 %>% 
+  ggplot(aes(x = draw, fill = factor(ld))) +
+  stat_halfeye() +
+  scale_fill_manual(values = c(clrs[5], clrs[1])) +
+  labs(x = "Attendance problem", y = "Density", fill = "ld",
+       title = "Conditional cluster-specific means",
+       subtitle = "Typical cluster where school intercept, slope bull = 0") +
+  coord_cartesian(xlim = c(0, 0.4)) 
+pdf(file.path(PPath, "Results/result1_ld.pdf"))
+p_conditional_preds1
+dev.off()
+```
+#####  Cluster-specific average treatment effect (when intercept is 0)
+```{r eval = FALSE}
+conditional_ate1 <- comparisons(
+   fits.imp1[[1]], 
+  variables = "ld",
+  re_formula = NA
+) %>% 
+  posteriordraws()
+```
+
+```{r eval = FALSE}
+p_conditional_ate1 <- conditional_ate1 %>% 
+  ggplot(aes(x = draw)) +
+  stat_halfeye(fill = clrs[3]) +
+ # scale_x_continuous(labels = label_dollar(style_negative = "minus")) +
+  labs(x = "(ld = 1) − (ld = 0)", y = "Density", 
+       title = "Conditional cluster-specific ATE",
+       subtitle = "Typical cluster where school intercept, slope bull = 0") +
+  coord_cartesian(xlim = c(-0.2,0.3)) #+
+  #theme_nice() #+
+  #theme(plot.subtitle = element_markdown())
+pdf(file.path(PPath, "Results/result1_ld_ate.pdf"))
+p_conditional_ate1
+dev.off()
+```
 
