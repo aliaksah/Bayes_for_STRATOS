@@ -128,11 +128,13 @@ mean.st_attendance <- apply(st_attendance,FUN = mean, MARGIN = 1, na.rm = TRUE)
 att <- scale(mean.st_attendance)[,1]
 ATT <- ave(att, school.id, FUN = function(x) mean(x, na.rm = TRUE))
 att01 <- as.numeric(att > 0.0)
-ATT01 <- ave(att01, school.id, FUN = function(x) mean(x, na.rm = TRUE))
+
 
 pisa18$attp <- rep(0, length(att01))
 pisa18$attp[part1 > 1] <- 1
 pisa18$attp[part2 > 2] <- 1
+pisa18$ATT01 <- ave(pisa18$attp, school.id, FUN = function(x) mean(x, na.rm = TRUE))
+
 # enjoyment of reading, 1 = Strongly disagree, 4 = Strongly agree
 
 # enjoyment of reading, high values indicate a positive attitude towards reading
