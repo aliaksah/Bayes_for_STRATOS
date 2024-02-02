@@ -345,7 +345,7 @@ sink(file=NULL)
 ```{r  eval = FALSE}
 # theoretical model, possible improvements, WITHOUT = 0
 imp0 <- as.formula(attp ~ aca + native + ld + uni  + bull + fewbooks + belong +  joyread + goal + mot + RES + VAL + ld:goal + native:ld  + (1 + bull| school.id))
-# theoretical model, possible improvements, WITHOUT = 0
+# theoretical model, possible improvements, WITHOUT = 1
 imp1 <- as.formula(attp ~ aca + native + ld + uni  + bull + fewbooks + belong +  joyread + goal + mot + RES + VAL + ld:fewbooks + native:fewbooks + goal:ld + (1 + bull| school.id))
 
 
@@ -517,39 +517,13 @@ p_conditional_preds0 <- conditional_preds0 %>%
   scale_fill_manual(values = c(clrs[5], clrs[1])) +
   labs(x = "Attendance problem", y = "Density", fill = "ld",
        title = "Conditional cluster-specific means",
-       subtitle = "Typical cluster where school intercept, slope bull = 0") +
+       subtitle = "Typical cluster, WITHOUT = 0") +
   coord_cartesian(xlim = c(0, 0.4)) 
-pdf(file.path(PPath, "Results/result0_ld.pdf"))
-p_conditional_preds0
-dev.off()
-```
-#####  Cluster-specific average treatment effect (when intercept is 0)
-```{r eval = FALSE}
-conditional_ate0 <- avg_comparisons(
-   fits.imp0[[1]], 
-  variables = "ld",
-  re_formula = NA
-) %>% 
-  posteriordraws()
+#pdf(file.path(PPath, "Results/result0_ld.pdf"))
+p0ld <- p_conditional_preds0
+#dev.off()
 ```
 
-```{r eval = FALSE}
-p_conditional_ate0 <- conditional_ate0 %>% 
-  ggplot(aes(x = draw)) +
-  stat_halfeye(fill = clrs[3]) +
- # scale_x_continuous(labels = label_dollar(style_negative = "minus")) +
-  labs(x = "(ld = 1) − (ld = 0)", y = "Density", 
-       title = "Conditional cluster-specific ATE",
-       subtitle = "Typical cluster where school intercept, slope bull = 0") +
-  coord_cartesian(xlim = c(-0.2,0.3)) #+
-  #theme_nice() #+
-  #theme(plot.subtitle = element_markdown())
-pdf(file.path(PPath, "Results/result0_ld_ate.pdf"))
-p_conditional_ate0
-dev.off()
-```
-
-##### result of focal interest, WITHOUT = 1
 ```{r eval = FALSE}
 conditional_preds1 <- avg_predictions(
   fits.imp1[[1]], 
@@ -569,37 +543,13 @@ p_conditional_preds1 <- conditional_preds1 %>%
   scale_fill_manual(values = c(clrs[5], clrs[1])) +
   labs(x = "Attendance problem", y = "Density", fill = "ld",
        title = "Conditional cluster-specific means",
-       subtitle = "Typical cluster where school intercept, slope bull = 0") +
+       subtitle = "Typical cluster, WITHOUT = 1") +
   coord_cartesian(xlim = c(0, 0.4)) 
-pdf(file.path(PPath, "Results/result1_ld.pdf"))
-p_conditional_preds1
-dev.off()
-```
-#####  Cluster-specific average treatment effect (when intercept is 0)
-```{r eval = FALSE}
-conditional_ate1 <- avg_comparisons(
-   fits.imp1[[1]], 
-  variables = "ld",
-  re_formula = NA
-) %>% 
-  posteriordraws()
+#pdf(file.path(PPath, "Results/result1_ld.pdf"))
+p1ld <- p_conditional_preds1
+#dev.off()
 ```
 
-```{r eval = FALSE}
-p_conditional_ate1 <- conditional_ate1 %>% 
-  ggplot(aes(x = draw)) +
-  stat_halfeye(fill = clrs[3]) +
- # scale_x_continuous(labels = label_dollar(style_negative = "minus")) +
-  labs(x = "(ld = 1) − (ld = 0)", y = "Density", 
-       title = "Conditional cluster-specific ATE",
-       subtitle = "Typical cluster where school intercept, slope bull = 0") +
-  coord_cartesian(xlim = c(-0.2,0.3)) #+
-  #theme_nice() #+
-  #theme(plot.subtitle = element_markdown())
-pdf(file.path(PPath, "Results/result1_ld_ate.pdf"))
-p_conditional_ate1
-dev.off()
-```
 
 ##### bull, WITHOUT = 0
 ```{r  eval = FALSE}
@@ -619,13 +569,18 @@ p_conditional_preds0_b <- conditional_preds0_b %>%
   scale_fill_manual(values = c(clrs[5], clrs[1])) +
   labs(x = "Attendance problem", y = "Density", fill = "bull",
        title = "Conditional cluster-specific means",
-       subtitle = "Typical cluster where school intercept, slope bull = 0") +
+       subtitle = "Typical cluster, WITHOUT = 0") +
   coord_cartesian(xlim = c(0, 0.4)) 
-pdf(file.path(PPath, "Results/result0_bull.pdf"))
-p_conditional_preds0_b
-dev.off()
+#pdf(file.path(PPath, "Results/result0_bull.pdf"))
+p0bull <- p_conditional_preds0_b
+#dev.off()
 ```
 ##### bull, WITHOUT = 1
+
+
+
+
+
 ```{r  eval = FALSE}
 conditional_preds1_b <- avg_predictions(
   fits.imp1[[1]], 
@@ -636,6 +591,8 @@ conditional_preds1_b <- avg_predictions(
   posteriordraws()
 ```
 
+
+
 ```{r  eval = FALSE}
 p_conditional_preds1_b <- conditional_preds1_b %>% 
   ggplot(aes(x = draw, fill = factor(bull))) +
@@ -643,63 +600,83 @@ p_conditional_preds1_b <- conditional_preds1_b %>%
   scale_fill_manual(values = c(clrs[5], clrs[1])) +
   labs(x = "Attendance problem", y = "Density", fill = "bull",
        title = "Conditional cluster-specific means",
-       subtitle = "Typical cluster where school intercept, slope bull = 0") +
+       subtitle = "Typical cluster, WITHOUT = 1") +
   coord_cartesian(xlim = c(0, 0.4)) 
-pdf(file.path(PPath, "Results/result1_bull.pdf"))
-p_conditional_preds1_b
+#pdf(file.path(PPath, "Results/result1_bull.pdf"))
+p1bull <- p_conditional_preds1_b
+#dev.off()
+```
+
+##### plot to pdf
+```{r  eval = FALSE}
+pdf(file.path(PPath,"Results/bull.pdf"))
+grid.arrange(p0bull, p1bull, nrow = 2)
+dev.off()
+
+pdf(file.path(PPath,"Results/ld.pdf"))
+grid.arrange(p0ld, p1ld, nrow = 2)
 dev.off()
 ```
-##### ATE of bull, WITHOUT = 0
-```{r  eval = FALSE}
-conditional_ate0_b <- avg_comparisons(
-   fits.imp0[[1]], 
-  variables = "bull",
-  re_formula = NA
-) %>% 
-  posteriordraws()
-
-
-```
-
-```{r  eval = FALSE}
-p_conditional_ate0_b <- conditional_ate0_b %>% 
-  ggplot(aes(x = draw)) +
-  stat_halfeye(fill = clrs[3]) +
- # scale_x_continuous(labels = label_dollar(style_negative = "minus")) +
-  labs(x = "(bull = 1) − (bull = 0)", y = "Density", 
-       title = "Conditional cluster-specific ATE",
-       subtitle = "Typical cluster where school intercept, slope bull = 0") +
-  coord_cartesian(xlim = c(-0.2,0.3)) #+
-  #theme_nice() #+
-  #theme(plot.subtitle = element_markdown())
-pdf(file.path(PPath, "Results/result0_bull_ate.pdf"))
-p_conditional_ate0_b
-dev.off()
-```
-
-
-##### ATE of bull, WITHOUT = 1
-```{r  eval = FALSE}
-conditional_ate1_b <- avg_comparisons(
-   fits.imp1[[1]], 
-  variables = "bull",
+##### final plot, WITHOUT = 1
+```{r eval = FALSE}
+conditional_preds1_both <- avg_predictions(
+  fits.imp1[[1]], 
+ # newdata = datagrid(ld = c(0, 1)), 
+  by = c("bull", "ld"),
   re_formula = NA
 ) %>% 
   posteriordraws()
 ```
 
+```{r eval = FALSE}
+conditional_preds1_both$ldbull <- interaction(conditional_preds1_both$ld,conditional_preds1_both$bull)
+```
+
+```{r eval = FALSE}
+p_conditional_preds1_both <- conditional_preds1_both %>% 
+  ggplot(aes(x = draw, fill = factor(ldbull))) +
+  stat_halfeye() +
+  scale_fill_manual(values = c(clrs[5], clrs[1],clrs[3], clrs[4])) +
+  labs(x = "Attendance problem", y = "Density", fill = "ldbull",
+       title = "Conditional cluster-specific means",
+       subtitle = "Typical cluster, WITHOUT = 1") +
+  coord_cartesian(xlim = c(0.1, 0.5)) 
+#pdf(file.path(PPath, "Results/result1_bull.pdf"))
+p1ldbull <- p_conditional_preds1_both
+```
+
+##### final plot, WITHOUT = 0
+```{r eval = FALSE}
+conditional_preds0_both <- avg_predictions(
+  fits.imp0[[1]], 
+ # newdata = datagrid(ld = c(0, 1)), 
+  by = c("bull", "ld"),
+  re_formula = NA
+) %>% 
+  posteriordraws()
+```
+
+```{r eval = FALSE}
+conditional_preds0_both$ldbull <- interaction(conditional_preds0_both$ld,conditional_preds0_both$bull)
+```
+
+```{r eval = FALSE}
+p_conditional_preds0_both <- conditional_preds0_both %>% 
+  ggplot(aes(x = draw, fill = factor(ldbull))) +
+  stat_halfeye() +
+  scale_fill_manual(values = c(clrs[5], clrs[1],clrs[3], clrs[4])) +
+  labs(x = "Attendance problem", y = "Density", fill = "ldbull",
+       title = "Conditional cluster-specific means",
+       subtitle = "Typical cluster, WITHOUT = 0") +
+  coord_cartesian(xlim = c(0.1, 0.5)) 
+#pdf(file.path(PPath, "Results/result1_bull.pdf"))
+p0ldbull <- p_conditional_preds0_both
+```
+##### plot to pdf
 ```{r  eval = FALSE}
-p_conditional_ate1_b <- conditional_ate1_b %>% 
-  ggplot(aes(x = draw)) +
-  stat_halfeye(fill = clrs[3]) +
- # scale_x_continuous(labels = label_dollar(style_negative = "minus")) +
-  labs(x = "(bull = 1) − (bull = 0)", y = "Density", 
-       title = "Conditional cluster-specific ATE",
-       subtitle = "Typical cluster where school intercept, slope bull = 0") +
-  coord_cartesian(xlim = c(-0.2,0.3)) #+
-  #theme_nice() #+
-  #theme(plot.subtitle = element_markdown())
-pdf(file.path(PPath, "Results/result1_bull_ate.pdf"))
-p_conditional_ate1_b
+pdf(file.path(PPath,"Results/ldbull.pdf"))
+grid.arrange(p0ldbull, p1ldbull, nrow = 2)
 dev.off()
+
+
 ```
