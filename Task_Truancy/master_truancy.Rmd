@@ -678,5 +678,129 @@ pdf(file.path(PPath,"Results/ldbull.pdf"))
 grid.arrange(p0ldbull, p1ldbull, nrow = 2)
 dev.off()
 
+```
+##### goal, WITHOUT = 0
+```{r eval = FALSE}
+conditional_preds0_goal <- avg_predictions(
+  fits.imp0[[1]], 
+ # newdata = datagrid(ld = c(0, 1)), 
+  by = c("goal"),
+  re_formula = NA
+) %>% 
+  posteriordraws()
+```
+
+```{r eval = FALSE}
+p_conditional_preds0_goal <- conditional_preds0_goal %>% 
+  ggplot(aes(x = draw, fill = factor(goal))) +
+  stat_halfeye() +
+  #scale_fill_manual(values = c(clrs[5], clrs[1],clrs[3], clrs[4])) +
+  labs(x = "Attendance problem", y = "Density", fill = "goal",
+       title = "Conditional cluster-specific means",
+       subtitle = "Typical cluster, WITHOUT = 0") +
+  coord_cartesian(xlim = c(0.0, 0.5)) 
+#pdf(file.path(PPath, "Results/result1_bull.pdf"))
+p0goal <- p_conditional_preds0_goal
+```
+##### goal, WITHOUT = 1
+```{r eval = FALSE}
+conditional_preds1_goal <- avg_predictions(
+  fits.imp1[[1]], 
+ # newdata = datagrid(ld = c(0, 1)), 
+  by = c("goal"),
+  re_formula = NA
+) %>% 
+  posteriordraws()
+```
+
+```{r eval = FALSE}
+p_conditional_preds1_goal <- conditional_preds1_goal %>% 
+  ggplot(aes(x = draw, fill = factor(goal))) +
+  stat_halfeye() +
+  #scale_fill_manual(values = c(clrs[5], clrs[1],clrs[3], clrs[4])) +
+  labs(x = "Attendance problem", y = "Density", fill = "goal",
+       title = "Conditional cluster-specific means",
+       subtitle = "Typical cluster, WITHOUT = 1") +
+  coord_cartesian(xlim = c(0.0, 0.5)) 
+#pdf(file.path(PPath, "Results/result1_bull.pdf"))
+p1goal <- p_conditional_preds1_goal
+```
+
+##### plot to pdf
+```{r  eval = FALSE}
+pdf(file.path(PPath,"Results/goal.pdf"))
+grid.arrange(p0goal, p1goal, nrow = 2)
+dev.off()
 
 ```
+### Students within schools, combination with VAL and RES
+
+##### RES and VAL for WITHOUT = 1
+```{r  eval = FALSE}
+fits.imp1[[1]]$data$VAL3 <- cut_number(fits.imp1[[1]]$data$VAL,3)
+fits.imp1[[1]]$data$RES3 <- cut_number(fits.imp1[[1]]$data$RES,3)
+
+
+foc.grid <- fits.imp1[[1]]$data |> 
+  summarise(
+    aca = mean(aca),native=mean(native), ld=mean(ld),uni= mean(uni), bull = mean(bull),  
+    fewbooks = mean(fewbooks),  belong  = mean(belong),   joyread = mean(joyread),
+    goal  = mean(goal),   mot =mean(mot), RES = mean(RES),  VAL = mean(VAL),
+    .by = c(VAL3,RES3)
+  )
+
+foc.grid.cnt <- fits.imp1[[1]]$data  |> count(VAL3,RES3) |>
+  mutate(Prop = n / sum(n))
+
+RESVAL1 <- predictions(
+  fits.imp1[[1]], 
+  newdata = foc.grid[,3:14], 
+  re_formula = NA
+)
+
+RESVAL_W1 = cbind(foc.grid[,1:2],RESVAL1)
+RESVAL_W1
+```
+##### Write to file
+```{r eval = FALSE}
+sink(file = file.path(PPath, "Results/resval1.txt"))
+RESVAL_W1[,1:18]
+sink(file = NULL)
+```
+
+
+
+
+##### RES and VAL for WITHOUT = 0
+```{r  eval = FALSE}
+fits.imp0[[1]]$data$VAL3 <- cut_number(fits.imp0[[1]]$data$VAL,3)
+fits.imp0[[1]]$data$RES3 <- cut_number(fits.imp0[[1]]$data$RES,3)
+
+
+foc.grid0 <- fits.imp0[[1]]$data |> 
+  summarise(
+    aca = mean(aca),native=mean(native), ld=mean(ld),uni= mean(uni), bull = mean(bull),  
+    fewbooks = mean(fewbooks),  belong  = mean(belong),   joyread = mean(joyread),
+    goal  = mean(goal),   mot =mean(mot), RES = mean(RES),  VAL = mean(VAL),
+    .by = c(VAL3,RES3)
+  )
+
+foc.grid.cnt0 <- fits.imp0[[1]]$data  |> count(VAL3,RES3) |>
+  mutate(Prop = n / sum(n))
+
+RESVAL0 <- predictions(
+  fits.imp0[[1]], 
+  newdata = foc.grid0[,3:14], 
+  re_formula = NA
+)
+
+RESVAL_W0 = cbind(foc.grid0[,1:2],RESVAL0)
+RESVAL_W0
+```
+##### Write to file
+```{r eval = FALSE}
+sink(file = file.path(PPath, "Results/resval0.txt"))
+RESVAL_W0[,1:18]
+sink(file = NULL)
+```
+

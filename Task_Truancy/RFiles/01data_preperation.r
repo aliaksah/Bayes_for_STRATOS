@@ -247,7 +247,7 @@ pisa18$RUR[pisa18$RUR == 5] <- 0
 pisa18$SN_SC <- IMPDAT$SC048Q02NA/100 # Students with special needs
 pisa18$FAILED <- IMPDAT$SC164Q01HA/100 # in the last full academic year, what proportion of 
 # students in your school’s final grade left school without 
-pisa18$WITHOUT  <- as.numeric(pisa18$FAILED > 0.02) # above median
+pisa18$WITHOUT  <- as.numeric(pisa18$FAILED > 0.02) # above2 %
 
 #As of <February 1, 2018>, what was the total school enrolment (number of students)?
 
