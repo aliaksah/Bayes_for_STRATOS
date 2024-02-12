@@ -781,7 +781,6 @@ sink(file = NULL)
 fits.imp0[[1]]$data$VAL3 <- cut_number(fits.imp0[[1]]$data$VAL,3)
 fits.imp0[[1]]$data$RES3 <- cut_number(fits.imp0[[1]]$data$RES,3)
 
-
 foc.grid0 <- fits.imp0[[1]]$data |> 
   summarise(
     aca = mean(aca),native=mean(native), ld=mean(ld),uni= mean(uni), bull = mean(bull),  
