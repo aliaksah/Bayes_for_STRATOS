@@ -807,94 +807,110 @@ sink(file = file.path(PPath, "Results/resval0.txt"))
 RESVAL_W0[,1:18]
 sink(file = NULL)
 ```
-#### Result analogous Figure 13.19 https://sites.google.com/view/statistical-modeling-with-r/part-iii
-##### cannot find 'slo.eff.m2.brms'
+##### Correlation between random intercept and random slope, WITHOUT = 0
 ```{r eval = FALSE}
-library("ggbreak")
-library("reshape2")
-DF <- fits.imp0[[1]]$data
-pop.ef.m2.brms=mcmc_areas(fits.imp0[[1]], prob=0.62, prob_outer = 0.95, regex_pars = "b")+
-  geom_density(lwd=1.2, alpha=0.9)+ 
-  theme_bw()+
-  scale_x_break(c(5, 50),scales = "fixed")+ 
-#  scale_y_discrete(labels=c("Int.boys", "Slope.boys", "diff.int","diff.slope"))+
-  theme(axis.text.y=element_text(size = 14, angle=90, hjust=0.4),
-        axis.text.x=element_text(size = 16, angle=90),  
-        axis.title.y = element_blank(),
-        strip.background=element_rect(colour = "black", fill = "white"),
-        strip.text = element_text(size = 14)) 
-# Gathering the posterior distributions of the group-level effects (random effects in the Frequentist framework)
-gr.eff.m2.brms=as_draws_df(fits.imp0[[1]], variable = "^r_", regex = TRUE)
-gr.eff.m2.brms=gr.eff.m2.brms[,-c(199,200,201)] # delete the last three columns: .chain, .draw, and .iteration
-names(gr.eff.m2.brms)=paste(rep(c("int", "slope"),each=length(unique(DF$school.id))), 
-                            rep(unique(DF$school.id),times=2)) # shortening the names
-# Reformatting gr.eff.m2.brms as "long format": stacked columns
-gr.eff.m2.brms=melt(gr.eff.m2.brms,value.name = "gr.eff.school") # stores posterior distr of all group level effects effects from 
-int.eff.m2.brms=gr.eff.m2.brms[grep(pattern="^int", gr.eff.m2.brms$variable),] # posterior distr of int group level effects 
-slopes.eff.m2.brms=gr.eff.m2.brms[grep(pattern="^slope", gr.eff.m2.brms$variable),] # posterior distr of slope group level effects
 
-# Posterior distribution plots of intercepts and slopes group effects
-m2.brms.int.schools=ggplot(data=int.eff.m2.brms,aes(x=gr.eff.school, col=variable))+
-  geom_density()+
-  theme_bw()+
-  geom_vline(xintercept = 0, linetype=2)+
-  labs(x="Group effect in Intercept", y="Probability density")+
-  theme(legend.position="none",
-        axis.text=element_text(size = 16),  
-        axis.title = element_text(size = 18))
-m2.brms.slopes.schools=ggplot(data=slo.eff.m2.brms,aes(x=gr.eff.school, col=variable))+
-  geom_density()+
-  theme_bw()+
-  geom_vline(xintercept = 0, linetype=2)+
-  labs(x="Group effect in Slope", y="Probability density")+
-  theme(legend.position="none",
-        axis.text=element_text(size = 16),  
-        axis.title = element_text(size = 18))
-# Obtains means, SE and 95% Credible Intervals of Group effects for m2.brms
-stats.ranef.m2.brms=as.data.frame(ranef(m2.brms)) 
-names(stats.ranef.m2.brms)=c("mean.int", "se.int", "Q2.5.int", "Q97.5.int",
+DF0 <- fits.imp0[[1]]$data
+ # Obtains means, SE and 95% Credible Intervals of Group effects for m2.brms
+stats.ranef.m2.brms0=as.data.frame(ranef(fits.imp0[[1]])) 
+names(stats.ranef.m2.brms0)=c("mean.int", "se.int", "Q2.5.int", "Q97.5.int",
                              "mean.slope", "se.slope", "Q2.5.slope", "Q97.5.slope") # put shorter names in the data frame
-stats.ranef.m2.brms$school=unique(DF$school.id) # adds schoolid  
-CrInt95.int.m2.brms=ggplot(data=stats.ranef.m2.brms, aes(x=reorder(school, mean.int), y=mean.int))+
+stats.ranef.m2.brms0$school=unique(DF0$school.id) # adds schoolid
+ 
+CrInt95.int.m2.brms0=ggplot(data=stats.ranef.m2.brms0, aes(x=reorder(school, mean.int), y=mean.int))+
   geom_point()+
   coord_flip()+
   geom_linerange(aes(ymin=Q2.5.int,ymax=Q97.5.int))+
   geom_hline(yintercept=0, size=1, linetype=2)+
-  scale_y_continuous(breaks=seq(from=-30, to=40, by=10))+
+#  scale_y_continuous(breaks=seq(from=-0.2, to=0.2, by=0.05))+
   theme_bw()+
   labs(x="School", y="Group intercept")+
   theme(axis.title.x = element_text(size=18),
         axis.title.y = element_blank(),
         axis.text.y = element_blank(), 
         axis.text.x = element_text(size=16))
-CrInt95.slopes.m2.brms=ggplot(data=stats.ranef.m2.brms, aes(x=reorder(school, mean.int), y=mean.slope))+
+CrInt95.slopes.m2.brms0=ggplot(data=stats.ranef.m2.brms0, aes(x=reorder(school, mean.int), y=mean.slope))+
   geom_point()+
   coord_flip()+
   geom_linerange(aes(ymin=Q2.5.slope,ymax=Q97.5.slope))+
   geom_hline(yintercept=0, size=1, linetype=2)+
-  scale_y_continuous(breaks=seq(from=-30, to=40, by=10))+
+#  scale_y_continuous(breaks=seq(from=-0.6, to=0.6, by=0.05))+
   theme_bw()+
   labs(x="School", y="Group slope")+
   theme(axis.title.x = element_text(size=18),
         axis.title.y = element_blank(),
         axis.text.y = element_blank(), 
         axis.text.x = element_text(size=16))
-cor.sl.int.m2.brms=ggplot(data=stats.ranef.m2.brms, aes(x=mean.int, y=mean.slope))+
+cor.sl.int.m2.brms0=ggplot(data=stats.ranef.m2.brms0, aes(x=mean.int, y=mean.slope))+
   geom_point()+
   geom_hline(yintercept=0, size=1, linetype=2)+
   geom_vline(xintercept=0, size=1, linetype=2)+
   theme_bw()+
-  labs(x="Mean group Intercept", y="Mean group slope")+
+  labs(x="Mean group Intercept W0", y="Mean group slope W0")+
   theme(axis.title = element_text(size=18), 
         axis.text = element_text(size=16))
-plot_grid(pop.ef.m2.brms, m2.brms.int.schools,m2.brms.slopes.schools,
-          CrInt95.int.m2.brms,CrInt95.slopes.m2.brms,cor.sl.int.m2.brms,
-          nrow=2,labels = LETTERS[1:6], align="hv",label_x=0.85, label_y=0.95) #Fig. 13.19
+plot_grid(CrInt95.int.m2.brms0,CrInt95.slopes.m2.brms0,cor.sl.int.m2.brms0,
+          nrow=2,labels = LETTERS[1:6], align="hv",label_x=0.85, label_y=0.95) #Fig. 
 ```
-##### plot to pdf, does not yet work
+##### plot to pdf
 ```{r eval = FALSE}
-pdf(file.path(PPath,"Results/test2.pdf"))
-pop.ef.m2.brms
+pdf(file.path(PPath,"Results/sumWithout0.pdf"))
+cor.sl.int.m2.brms0
 dev.off()
 ```
+##### Correlation between random intercept and random slope, WITHOUT = 1
+```{r eval = FALSE}
 
+DF1 <- fits.imp1[[1]]$data
+ # Obtains means, SE and 95% Credible Intervals of Group effects for m2.brms
+stats.ranef.m2.brms1=as.data.frame(ranef(fits.imp1[[1]])) 
+names(stats.ranef.m2.brms1)=c("mean.int", "se.int", "Q2.5.int", "Q97.5.int",
+                             "mean.slope", "se.slope", "Q2.5.slope", "Q97.5.slope") # put shorter names in the data frame
+stats.ranef.m2.brms1$school=unique(DF1$school.id) # adds schoolid
+CrInt95.int.m2.brms1=ggplot(data=stats.ranef.m2.brms1, aes(x=reorder(school, mean.int), y=mean.int))+
+  geom_point()+
+  coord_flip()+
+  geom_linerange(aes(ymin=Q2.5.int,ymax=Q97.5.int))+
+  geom_hline(yintercept=0, size=1, linetype=2)+
+#  scale_y_continuous(breaks=seq(from=-0.2, to=0.2, by=0.05))+
+  theme_bw()+
+  labs(x="School", y="Group intercept")+
+  theme(axis.title.x = element_text(size=18),
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank(), 
+        axis.text.x = element_text(size=16))
+CrInt95.slopes.m2.brms1=ggplot(data=stats.ranef.m2.brms, aes(x=reorder(school, mean.int), y=mean.slope))+
+  geom_point()+
+  coord_flip()+
+  geom_linerange(aes(ymin=Q2.5.slope,ymax=Q97.5.slope))+
+  geom_hline(yintercept=0, size=1, linetype=2)+
+#  scale_y_continuous(breaks=seq(from=-0.6, to=0.6, by=0.05))+
+  theme_bw()+
+  labs(x="School", y="Group slope")+
+  theme(axis.title.x = element_text(size=18),
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank(), 
+        axis.text.x = element_text(size=16))
+cor.sl.int.m2.brms1=ggplot(data=stats.ranef.m2.brms, aes(x=mean.int, y=mean.slope))+
+  geom_point()+
+  geom_hline(yintercept=0, size=1, linetype=2)+
+  geom_vline(xintercept=0, size=1, linetype=2)+
+  theme_bw()+
+  labs(x="Mean group Intercept W1", y="Mean group slope W1")+
+  theme(axis.title = element_text(size=18), 
+        axis.text = element_text(size=16))
+plot_grid(CrInt95.int.m2.brms1,CrInt95.slopes.m2.brms1,cor.sl.int.m2.brms1,
+          nrow=2,labels = LETTERS[1:6], align="hv",label_x=0.85, label_y=0.95) #Fig. 
+```
+
+##### plot to pdf
+```{r eval = FALSE}
+pdf(file.path(PPath,"Results/sumWithout1.pdf"))
+cor.sl.int.m2.brms1
+dev.off()
+
+pdf(file.path(PPath,"Results/corIS.pdf"))
+grid.arrange(cor.sl.int.m2.brms0, cor.sl.int.m2.brms1, nrow = 2)
+dev.off()
+
+```
