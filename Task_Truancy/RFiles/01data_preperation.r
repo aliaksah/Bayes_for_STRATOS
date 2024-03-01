@@ -244,7 +244,7 @@ pisa18$RUR[pisa18$RUR == 4] <- 0
 pisa18$RUR[pisa18$RUR == 5] <- 0
  
 
-pisa18$SN_SC <- IMPDAT$SC048Q02NA/100 # Students with special needs
+pisa18$SN <- IMPDAT$SC048Q02NA/100 # Students with special needs
 pisa18$FAILED <- IMPDAT$SC164Q01HA/100 # in the last full academic year, what proportion of 
 # students in your school’s final grade left school without 
 pisa18$WITHOUT  <- as.numeric(pisa18$FAILED > 0.02) # above2 %
@@ -256,4 +256,9 @@ FEMS <- IMPDAT$SC002Q02TA
 # Fraction of female students
 pisa18$FEMFRAC <- FEMS/(FEMS + MALES)
 
-pisa18$NN_SC <- IMPDAT$SC048Q01NA/100 # Students whose <heritage language> is different from <test language>
+# Is your school a public or a private school?
+PUBLIC12 <- IMPDAT$SC013Q01TA # 1 = public, 2 = private
+pisa18$PUBLIC <- rep(1, length(PUBLIC12))
+pisa18$PUBLIC[PUBLIC12 == 2] <- 0
+
+pisa18$NN <- IMPDAT$SC048Q01NA/100 # Students whose <heritage language> is different from <test language>

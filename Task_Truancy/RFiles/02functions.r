@@ -354,8 +354,8 @@ visualPPC2 <- function(y.obs = pisa18$attp, yrepM = yrepM, WITHOUT = 0){
   ppc.plots[[5]] <- vppc[[1]]
   pppvals[[5]]  <- vppc[[2]]
   
-  vppc  <- visualPPC(y.obs = pisa18$attp, foc = pisa18$GYM, 
-                     title = "stat = mean, GYM",
+  vppc  <- visualPPC(y.obs = pisa18$attp, foc = pisa18$PUBLIC, 
+                     title = "stat = mean, PUBLIC",
                      yrep = yrepM, WITHOUT)
   
   ppc.plots[[6]] <- vppc[[1]]

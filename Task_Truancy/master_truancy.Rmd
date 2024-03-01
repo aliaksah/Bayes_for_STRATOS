@@ -69,7 +69,7 @@ load(file.path(PPath,"Files/pisa18_sc.RData"))
 model1 <- as.formula(attp ~ aca + native + ld + uni  + bull + fewbooks + belong +  joyread + goal + mot + RES + VAL  + (1 | school.id))
 # composition effect model
 model2 <- as.formula(attp ~  immig  + female + escs  + RUR + DISH 
-                     + GYM + STAFFSHORT + EDUSHORT + FEMFRAC + SN_SC + NN_SC + (1 | school.id))
+                     + PUBLIC + STAFFSHORT + EDUSHORT + FEMFRAC + SN + NN + (1 | school.id))
 
 models <- vector(mode = "list", length = 2)
 
@@ -81,7 +81,7 @@ models[[2]] <- model2
 
 ```{r  eval = FALSE}
 a.seed <- 12345 
-a.iter <-  1000 
+a.iter <-  2000 
 a.chains <- 4  
 warmup <- 1000
 
