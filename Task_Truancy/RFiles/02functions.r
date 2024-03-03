@@ -386,16 +386,16 @@ visualPPC2 <- function(y.obs = pisa18$attp, yrepM = yrepM, WITHOUT = 0){
   ppc.plots[[9]] <- vppc[[1]]
   pppvals[[9]]  <- vppc[[2]]
   
-  SN_SC4 <- cut_number(pisa18$SN_SC,4)
+  SN_SC4 <- cut_number(pisa18$SN,4)
   vppc  <- visualPPC(y.obs = pisa18$attp, foc = SN_SC4, 
-                     title = "stat = mean, SN_SC",
+                     title = "stat = mean, SN",
                      yrep = yrepM, WITHOUT)
   ppc.plots[[10]] <- vppc[[1]]
   pppvals[[10]]  <- vppc[[2]]
   
-  NN_SC4 <- cut_number(pisa18$NN_SC,4)
+  NN_SC4 <- cut_number(pisa18$NN,4)
   vppc <- visualPPC(y.obs = pisa18$attp, foc = NN_SC4, 
-                    title = "stat = mean, NN_SC",
+                    title = "stat = mean, NN",
                     yrep = yrepM, WITHOUT)
   
   ppc.plots[[11]] <- vppc[[1]]
