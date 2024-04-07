@@ -344,9 +344,9 @@ sink(file=NULL)
 ###### interaction based plausibility
 ```{r  eval = FALSE}
 # theoretical model, possible improvements, WITHOUT = 0
-imp0 <- as.formula(attp ~ aca + native + ld + uni  + bull + fewbooks + belong +  joyread + goal + mot + RES + VAL + ld:goal + native:ld  + (1 + bull| school.id))
+imp0 <- as.formula(attp ~ )
 # theoretical model, possible improvements, WITHOUT = 1
-imp1 <- as.formula(attp ~ aca + native + ld + uni  + bull + fewbooks + belong +  joyread + goal + mot + RES + VAL + ld:fewbooks + native:fewbooks + goal:ld + (1 + bull| school.id))
+imp1 <- as.formula(attp ~ )
 
 
 models.imp<- vector(mode = "list", length = 2)

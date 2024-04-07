@@ -412,7 +412,7 @@ load(file.path(PPath,&quot;Files/pisa18_sc.RData&quot;))</code></pre>
 model1 &lt;- as.formula(attp ~ aca + native + ld + uni  + bull + fewbooks + belong +  joyread + goal + mot + RES + VAL  + (1 | school.id))
 # composition effect model
 model2 &lt;- as.formula(attp ~  immig  + female + escs  + RUR + DISH 
-                     + GYM + STAFFSHORT + EDUSHORT + FEMFRAC + SN_SC + NN_SC + (1 | school.id))
+                     + PUBLIC + STAFFSHORT + EDUSHORT + FEMFRAC + SN + NN + (1 | school.id))
 
 models &lt;- vector(mode = &quot;list&quot;, length = 2)
 
@@ -422,7 +422,7 @@ models[[2]] &lt;- model2</code></pre>
 <div id="fit-models" class="section level5">
 <h5>fit models</h5>
 <pre class="r"><code>a.seed &lt;- 12345 
-a.iter &lt;-  1000 
+a.iter &lt;-  2000 
 a.chains &lt;- 4  
 warmup &lt;- 1000
 
@@ -676,9 +676,9 @@ important predictors,</h5>
 <div id="interaction-based-plausibility" class="section level6">
 <h6>interaction based plausibility</h6>
 <pre class="r"><code># theoretical model, possible improvements, WITHOUT = 0
-imp0 &lt;- as.formula(attp ~ aca + native + ld + uni  + bull + fewbooks + belong +  joyread + goal + mot + RES + VAL + ld:goal + native:ld  + (1 + bull| school.id))
+imp0 &lt;- as.formula(attp ~ )
 # theoretical model, possible improvements, WITHOUT = 1
-imp1 &lt;- as.formula(attp ~ aca + native + ld + uni  + bull + fewbooks + belong +  joyread + goal + mot + RES + VAL + ld:fewbooks + native:fewbooks + goal:ld + (1 + bull| school.id))
+imp1 &lt;- as.formula(attp ~ )
 
 
 models.imp&lt;- vector(mode = &quot;list&quot;, length = 2)
