@@ -29,7 +29,7 @@ format:
 
 ## Data sets
 
-Two data sets are available. The first is a data set published by [Johnson (2021)](https://doi.org/10.1080/26939169.2021.1971585) contains body fat proportion and anthropometric measures of 184 women aged 18-25. The second data set was published by [Johnson (1996)[http://jse.amstat.org/v4n1/datasets.johnson.html] and contains similar data of 252 men aged 22-81.
+Two data sets are available. The first is a data set published by [Johnson (2021)](https://doi.org/10.1080/26939169.2021.1971585) contains body fat proportion and anthropometric measures of 184 women aged 18-25. The second data set was published by \[Johnson (1996)\[http://jse.amstat.org/v4n1/datasets.johnson.html\] and contains similar data of 252 men aged 22-81.
 
 ### Data set of college women
 
@@ -47,49 +47,40 @@ Percentage of body fat, age, weight, height, body mass index and fourteen circum
 
 SOURCES:
 
-* Lohman, T.G., Roche, A.F., Martorell, R. (1988), Anthropometric Standardization Reference Manual, Champaign, IL: Human Kinetics Books.
-* Siri, W.E. (1956), Gross Composition of the Body, in Advances in Biological and Medical Physics (vol. IV), editors J.H. Lawrence and C.A. Tobias, New York: Academic Press.
-* Slack, Jason V. (1997), Estimating Body Fat Percentage Using Circumference Measurements and Lifestyle Questionnaire Data: A Multivariate Study of 184 College Aged Females, M.S. Thesis, Department of Physical Education, Brigham Young University. An electronic copy of this thesis is available via OregonPDF in Health & Performance, https://www.oregonpdf.org/, Catalog ID: PE 3794.
+-   Lohman, T.G., Roche, A.F., Martorell, R. (1988), Anthropometric Standardization Reference Manual, Champaign, IL: Human Kinetics Books.
+-   Siri, W.E. (1956), Gross Composition of the Body, in Advances in Biological and Medical Physics (vol. IV), editors J.H. Lawrence and C.A. Tobias, New York: Academic Press.
+-   Slack, Jason V. (1997), Estimating Body Fat Percentage Using Circumference Measurements and Lifestyle Questionnaire Data: A Multivariate Study of 184 College Aged Females, M.S. Thesis, Department of Physical Education, Brigham Young University. An electronic copy of this thesis is available via OregonPDF in Health & Performance, https://www.oregonpdf.org/, Catalog ID: PE 3794.
 
 VARIABLE DESCRIPTIONS:
 
-* Obs: Observation number, 1-184
-* Fat: Amount of body fat expressed as a percentage of total body weight, using Siri's (1956) method
-* Weight (kg)
-* Height (m)
-* BMI: (Body Mass Index) Weight divided by the square of Height
-* Age
-* Neck: Minimal circumference perpendicular to the long axis of the neck (cm)
-* Chest: Horizontal plane measurement at the sixth rib, at the end of a normal expiration (cm)
-* Calf: Horizontal maximal calf measurement (cm)
-* Biceps: Measurement with arm extended (cm)
-* Hips: Horizontal maximal measurement around buttocks (cm)
-* Waist: Horizontal minimal measurement, at the end of a normal expiration (cm)
-* Forearm: Maximal measurement perpendicular to long axis (cm)
-* PThigh: (Proximal Thigh) Horizontal measurement immediately distal to the gluteal furrow (cm)
-* MThigh: (Middle Thigh) Measurement midway between the midpoint of the inguinal crease and the proximal border of the patella (cm)
-* DThigh: (Distal Thigh) Measurement proximal to the femoral epicondyles (cm)
-* Wrist: Measurement perpendicular to the long axis of the forearm (cm)
-* Knee: Measurement at the mid-patellar level, with the knee slightly flexed (cm)
-* Elbow: A minimal circumference measurement with the elbow extended (cm)
-* Ankle: Minimal circumference measurement perpendicular to the long axis of the calf (cm)
+-   Obs: Observation number, 1-184
+-   Fat: Amount of body fat expressed as a percentage of total body weight, using Siri's (1956) method
+-   Weight (kg)
+-   Height (m)
+-   BMI: (Body Mass Index) Weight divided by the square of Height
+-   Age
+-   Neck: Minimal circumference perpendicular to the long axis of the neck (cm)
+-   Chest: Horizontal plane measurement at the sixth rib, at the end of a normal expiration (cm)
+-   Calf: Horizontal maximal calf measurement (cm)
+-   Biceps: Measurement with arm extended (cm)
+-   Hips: Horizontal maximal measurement around buttocks (cm)
+-   Waist: Horizontal minimal measurement, at the end of a normal expiration (cm)
+-   Forearm: Maximal measurement perpendicular to long axis (cm)
+-   PThigh: (Proximal Thigh) Horizontal measurement immediately distal to the gluteal furrow (cm)
+-   MThigh: (Middle Thigh) Measurement midway between the midpoint of the inguinal crease and the proximal border of the patella (cm)
+-   DThigh: (Distal Thigh) Measurement proximal to the femoral epicondyles (cm)
+-   Wrist: Measurement perpendicular to the long axis of the forearm (cm)
+-   Knee: Measurement at the mid-patellar level, with the knee slightly flexed (cm)
+-   Elbow: A minimal circumference measurement with the elbow extended (cm)
+-   Ankle: Minimal circumference measurement perpendicular to the long axis of the calf (cm)
 
 STORY BEHIND THE DATA:
 
 Please see the JSE Datasets article.
 
-PEDAGOGICAL NOTES:
-The dataset may be used to illustrate the various components of building a predictive model for percent body fat. While the number of cases is fairly modest, the dataset is fairly rich in terms of the number of potential predictor variables. 
+PEDAGOGICAL NOTES: The dataset may be used to illustrate the various components of building a predictive model for percent body fat. While the number of cases is fairly modest, the dataset is fairly rich in terms of the number of potential predictor variables.
 
-SUBMITTED BY:
-Roger W. Johnson
-Department of Mathematics
-South Dakota School of Mines & Technology
-501 East St. Joseph Street
-Rapid City, South Dakota 57701
-roger.johnson@sdsmt.edu
-
-
+SUBMITTED BY: Roger W. Johnson Department of Mathematics South Dakota School of Mines & Technology 501 East St. Joseph Street Rapid City, South Dakota 57701 roger.johnson\@sdsmt.edu
 
 The variable `Fat` corresponds to the Siri formula of estimating body fat proportion in percent.
 
@@ -125,16 +116,14 @@ bodyfat_corr[,"siri"]   <- pmax(round(495 / bodyfat_corr$density - 450, 1) , 0)
 bodyfat_corr[,"brozek"] <- pmax(round(457/ bodyfat_corr$density - 414.2, 1) , 0)
 ```
 
-
 ### Aligning the two data sets
 
-Now we transform the measurements of height and weight in `men` into m and kg for better comparability with the `women` data set. 
+Now we transform the measurements of height and weight in `men` into m and kg for better comparability with the `women` data set.
 
 ```{r}
 bodyfat_corr$height <- bodyfat_corr$height * 2.54/100
 bodyfat_corr$weight <- bodyfat_corr$weight * 0.454592
 ```
-
 
 Several variables have different names in the two data sources. The following code makes the two data sets comparable. Note that circumference of thigh is given as a single measurement in the `men` data but as three different measurements in the `women` data set. Hence, it is not aligned but only capitalized for consistency.
 
@@ -147,12 +136,12 @@ men <- bodyfat_corr %>%
 
 ## Task description
 
-*Training set:* For the task, the `women` data set should be used as training set to develop a prediction model of body fat percentage. The prediction model should contain no more than 5 predictors (originally measured anthopometrics including age and weight), but can have fewer predictors. In the final formula, the predictors may have nonlinear functional forms or interactions.   
+*Training set:* For the task, the `women` data set should be used as training set to develop a prediction model of body fat percentage. The prediction model should contain no more than 5 predictors (originally measured anthopometrics including age and weight), but can have fewer predictors. In the final formula, the predictors may have nonlinear functional forms or interactions.
 
-*Validation set:* A part of the `men` data set can be used as a validation data set to tune the model and to calibrate it for application in men. The remaining, hold out data set must be kept in a vault and not be used for tuning or for informing model development. All tuning must be documented. The proportion used for tuning can be chosen ad lib. 
+*Validation set:* A part of the `men` data set can be used as a validation data set to tune the model and to calibrate it for application in men. The remaining, hold out data set must be kept in a vault and not be used for tuning or for informing model development. All tuning must be documented. The proportion used for tuning can be chosen ad lib.
 
 *Test set:* The remainder of the `men` data set should be used to provide an estimate of the model's performance in terms of root mean squared prediction error (RMSPE, root mean squared difference of predicted and measured body fat percentage), R-squared (squared correlation of predicted and measured body fat percentage), calibration slope (slope of regression line of observed regressed on predicted body fat percentage) and calibration intercept (intercept of regression of observed on predicted body fat percentage with the slope fixed to 1). *These measures should be accompanied by appropriate uncertainty intervals.*
 
 The goal is to find a 5-predictor model for which we can find the highest possible lower bound of prediction performance when applying the model to adult men of any age.
 
-Since the proportion  of the `men` data used for tuning and for testing can be chosen ad lib, the analyst can decide whether to put more emphasis on accurate performance evaluation (more data in test set, less variance when testing the model) or on calibrating the model for men (more data in validation set, probably better expected performance).
+Since the proportion of the `men` data used for tuning and for testing can be chosen ad lib, the analyst can decide whether to put more emphasis on accurate performance evaluation (more data in test set, less variance when testing the model) or on calibrating the model for men (more data in validation set, probably better expected performance).
