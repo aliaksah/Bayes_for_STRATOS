@@ -1,0 +1,916 @@
+
+
+---
+title: "Students with attendance problems"
+author: "Mariana Nold"
+output: html_document
+---
+##### Load R packages
+```{r  eval = FALSE}
+source("RFiles/packages.r")
+```
+
+##### Load single imputed PISA data.
+```{r  eval = FALSE}
+PPath <- "C:/Users/zo95yup/Documents/GitHub/Bayes_for_STRATOS/Task_Truancy"
+load(file = file.path(PPath,"Orgdata/IMPDAT_PISA.RData"))
+```
+
+##### Prepare data, thus build PISA scales 
+```{r  eval = FALSE}
+source(file.path(PPath,"RFiles/01data_preperation.r"))
+to.rm <- objects()[!objects() %in% c("PPath","pisa18","countries")]
+rm(list = to.rm)
+ #head(pisa18)
+# dim(pisa18)
+```
+
+
+##### There should be at least ten students per school. Schools with fewer observations are excluded from the analysis. The variable nb.stud informs about the number of stundets per school and save final data set
+
+```{r  eval = FALSE}
+tab.id <- table(pisa18$school.id)
+id.frame <- as.data.frame(tab.id)
+
+nb.stud <- rep(id.frame$Freq,id.frame$Freq)
+pisa18$nb.stud <- nb.stud
+rm(tab.id,id.frame,nb.stud)
+pisa.data <- subset(pisa18, pisa18$nb.stud > 9)
+pisa18 <- pisa.data
+
+rm(pisa.data)
+summary(pisa18$nb.stud)
+save(pisa18,file = file.path(PPath,"Files/pisa18.RData")) #file = file.path(PPath,"File/fits0.RData")
+#load(file.path(PPath,"Files/pisa18.RData"))
+```
+
+
+
+##### Data sets for schools: Data set contains one row for each school and only school level variables
+```{r  eval = FALSE}
+sc.level <- names(pisa18) == toupper(names(pisa18))
+sc.level[1] <- TRUE
+pisa18_sc <- pisa18[,sc.level]
+dim(pisa18_sc)
+pisa18_sc <- pisa18_sc[!duplicated(pisa18_sc$school.id), ]
+dim(pisa18_sc)
+names(pisa18_sc)
+
+save(pisa18,file = file.path(PPath,"Files/pisa18_sc.RData")) 
+load(file.path(PPath,"Files/pisa18_sc.RData"))
+```
+
+##### Two models, one to check the other, model 2 to check model 1
+
+
+```{r  eval = FALSE}
+#
+# theoretical model
+model1 <- as.formula(attp ~ aca + native + ld + uni  + bull + fewbooks + belong +  joyread + goal + mot + RES + VAL  + (1 | school.id))
+# composition effect model
+model2 <- as.formula(attp ~  immig  + female + escs  + RUR + DISH 
+                     + PUBLIC + STAFFSHORT + EDUSHORT + FEMFRAC + SN + NN + (1 | school.id))
+
+models <- vector(mode = "list", length = 2)
+
+models[[1]] <- model1
+models[[2]] <- model2
+
+```
+##### fit models
+
+```{r  eval = FALSE}
+a.seed <- 12345 
+a.iter <-  2000 
+a.chains <- 4  
+warmup <- 1000
+
+#pisa18$WITHOUT  <- as.numeric(pisa18$FAILED >= 0.02) # above median
+
+fits0 <- list()
+
+fits0[[1]] <- brm(bf(models[[1]]), data = pisa18[pisa18$WITHOUT == 0,], seed = a.seed, iter = a.iter, chains = a.chains, warmup = warmup, bernoulli(link="logit")) 
+
+fits0[[2]] <- brm(bf(models[[2]]), data = pisa18[pisa18$WITHOUT == 0,], seed = a.seed, iter = a.iter, chains = a.chains, warmup = warmup, bernoulli(link="logit")) 
+
+fits1 <- list()
+
+fits1[[1]] <- brm(bf(models[[1]]), data = pisa18[pisa18$WITHOUT == 1,], seed = a.seed, iter = a.iter, chains = a.chains, warmup = warmup, bernoulli(link="logit")) 
+
+fits1[[2]] <- brm(bf(models[[2]]), data = pisa18[pisa18$WITHOUT == 1,], seed = a.seed, iter = a.iter, chains = a.chains, warmup = warmup, bernoulli(link="logit")) 
+
+
+save(fits0, file = file.path(PPath,"Files/fits0.RData"))
+save(fits1, file = file.path(PPath,"Files/fits1.RData"))
+```
+
+
+##### load fits
+
+```{r  eval = FALSE}
+load(file.path(PPath, "Files/fits0.RData"))
+load(file.path(PPath, "Files/fits1.RData"))
+```
+
+
+##### Study model parameters
+
+```{r  eval = FALSE}
+n01.models <- length(models)
+sink(file = file.path(PPath, "Results/fixed_par0.txt"))
+for (i in 1:n01.models) {
+  print(kable(tidy(fits0[[i]],conf.int  = T, conf.level = .95, 
+                   effects = "fixed"),"simple",digits = 4, 
+              caption = paste("model ",i," *****")))
+}
+sink(file = NULL)
+
+sink(file = file.path(PPath, "Results/ran_par0.txt"))
+for (i in 1:n01.models){
+  print(kable(tidy(fits0[[i]],conf.int=T, conf.level=.95, effects = "ran_pars"),"simple",digits=4, caption = paste("model ",i," *****")))
+  
+  }
+sink(file = NULL)
+
+
+n01.models <- length(models)
+sink(file = file.path(PPath, "Results/fixed_par1.txt"))
+for (i in 1:n01.models) {
+  print(kable(tidy(fits1[[i]],conf.int  = T, conf.level = .95, 
+                   effects = "fixed"),"simple",digits = 4, 
+              caption = paste("model ",i," *****")))
+}
+sink(file = NULL)
+
+sink(file = file.path(PPath, "Results/ran_par1.txt"))
+for (i in 1:n01.models){
+  print(kable(tidy(fits1[[i]],conf.int=T, conf.level=.95, effects = "ran_pars"),"simple",digits=4, caption = paste("model ",i," *****")))
+  
+  }
+sink(file = NULL)
+
+```
+##### load functions
+```{r  eval = FALSE}
+source(file.path(PPath, "RFiles/02functions.r"))
+```
+##### compute predictions and Brier score
+```{r  eval = FALSE}
+#n01.models <- length(models)-1
+ypredCand0 <- list()
+for (i in 1:n01.models) {
+  set.seed(a.seed)
+  ypredCand0[[i]] <- posterior_predict(fits0[[i]])
+}
+save("ypredCand0", file = file.path(PPath, "Files/ypredCand0.RData"))
+
+
+br.candL20 <- list()
+for (i in 1:n01.models) {
+  colMeansM <- colMeans(ypredCand0[[i]])
+  br.candL20[[i]] <- brierS(pisa18$attp[pisa18$WITHOUT == 0],colMeansM)
+ }
+
+# Write Brier score to file.
+sink(file = file.path(PPath, "Results/brier.scores0.txt"))
+
+for (i in 1:n01.models) {
+  print(paste("model ", i))
+  print(br.candL20[[i]])
+  
+}
+sink(file = NULL)
+
+
+ypredCand1 <- list()
+for (i in 1:n01.models) {
+  set.seed(a.seed)
+  ypredCand1[[i]] <- posterior_predict(fits1[[i]])
+}
+save("ypredCand1", file = file.path(PPath, "Files/ypredCand1.RData"))
+
+## Brier Score 
+
+br.candL21 <- list()
+for (i in 1:n01.models) {
+  br.candL21[[i]] <- brierS(pisa18$attp[pisa18$WITHOUT == 1],colMeans(ypredCand1[[i]]))
+ 
+}
+
+# Write Brier score to file.
+sink(file = file.path(PPath, "Results/brier.scores1.txt"))
+
+for (i in 1:n01.models) {
+  print(paste("model ", i))
+  print(br.candL21[[i]])
+  
+}
+sink(file = NULL)
+```
+
+##### Posterior predictive checks, predictors of candidate model 1, not of key interest
+```{r  eval = FALSE}
+## hold out ppc
+color_scheme_set(scheme = "blue")
+ppcCand20_out <- visualPPC1(yrepM = ypredCand0[[2]])
+pdf(file.path(PPath, "Results/ppcCand2W0_out.pdf"))
+ppcCand20_out$ppc.plots
+dev.off()
+
+color_scheme_set(scheme = "green")
+ppcCand21_out <- visualPPC1(yrepM = ypredCand1[[2]], WITHOUT = 1)
+pdf(file.path(PPath, "Results/ppcCand2W1_out.pdf"))
+ppcCand21_out$ppc.plots
+dev.off()
+
+color_scheme_set(scheme = "yellow")
+ppcCand10_in <- visualPPC1(yrepM = ypredCand0[[1]])
+pdf(file.path(PPath, "Results/ppcCand1W0_in.pdf"))
+ppcCand10_in$ppc.plots
+dev.off()
+
+color_scheme_set(scheme = "red")
+ppcCand11_in <- visualPPC1(yrepM = ypredCand1[[1]], WITHOUT = 1)
+pdf(file.path(PPath, "Results/ppcCand1W1_in.pdf"))
+ppcCand11_in$ppc.plots
+dev.off()
+
+num <- length(ppcCand10_in$ppc.plots)
+
+sink(file = file.path(PPath,"Results/ppcCand2W0_out.txt"))
+for(i in 1:num){
+  print(paste("Table   ",i))
+  print(kable(ppcCand20_out$pppvals[i], format = "simple", digits = 2))
+  print("                 ")
+}
+sink(file=NULL)
+
+sink(file = file.path(PPath,"Results/ppcCand2W1_out.txt"))
+for(i in 1:num){
+  print(paste("Table   ",i))
+  print(kable(ppcCand21_out$pppvals[i], format = "simple", digits = 2))
+  print("                 ")
+}
+sink(file=NULL)
+
+sink(file = file.path(PPath,"Results/ppcCand1W0_in.txt"))
+for(i in 1:num){
+  print(paste("Table   ",i))
+  print(kable(ppcCand10_in$pppvals[i], format = "simple", digits = 2))
+  print("                 ")
+}
+sink(file=NULL)
+
+
+sink(file = file.path(PPath,"Results/ppcCand1W1_in.txt"))
+for(i in 1:num){
+  print(paste("Table   ",i))
+  print(kable(ppcCand11_in$pppvals[i], format = "simple", digits = 2))
+  print("                 ")
+}
+sink(file=NULL)
+
+
+```
+##### Posterior predictive checks, predictors of candidate model 2, this is of focal interest, if the model doas not pass this check, we need to include further predictors, or if not possible the stop and rethink the theoretical model
+
+
+```{r  eval = FALSE}
+
+## hold out ppc
+color_scheme_set(scheme = "blue")
+ppcCand10_out <- visualPPC2(yrepM = ypredCand0[[1]])
+pdf(file.path(PPath, "Results/ppcCand1W0_out.pdf"))
+ppcCand10_out$ppc.plots
+dev.off()
+
+color_scheme_set(scheme = "green")
+ppcCand11_out <- visualPPC2(yrepM = ypredCand1[[1]], WITHOUT = 1)
+pdf(file.path(PPath, "Results/ppcCand1W1_out.pdf"))
+ppcCand11_out$ppc.plots
+dev.off()
+
+color_scheme_set(scheme = "yellow")
+ppcCand20_in <- visualPPC2(yrepM = ypredCand0[[2]])
+pdf(file.path(PPath, "Results/ppcCand2W0_in.pdf"))
+ppcCand20_in$ppc.plots
+dev.off()
+
+color_scheme_set(scheme = "red")
+ppcCand21_in <- visualPPC2(yrepM = ypredCand1[[2]], WITHOUT = 1)
+pdf(file.path(PPath, "Results/ppcCand2W1_in.pdf"))
+ppcCand21_in$ppc.plots
+dev.off()
+
+num <- length(ppcCand21_in$ppc.plots)
+
+sink(file = file.path(PPath,"Results/ppcCand1W0_out.txt"))
+for(i in 1:num){
+  print(paste("Table   ",i))
+  print(kable(ppcCand10_out$pppvals[i], format = "simple", digits = 2))
+  print("                 ")
+}
+sink(file=NULL)
+
+sink(file = file.path(PPath,"Results/ppcCand1W1_out.txt"))
+for(i in 1:num){
+  print(paste("Table   ",i))
+  print(kable(ppcCand11_out$pppvals[i], format = "simple", digits = 2))
+  print("                 ")
+}
+sink(file=NULL)
+
+sink(file = file.path(PPath,"Results/ppcCand2W0_in.txt"))
+for(i in 1:num){
+  print(paste("Table   ",i))
+  print(kable(ppcCand20_in$pppvals[i], format = "simple", digits = 2))
+  print("                 ")
+}
+sink(file=NULL)
+
+
+sink(file = file.path(PPath,"Results/ppcCand2W1_in.txt"))
+for(i in 1:num){
+  print(paste("Table   ",i))
+  print(kable(ppcCand21_in$pppvals[i], format = "simple", digits = 2))
+  print("                 ")
+}
+sink(file=NULL)
+
+```
+
+
+##### more flexibility for important predictors, each model is of substantive interest, improve theoretical model, more flexibility for important predictors,
+###### interaction based plausibility
+```{r  eval = FALSE}
+# theoretical model, possible improvements, WITHOUT = 0
+imp0 <- as.formula(attp ~ )
+# theoretical model, possible improvements, WITHOUT = 1
+imp1 <- as.formula(attp ~ )
+
+
+models.imp<- vector(mode = "list", length = 2)
+
+models.imp[[1]] <- imp0
+models.imp[[2]] <- imp1
+
+```
+##### fit improved models, for pisa18$WITHOUT == 1
+
+```{r  eval = FALSE}
+fits.imp1 <- vector(mode = "list", length = 1)
+a.seed <- 12345 
+a.iter <-  3000 
+a.chains <- 4  
+
+fits.imp1[[1]] <- brm(bf(models.imp[[2]]), data = pisa18[pisa18$WITHOUT == 1,], seed = a.seed, iter = a.iter, chains = a.chains, warmup = warmup, bernoulli(link="logit"))
+
+save(fits.imp1, file = file.path(PPath,"Files/fits.imp1.RData"))
+#load(file.path(PPath,"Files/fits.imp1.RData"))
+```
+##### fit improved models, for pisa18$WITHOUT == 0
+
+```{r  eval = FALSE}
+ 
+fits.imp0 <- vector(mode = "list", length = 1)
+a.seed <- 12345 
+a.iter <-  3000 
+a.chains <- 4  
+
+fits.imp0[[1]] <- brm(bf(models.imp[[1]]), data = pisa18[pisa18$WITHOUT == 0,], seed = a.seed, iter = a.iter, chains = a.chains, warmup = warmup, bernoulli(link="logit"))
+
+save(fits.imp0, file = file.path(PPath,"Files/fits.imp0.RData"))
+
+#load(file.path(PPath,"Files/fits.imp0.RData"))
+
+```
+
+##### loo-compare for the improved theoretical model, WITHOUT == 1
+```{r  eval = FALSE}
+
+fits.imp1[[2]] <- fits1[[1]]
+n01.models <- length(fits.imp1)
+# Compute loo
+
+loo_list1 <- lapply(fits.imp1, loo, cores = 1)
+loo_compare(loo_list1)
+
+save("loo_list1", file = file.path(PPath, "Files","loo_list1.RData"))
+#load(file.path(PPath, "Files","loo_list0.RData"))
+
+sink(file = file.path(PPath, "Files","loo_info1.txt"))
+for (i in 1:n01.models) {
+  print(paste("******** "))
+  print(paste("model ", i))
+  print(loo_list1[[i]])
+  print(paste("******** "))
+}
+#print(loo_list[[1]])
+sink(file = NULL) # All models are similar, first model is best
+
+#wtsStacking1 <- list()
+
+#wtsStacking1 <- loo_model_weights(loo_list1, method = "stacking")
+#print(wtsStacking1)
+
+
+#sink(file = file.path(PPath, "Results","wtsStacking1.txt"))
+#print(wtsStacking1)
+#print(paste("******** "))
+#sink(file = NULL)
+
+```
+
+##### Stacking, only if continous model extension is not possible
+##### https://jrnold.github.io/bayesian_notes/model-comparison.html
+##### loo-compare for the improved theoretical model, WITHOUT == 0
+```{r  eval = FALSE}
+fits.imp0[[2]] <- fits0[[1]]
+n01.models <- length(fits.imp0)
+
+loo_list0 <- lapply(fits.imp0, loo, cores = 1)
+loo_compare(loo_list0)
+
+save("loo_list0", file = file.path(PPath, "Files","loo_list0.RData"))
+#load(file.path(PPath, "Files","loo_list0.RData"))
+
+sink(file = file.path(PPath, "Files","loo_info0.txt"))
+for (i in 1:n01.models) {
+  print(paste("******** "))
+  print(paste("model ", i))
+  print(loo_list0[[i]])
+  print(paste("******** "))
+}
+#print(loo_list[[1]])
+sink(file = NULL)
+
+#wtsStacking0 <- list()
+
+#wtsStacking0 <- loo_model_weights(loo_list0, method = "stacking")
+#print(wtsStacking0)
+
+
+#sink(file = file.path(PPath, "Results","wtsStacking0.txt"))
+#print(wtsStacking0)
+#print(paste("******** "))
+#sink(file = NULL)
+
+```
+
+
+
+
+##### PPC for improved model, WITHOUT = 0
+```{r  eval = FALSE}
+set.seed(a.seed)
+ypred0 <- posterior_predict(fits.imp0[[1]]) 
+save("ypred0", file = file.path("Files/ypred0.RData"))
+
+color_scheme_set(scheme = "pink")
+ppc0 <- visualPPC2(y.obs = pisa18$attp, yrepM = ypred0)
+pdf(file.path(PPath, "Results/ppc0.pdf"))
+ppc0
+dev.off()
+
+```
+
+##### PPC for improved model, WITHOUT = 0
+```{r  eval = FALSE}
+set.seed(a.seed)
+
+ypred1 <- posterior_predict(fits.imp1[[1]]) 
+save("ypred1", file = file.path("Files/ypred1.RData"))
+
+color_scheme_set(scheme = "purple")
+ppc0 <- visualPPC2(y.obs = pisa18$attp, yrepM = ypred1, WITHOUT = 1)
+pdf(file.path(PPath, "Results/ppc1.pdf"))
+ppc0
+dev.off()
+
+
+
+```
+
+
+###### marginaeffects code
+###### https://www.andrewheiss.com/blog/2022/11/29/conditional-marginal-marginaleffects/
+
+
+
+##### result of focal interest, WITHOUT = 0
+##### https://marginaleffects.com/vignettes/brms.html
+```{r eval = FALSE}
+conditional_preds0 <- avg_predictions(
+  fits.imp0[[1]], 
+  by = "ld", 
+  re_formula = NA
+) %>% 
+  posteriordraws()
+```
+
+##### result of focal interest, WITHOUT = 0, plot
+```{r eval = FALSE}
+clrs <- NatParksPalettes::natparks.pals("BryceCanyon")
+p_conditional_preds0 <- conditional_preds0 %>% 
+  ggplot(aes(x = draw, fill = factor(ld))) +
+  stat_halfeye() +
+  scale_fill_manual(values = c(clrs[5], clrs[1])) +
+  labs(x = "Attendance problem", y = "Density", fill = "ld",
+       title = "Conditional cluster-specific means",
+       subtitle = "Typical cluster, WITHOUT = 0") +
+  coord_cartesian(xlim = c(0, 0.4)) 
+#pdf(file.path(PPath, "Results/result0_ld.pdf"))
+p0ld <- p_conditional_preds0
+#dev.off()
+```
+
+```{r eval = FALSE}
+conditional_preds1 <- avg_predictions(
+  fits.imp1[[1]], 
+  by = "ld", 
+  re_formula = NA
+) %>% 
+  posteriordraws()
+```
+
+##### result of focal interest, WITHOUT = 1, plot
+```{r eval = FALSE}
+
+p_conditional_preds1 <- conditional_preds1 %>% 
+  ggplot(aes(x = draw, fill = factor(ld))) +
+  stat_halfeye() +
+  scale_fill_manual(values = c(clrs[5], clrs[1])) +
+  labs(x = "Attendance problem", y = "Density", fill = "ld",
+       title = "Conditional cluster-specific means",
+       subtitle = "Typical cluster, WITHOUT = 1") +
+  coord_cartesian(xlim = c(0, 0.4)) 
+#pdf(file.path(PPath, "Results/result1_ld.pdf"))
+p1ld <- p_conditional_preds1
+#dev.off()
+```
+
+
+##### bull, WITHOUT = 0
+```{r  eval = FALSE}
+conditional_preds0_b <- avg_predictions(
+  fits.imp0[[1]], 
+  by = "bull", 
+  re_formula = NA
+) %>% 
+  posteriordraws()
+```
+##### plot
+```{r  eval = FALSE}
+p_conditional_preds0_b <- conditional_preds0_b %>% 
+  ggplot(aes(x = draw, fill = factor(bull))) +
+  stat_halfeye() +
+  scale_fill_manual(values = c(clrs[5], clrs[1])) +
+  labs(x = "Attendance problem", y = "Density", fill = "bull",
+       title = "Conditional cluster-specific means",
+       subtitle = "Typical cluster, WITHOUT = 0") +
+  coord_cartesian(xlim = c(0, 0.4)) 
+#pdf(file.path(PPath, "Results/result0_bull.pdf"))
+p0bull <- p_conditional_preds0_b
+#dev.off()
+```
+##### bull, WITHOUT = 1
+
+
+
+
+
+```{r  eval = FALSE}
+conditional_preds1_b <- avg_predictions(
+  fits.imp1[[1]], 
+  by = "bull", 
+  re_formula = NA
+) %>% 
+  posteriordraws()
+```
+
+
+
+```{r  eval = FALSE}
+p_conditional_preds1_b <- conditional_preds1_b %>% 
+  ggplot(aes(x = draw, fill = factor(bull))) +
+  stat_halfeye() +
+  scale_fill_manual(values = c(clrs[5], clrs[1])) +
+  labs(x = "Attendance problem", y = "Density", fill = "bull",
+       title = "Conditional cluster-specific means",
+       subtitle = "Typical cluster, WITHOUT = 1") +
+  coord_cartesian(xlim = c(0, 0.4)) 
+#pdf(file.path(PPath, "Results/result1_bull.pdf"))
+p1bull <- p_conditional_preds1_b
+#dev.off()
+```
+
+##### plot to pdf
+```{r  eval = FALSE}
+pdf(file.path(PPath,"Results/bull.pdf"))
+grid.arrange(p0bull, p1bull, nrow = 2)
+dev.off()
+
+pdf(file.path(PPath,"Results/ld.pdf"))
+grid.arrange(p0ld, p1ld, nrow = 2)
+dev.off()
+```
+##### final plot, WITHOUT = 1, bull and ld in one plot
+```{r eval = FALSE}
+conditional_preds1_both <- avg_predictions(
+  fits.imp1[[1]], 
+  by = c("bull", "ld"),
+  re_formula = NA
+) %>% 
+  posteriordraws()
+```
+##### predictors not used in by-option are as observed
+##### before posteriordraws() is used
+```{r eval = FALSE}
+#dat <- attr(conditional_preds1_both,"newdata_modeldata")
+# table(pisa18[pisa18$WITHOUT==1,]$belong)
+# table(dat$belong)
+```
+
+
+```{r eval = FALSE}
+conditional_preds1_both$ldbull <- interaction(conditional_preds1_both$ld,conditional_preds1_both$bull)
+```
+
+```{r eval = FALSE}
+# library(ggdist)
+p_conditional_preds1_both <- conditional_preds1_both %>% 
+  ggplot(aes(x = draw, fill = factor(ldbull))) +
+  stat_halfeye() +
+  scale_fill_manual(values = c(clrs[5], clrs[1],clrs[3], clrs[4])) +
+  labs(x = "Attendance problem", y = "Density", fill = "ldbull",
+       title = "Conditional cluster-specific means",
+       subtitle = "Typical cluster, WITHOUT = 1") +
+  coord_cartesian(xlim = c(0.1, 0.5)) 
+#pdf(file.path(PPath, "Results/result1_bull.pdf"))
+p1ldbull <- p_conditional_preds1_both
+```
+
+##### final plot, WITHOUT = 0
+```{r eval = FALSE}
+conditional_preds0_both <- avg_predictions(
+  fits.imp0[[1]], 
+ # newdata = datagrid(ld = c(0, 1)), 
+  by = c("bull", "ld"),
+  re_formula = NA
+) %>% 
+  posteriordraws()
+```
+
+```{r eval = FALSE}
+conditional_preds0_both$ldbull <- interaction(conditional_preds0_both$ld,conditional_preds0_both$bull)
+```
+
+```{r eval = FALSE}
+p_conditional_preds0_both <- conditional_preds0_both %>% 
+  ggplot(aes(x = draw, fill = factor(ldbull))) +
+  stat_halfeye() +
+  scale_fill_manual(values = c(clrs[5], clrs[1],clrs[3], clrs[4])) +
+  labs(x = "Attendance problem", y = "Density", fill = "ldbull",
+       title = "Conditional cluster-specific means",
+       subtitle = "Typical cluster, WITHOUT = 0") +
+  coord_cartesian(xlim = c(0.1, 0.5)) 
+#pdf(file.path(PPath, "Results/result1_bull.pdf"))
+p0ldbull <- p_conditional_preds0_both
+```
+##### plot to pdf
+```{r  eval = FALSE}
+pdf(file.path(PPath,"Results/ldbull.pdf"))
+grid.arrange(p0ldbull, p1ldbull, nrow = 2)
+dev.off()
+
+```
+##### goal, WITHOUT = 0
+```{r eval = FALSE}
+conditional_preds0_goal <- avg_predictions(
+  fits.imp0[[1]], 
+ # newdata = datagrid(ld = c(0, 1)), 
+  by = c("goal"),
+  re_formula = NA
+) %>% 
+  posteriordraws()
+```
+
+```{r eval = FALSE}
+p_conditional_preds0_goal <- conditional_preds0_goal %>% 
+  ggplot(aes(x = draw, fill = factor(goal))) +
+  stat_halfeye() +
+  #scale_fill_manual(values = c(clrs[5], clrs[1],clrs[3], clrs[4])) +
+  labs(x = "Attendance problem", y = "Density", fill = "goal",
+       title = "Conditional cluster-specific means",
+       subtitle = "Typical cluster, WITHOUT = 0") +
+  coord_cartesian(xlim = c(0.0, 0.5)) 
+#pdf(file.path(PPath, "Results/result1_bull.pdf"))
+p0goal <- p_conditional_preds0_goal
+```
+##### goal, WITHOUT = 1
+```{r eval = FALSE}
+conditional_preds1_goal <- avg_predictions(
+  fits.imp1[[1]], 
+ # newdata = datagrid(ld = c(0, 1)), 
+  by = c("goal"),
+  re_formula = NA
+) %>% 
+  posteriordraws()
+```
+
+```{r eval = FALSE}
+p_conditional_preds1_goal <- conditional_preds1_goal %>% 
+  ggplot(aes(x = draw, fill = factor(goal))) +
+  stat_halfeye() +
+  #scale_fill_manual(values = c(clrs[5], clrs[1],clrs[3], clrs[4])) +
+  labs(x = "Attendance problem", y = "Density", fill = "goal",
+       title = "Conditional cluster-specific means",
+       subtitle = "Typical cluster, WITHOUT = 1") +
+  coord_cartesian(xlim = c(0.0, 0.5)) 
+#pdf(file.path(PPath, "Results/result1_bull.pdf"))
+p1goal <- p_conditional_preds1_goal
+```
+
+##### plot to pdf
+```{r  eval = FALSE}
+pdf(file.path(PPath,"Results/goal.pdf"))
+grid.arrange(p0goal, p1goal, nrow = 2)
+dev.off()
+
+```
+### Students within schools, combination with VAL and RES
+
+##### RES and VAL for WITHOUT = 1
+```{r  eval = FALSE}
+fits.imp1[[1]]$data$VAL3 <- cut_number(fits.imp1[[1]]$data$VAL,3)
+fits.imp1[[1]]$data$RES3 <- cut_number(fits.imp1[[1]]$data$RES,3)
+
+
+foc.grid <- fits.imp1[[1]]$data |> 
+  summarise(
+    aca = mean(aca),native=mean(native), ld=mean(ld),uni= mean(uni), bull = mean(bull),  
+    fewbooks = mean(fewbooks),  belong  = mean(belong),   joyread = mean(joyread),
+    goal  = mean(goal),   mot =mean(mot), RES = mean(RES),  VAL = mean(VAL),
+    .by = c(VAL3,RES3)
+  )
+
+foc.grid.cnt <- fits.imp1[[1]]$data  |> count(VAL3,RES3) |>
+  mutate(Prop = n / sum(n))
+
+RESVAL1 <- predictions(
+  fits.imp1[[1]], 
+  newdata = foc.grid[,3:14], 
+  re_formula = NA
+)
+
+RESVAL_W1 = cbind(foc.grid[,1:2],RESVAL1)
+RESVAL_W1
+```
+##### Write to file
+```{r eval = FALSE}
+sink(file = file.path(PPath, "Results/resval1.txt"))
+RESVAL_W1[,1:18]
+sink(file = NULL)
+```
+
+
+
+
+##### RES and VAL for WITHOUT = 0
+```{r  eval = FALSE}
+fits.imp0[[1]]$data$VAL3 <- cut_number(fits.imp0[[1]]$data$VAL,3)
+fits.imp0[[1]]$data$RES3 <- cut_number(fits.imp0[[1]]$data$RES,3)
+
+foc.grid0 <- fits.imp0[[1]]$data |> 
+  summarise(
+    aca = mean(aca),native=mean(native), ld=mean(ld),uni= mean(uni), bull = mean(bull),  
+    fewbooks = mean(fewbooks),  belong  = mean(belong),   joyread = mean(joyread),
+    goal  = mean(goal),   mot =mean(mot), RES = mean(RES),  VAL = mean(VAL),
+    .by = c(VAL3,RES3)
+  )
+
+foc.grid.cnt0 <- fits.imp0[[1]]$data  |> count(VAL3,RES3) |>
+  mutate(Prop = n / sum(n))
+
+RESVAL0 <- predictions(
+  fits.imp0[[1]], 
+  newdata = foc.grid0[,3:14], 
+  re_formula = NA
+)
+
+RESVAL_W0 = cbind(foc.grid0[,1:2],RESVAL0)
+RESVAL_W0
+```
+##### Write to file
+```{r eval = FALSE}
+sink(file = file.path(PPath, "Results/resval0.txt"))
+RESVAL_W0[,1:18]
+sink(file = NULL)
+```
+##### Correlation between random intercept and random slope, WITHOUT = 0
+```{r eval = FALSE}
+
+DF0 <- fits.imp0[[1]]$data
+ # Obtains means, SE and 95% Credible Intervals of Group effects for m2.brms
+stats.ranef.m2.brms0=as.data.frame(ranef(fits.imp0[[1]])) 
+names(stats.ranef.m2.brms0)=c("mean.int", "se.int", "Q2.5.int", "Q97.5.int",
+                             "mean.slope", "se.slope", "Q2.5.slope", "Q97.5.slope") # put shorter names in the data frame
+stats.ranef.m2.brms0$school=unique(DF0$school.id) # adds schoolid
+ 
+CrInt95.int.m2.brms0=ggplot(data=stats.ranef.m2.brms0, aes(x=reorder(school, mean.int), y=mean.int))+
+  geom_point()+
+  coord_flip()+
+  geom_linerange(aes(ymin=Q2.5.int,ymax=Q97.5.int))+
+  geom_hline(yintercept=0, size=1, linetype=2)+
+#  scale_y_continuous(breaks=seq(from=-0.2, to=0.2, by=0.05))+
+  theme_bw()+
+  labs(x="School", y="Group intercept")+
+  theme(axis.title.x = element_text(size=18),
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank(), 
+        axis.text.x = element_text(size=16))
+CrInt95.slopes.m2.brms0=ggplot(data=stats.ranef.m2.brms0, aes(x=reorder(school, mean.int), y=mean.slope))+
+  geom_point()+
+  coord_flip()+
+  geom_linerange(aes(ymin=Q2.5.slope,ymax=Q97.5.slope))+
+  geom_hline(yintercept=0, size=1, linetype=2)+
+#  scale_y_continuous(breaks=seq(from=-0.6, to=0.6, by=0.05))+
+  theme_bw()+
+  labs(x="School", y="Group slope")+
+  theme(axis.title.x = element_text(size=18),
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank(), 
+        axis.text.x = element_text(size=16))
+cor.sl.int.m2.brms0=ggplot(data=stats.ranef.m2.brms0, aes(x=mean.int, y=mean.slope))+
+  geom_point()+
+  geom_hline(yintercept=0, size=1, linetype=2)+
+  geom_vline(xintercept=0, size=1, linetype=2)+
+  theme_bw()+
+  labs(x="Mean group Intercept W0", y="Mean group slope W0")+
+  theme(axis.title = element_text(size=18), 
+        axis.text = element_text(size=16))
+plot_grid(CrInt95.int.m2.brms0,CrInt95.slopes.m2.brms0,cor.sl.int.m2.brms0,
+          nrow=2,labels = LETTERS[1:6], align="hv",label_x=0.85, label_y=0.95) #Fig. 
+```
+##### plot to pdf
+```{r eval = FALSE}
+pdf(file.path(PPath,"Results/sumWithout0.pdf"))
+cor.sl.int.m2.brms0
+dev.off()
+```
+##### Correlation between random intercept and random slope, WITHOUT = 1
+```{r eval = FALSE}
+
+DF1 <- fits.imp1[[1]]$data
+ # Obtains means, SE and 95% Credible Intervals of Group effects for m2.brms
+stats.ranef.m2.brms1=as.data.frame(ranef(fits.imp1[[1]])) 
+names(stats.ranef.m2.brms1)=c("mean.int", "se.int", "Q2.5.int", "Q97.5.int",
+                             "mean.slope", "se.slope", "Q2.5.slope", "Q97.5.slope") # put shorter names in the data frame
+stats.ranef.m2.brms1$school=unique(DF1$school.id) # adds schoolid
+CrInt95.int.m2.brms1=ggplot(data=stats.ranef.m2.brms1, aes(x=reorder(school, mean.int), y=mean.int))+
+  geom_point()+
+  coord_flip()+
+  geom_linerange(aes(ymin=Q2.5.int,ymax=Q97.5.int))+
+  geom_hline(yintercept=0, size=1, linetype=2)+
+#  scale_y_continuous(breaks=seq(from=-0.2, to=0.2, by=0.05))+
+  theme_bw()+
+  labs(x="School", y="Group intercept")+
+  theme(axis.title.x = element_text(size=18),
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank(), 
+        axis.text.x = element_text(size=16))
+CrInt95.slopes.m2.brms1=ggplot(data=stats.ranef.m2.brms, aes(x=reorder(school, mean.int), y=mean.slope))+
+  geom_point()+
+  coord_flip()+
+  geom_linerange(aes(ymin=Q2.5.slope,ymax=Q97.5.slope))+
+  geom_hline(yintercept=0, size=1, linetype=2)+
+#  scale_y_continuous(breaks=seq(from=-0.6, to=0.6, by=0.05))+
+  theme_bw()+
+  labs(x="School", y="Group slope")+
+  theme(axis.title.x = element_text(size=18),
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank(), 
+        axis.text.x = element_text(size=16))
+cor.sl.int.m2.brms1=ggplot(data=stats.ranef.m2.brms, aes(x=mean.int, y=mean.slope))+
+  geom_point()+
+  geom_hline(yintercept=0, size=1, linetype=2)+
+  geom_vline(xintercept=0, size=1, linetype=2)+
+  theme_bw()+
+  labs(x="Mean group Intercept W1", y="Mean group slope W1")+
+  theme(axis.title = element_text(size=18), 
+        axis.text = element_text(size=16))
+plot_grid(CrInt95.int.m2.brms1,CrInt95.slopes.m2.brms1,cor.sl.int.m2.brms1,
+          nrow=2,labels = LETTERS[1:6], align="hv",label_x=0.85, label_y=0.95) #Fig. 
+```
+
+##### plot to pdf
+```{r eval = FALSE}
+pdf(file.path(PPath,"Results/sumWithout1.pdf"))
+cor.sl.int.m2.brms1
+dev.off()
+
+pdf(file.path(PPath,"Results/corIS.pdf"))
+grid.arrange(cor.sl.int.m2.brms0, cor.sl.int.m2.brms1, nrow = 2)
+dev.off()
+
+```

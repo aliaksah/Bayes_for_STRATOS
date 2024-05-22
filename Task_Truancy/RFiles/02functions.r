@@ -83,14 +83,14 @@ comp.int.stack.core01.inner <- function(sgr = sgr,fits = fits,
   sgr2 <- list()
   med <- list()
   for (i in 1:l) {
-    sgr2[[i]] <- sgr[[i]][, -which(names(sgr[[i]]) %in% c("school.id","CNT","nb.stud","DH_QU","BL_QU",
-                                                          "ATT_QU","RES_QU","UNI_QU"))]#,"BULL_QU"
-    # Data frame which contains the group specific quantiles for the eight representative students
+    sgr2[[i]] <- sgr[[i]][, -which(names(sgr[[i]]) %in% c("school.id","CNT","nb.stud","DH_QU","escs_QU","DP_QU"))]#,"BULL_QU"
+    # Data frame which contains the group specific quantiles for the eight representative students, "escs01","STAFF_QU"
     med[[i]] <- data.frame(lapply(sgr2[[i]],quantile, probs=c(p))) 
     }
   meds <- do.call(rbind, med)
-#  f <- as.factor(c(1,2,3,4))
+ # f <- as.factor(c(1,2,3,4))
 #  meds$DH_QU <- rep(f,l/4)
+  
   pred.grc <- list()
   # number of draws from the posterior distribution
   n_draws <- 4000
@@ -180,212 +180,229 @@ pppval_group <- function(group_nr = 1, groups = my.groups, y,
 }
 
 
-#' @title Returns a series of (two sided) posterior predictive p-values
-#' @description The function contains all the PPCs that are of substantive 
-#' interest. The summary statistic is the mean. It computes the corresponding
-#' (two sided) p-value.
-#' @param y.obs The outcome
-#' @param yrepM  Matrix with replicated data sets of the corresponding model.
-#' @alternative  alternative = c("two.sided", "less", "greater")
-#' @return Two sided posterior predictive p values 
-two.sided.pppv <- function(y.obs = pisa18$ld, yrepM = ypredStack, 
-                           alternative = alternative){
+
+
+
+visualPPC <- function(y.obs = y.obs, foc = foc, title = "stat = mean, var.name",
+                      yrepM = yrepM,WITHOUT = 0){
   
-  num.plots <- 10
-  #ppc.plots <- vector(num.plots, mode = 'list')
-  ppc.pppv <- vector(num.plots, mode = 'list')
-  #STAFFLACK + DH_QU
-  ng <-length(levels(interaction(pisa18$DH_QU, pisa18$STAFFLACK)))
+  ppc.plot <-  ppc_stat_grouped(y = y.obs[pisa18$WITHOUT == WITHOUT],
+                                yrep = yrepM, stat = "mean", 
+                     group = interaction(foc[pisa18$WITHOUT == WITHOUT]),
+                     facet_args = list(nrow = 2, scales = "fixed")) + 
+    xlab("probability of attp") + ggtitle(title) +#,facet_args = list(ncol = 2)
+    theme(text = element_text(size = 25), axis.text = element_text(size = 8))
+  
+  ng <-length(levels(interaction(foc[pisa18$WITHOUT == WITHOUT])))
   pppv <- rep(-1,ng)
   for (i in 1:ng){
     pppv[i] <- pppval_group(group_nr = i, 
-                            groups = interaction(pisa18$DH_QU, pisa18$STAFFLACK), 
-                            y.obs, yrepM, alternative = alternative)
+                            groups = interaction(foc[pisa18$WITHOUT == WITHOUT]), 
+                            y.obs[pisa18$WITHOUT == WITHOUT], yrepM, alternative = "two.sided")
   }
   
-  ppc.pppv[[1]] <- unlist(pppv)
-  
-  
-  ng <-length(levels(interaction(pisa18$WITHOUT)))
-  pppv <- rep(-1,ng)
-  for (i in 1:ng){
-    pppv[i] <- pppval_group(group_nr = i, 
-                            groups = interaction(pisa18$WITHOUT), 
-                            y.obs, yrepM, alternative = alternative)
-  }
-  
-  ppc.pppv[[2]] <- unlist(pppv)
-  
-  
-  ng <-length(levels(interaction(pisa18$BL_QU, pisa18$WITHOUT)))
-  pppv <- rep(-1,ng)
-  for (i in 1:ng){
-    pppv[i] <- pppval_group(group_nr = i, 
-                            groups = interaction(pisa18$BL_QU, pisa18$WITHOUT), 
-                            y.obs, yrepM, alternative = alternative)
-  }
-  
-  ppc.pppv[[3]] <- unlist(pppv)
-  
-  ng <-length(levels(interaction(pisa18$ATT_QU, pisa18$WITHOUT)))
-  pppv <- rep(-1,ng)
-  for (i in 1:ng){
-    pppv[i] <- pppval_group(group_nr = i, 
-                            groups = interaction(pisa18$ATT_QU, pisa18$WITHOUT), 
-                            y.obs, yrepM, alternative = alternative)
-  }
-  
-  ppc.pppv[[4]] <- unlist(pppv)
-  
-  ng <-length(levels(interaction(pisa18$RES_QU, pisa18$WITHOUT)))
-  pppv <- rep(-1,ng)
-  for (i in 1:ng){
-    pppv[i] <- pppval_group(group_nr = i, 
-                            groups = interaction(pisa18$RES_QU, pisa18$WITHOUT), 
-                            y.obs, yrepM, alternative = alternative)
-  }
-  
-  ppc.pppv[[5]] <- unlist(pppv)
-  
-  ng <-length(levels(interaction(pisa18$DH_QU)))
-  pppv <- rep(-1,ng)
-  for (i in 1:ng){
-    pppv[i] <- pppval_group(group_nr = i, 
-                            groups = interaction(pisa18$DH_QU), 
-                            y.obs, yrepM, alternative = alternative)
-  }
-  
-  ppc.pppv[[6]] <- unlist(pppv)
-  
-  ng <-length(levels(interaction(pisa18$BL_QU)))
-  pppv <- rep(-1,ng)
-  for (i in 1:ng){
-    pppv[i] <- pppval_group(group_nr = i, 
-                            groups = interaction(pisa18$BL_QU), 
-                            y.obs, yrepM, alternative = alternative)
-  }
-  
-  ppc.pppv[[7]] <- unlist(pppv)
-  
-  ng <-length(levels(interaction(pisa18$ATT_QU)))
-  pppv <- rep(-1,ng)
-  for (i in 1:ng){
-    pppv[i] <- pppval_group(group_nr = i, 
-                            groups = interaction(pisa18$ATT_QU), 
-                            y.obs, yrepM, alternative = alternative)
-  }
-  
-  ppc.pppv[[8]] <- unlist(pppv)
-  
-  ng <-length(levels(interaction(pisa18$RES_QU)))
-  pppv <- rep(-1,ng)
-  for (i in 1:ng){
-    pppv[i] <- pppval_group(group_nr = i, 
-                            groups = interaction(pisa18$RES_QU), 
-                            y.obs, yrepM, alternative = alternative)
-  }
-  
-  ppc.pppv[[9]] <- unlist(pppv)
-  
-  ng <-length(levels(interaction(pisa18$STAFFLACK)))
-  pppv <- rep(-1,ng)
-  for (i in 1:ng){
-    pppv[i] <- pppval_group(group_nr = i, 
-                            groups = interaction(pisa18$STAFFLACK), 
-                            y.obs, yrepM, alternative = alternative)
-  }
-  
-  ppc.pppv[[10]] <- unlist(pppv)
-  
-  pppv <- list()
-  for(i in 1:num.plots){
-    pppv[[i]] <- matrix(ppc.pppv[[i]], nrow = 2, byrow = TRUE)
-    
-  }
-  
-  
-  return(pppv)
+  return(list(ppc.plot=ppc.plot,pppv = pppv))
 }
 
 
 
-#' @title Returns a series of visual PPCs.
-#' @description The function contains all the PPCs that are of substantive 
-#' interest. The summary statistic is the mean. 
+#' @title Returns a series of visual PPCs, predictors of model 1
+#' @description The function contains all the PPCs that are included in
+#' candidate model 1. The summary statistic is the mean. 
 #' @param y.obs The outcome
 #' @param yrepM  Matrix with replicated data sets of the corresponding model.
 #' @return PPC plots 
-visualPPC <- function(y.obs = pisa18$ld, yrepM = ypredStack){
+visualPPC1 <- function(y.obs = pisa18$attp, yrepM = yrepM, WITHOUT = 0){
   
-  num.plots <- 10
+  num.plots <- 12
   ppc.plots <- vector(num.plots, mode = 'list')
+  pppvals <- vector(num.plots, mode = 'list')
   
-  ppc.plots[[1]] <-  ppc_stat_grouped(y = y.obs,yrep = yrepM, stat = "mean", 
-                                      group = interaction(pisa18$DH_QU, pisa18$STAFFLACK),
-                                      facet_args = list(nrow = 2)) +   
-    xlab("probability of ld") + ggtitle("stat = mean, DH_QU x STAFFLACK") +
-    theme(text = element_text(size = 25), axis.text = element_text(size = 8))
+  vppc <- visualPPC(y.obs = pisa18$attp, foc = pisa18$aca, 
+                               title = "stat = mean, aca",
+                               yrep = yrepM, WITHOUT)
+  ppc.plots[[1]] <- vppc[[1]]
+  pppvals[[1]]  <- vppc[[2]]
   
+  vppc <- visualPPC(y.obs = pisa18$attp, foc = pisa18$native, 
+                    title = "stat = mean, native",
+                    yrep = yrepM, WITHOUT)
+  ppc.plots[[2]] <- vppc[[1]]
+  pppvals[[2]]  <- vppc[[2]]
+
+  vppc <- visualPPC(y.obs = pisa18$attp, foc = pisa18$ld, 
+                               title = "stat = mean, ld",
+                               yrep = yrepM, WITHOUT)
+  ppc.plots[[3]] <- vppc[[1]]
+  pppvals[[3]]  <- vppc[[2]]
   
-  ### Hold out
-  ppc.plots[[2]] <-  ppc_stat_grouped(y = y.obs,yrep = yrepM, stat = "mean", 
-                                      group = pisa18$WITHOUT,
-                                      facet_args = list(nrow = 1, scales = "fixed")) + 
-    xlab("probability of ld") + ggtitle("stat = mean, WITHOUT") +#,facet_args = list(ncol = 2)
-    theme(text = element_text(size = 25), axis.text = element_text(size = 8))
+  vppc <- visualPPC(y.obs = pisa18$attp, foc = pisa18$uni, 
+                               title = "stat = mean, uni",
+                               yrep = yrepM, WITHOUT)
+  ppc.plots[[4]] <- vppc[[1]]
+  pppvals[[4]]  <- vppc[[2]]
   
-  ppc.plots[[3]] <-  ppc_stat_grouped(y = y.obs,yrep = yrepM, stat = "mean", 
-                                      group = interaction(pisa18$BL_QU, pisa18$WITHOUT),
-                                      facet_args = list(nrow = 2)) +   
-    xlab("probability of ld") + ggtitle("stat = mean, BL_QU x WITHOUT") +
-    theme(text = element_text(size = 25), axis.text = element_text(size = 8))
+  vppc <- visualPPC(y.obs = pisa18$attp, foc = pisa18$bull, 
+                               title = "stat = mean, bull",
+                               yrep = yrepM, WITHOUT)
+  ppc.plots[[5]] <- vppc[[1]]
+  pppvals[[5]]  <- vppc[[2]]
   
-  ppc.plots[[4]] <-  ppc_stat_grouped(y = y.obs,yrep = yrepM, stat = "mean", 
-                                      group = interaction(pisa18$ATT_QU, pisa18$WITHOUT),
-                                      facet_args = list(nrow = 2)) +   
-    xlab("probability of ld") + ggtitle("stat = mean, ATT_QU x WITHOUT") +
-    theme(text = element_text(size = 25), axis.text = element_text(size = 8))
+  vppc <- visualPPC(y.obs = pisa18$attp, foc = pisa18$fewbooks, 
+                               title = "stat = mean, fewbooks",
+                               yrep = yrepM, WITHOUT)
+  ppc.plots[[6]] <- vppc[[1]]
+  pppvals[[6]]  <- vppc[[2]]
   
-  ppc.plots[[5]] <-  ppc_stat_grouped(y = y.obs,yrep = yrepM, stat = "mean", 
-                                      group = interaction(pisa18$RES_QU, pisa18$WITHOUT),
-                                      facet_args = list(nrow = 2)) +   
-    xlab("probability of ld") + ggtitle("stat = mean, RES_QU x WITHOUT") +
-    theme(text = element_text(size = 25), axis.text = element_text(size = 8))
+  belong4 <- cut_number(pisa18$belong,4)
+  vppc  <- visualPPC(y.obs = pisa18$attp, foc = belong4, 
+                               title = "stat = mean, belong",
+                               yrep = yrepM, WITHOUT)
+  ppc.plots[[7]] <- vppc[[1]]
+  pppvals[[7]]  <- vppc[[2]]
   
-  ## Focal
+  joyread4 <- cut_number(pisa18$joyread,4)
+  vppc  <- visualPPC(y.obs = pisa18$attp, foc = joyread4, 
+                               title = "stat = mean, joyread",
+                               yrep = yrepM, WITHOUT)
   
-  ppc.plots[[6]] <-  ppc_stat_grouped(y = y.obs,yrep = yrepM, stat = "mean", 
-                                      group = pisa18$DH_QU,
-                                      facet_args = list(nrow = 1, scales = "fixed")) + 
-    xlab("probability of ld") + ggtitle("stat = mean, DH_QU") +#,facet_args = list(ncol = 2)
-    theme(text = element_text(size = 25), axis.text = element_text(size = 8))
+  ppc.plots[[8]] <- vppc[[1]]
+  pppvals[[8]]  <- vppc[[2]]
   
-  ppc.plots[[7]] <-  ppc_stat_grouped(y = y.obs,yrep = yrepM, stat = "mean", 
-                                      group = pisa18$BL_QU,
-                                      facet_args = list(nrow = 1, scales = "fixed")) + 
-    xlab("probability of ld") + ggtitle("stat = mean, BL_QU") +#,facet_args = list(ncol = 2)
-    theme(text = element_text(size = 25), axis.text = element_text(size = 8))
+  goal4 <- cut_number(pisa18$goal,4)
+  vppc  <- visualPPC(y.obs = pisa18$attp, foc = goal4, 
+                               title = "stat = mean, goal",
+                               yrep = yrepM, WITHOUT)
   
-  ppc.plots[[8]] <-  ppc_stat_grouped(y = y.obs,yrep = yrepM, stat = "mean", 
-                                      group = pisa18$ATT_QU,
-                                      facet_args = list(nrow = 1, scales = "fixed")) + 
-    xlab("probability of ld") + ggtitle("stat = mean, ATT_QU") +#,facet_args = list(ncol = 2)
-    theme(text = element_text(size = 25), axis.text = element_text(size = 8))
+  ppc.plots[[9]] <- vppc[[1]]
+  pppvals[[9]]  <- vppc[[2]]
   
-  ppc.plots[[9]] <-  ppc_stat_grouped(y = y.obs,yrep = yrepM, stat = "mean", 
-                                      group = pisa18$RES_QU,
-                                      facet_args = list(nrow = 1, scales = "fixed")) + 
-    xlab("probability of ld") + ggtitle("stat = mean, RES_QU") +#,facet_args = list(ncol = 2)
-    theme(text = element_text(size = 25), axis.text = element_text(size = 8))
+  mot4 <- cut_number(pisa18$mot,4)
+  vppc  <- visualPPC(y.obs = pisa18$attp, foc = mot4, 
+                               title = "stat = mean, mot",
+                               yrep = yrepM, WITHOUT)
   
-  ppc.plots[[10]] <-  ppc_stat_grouped(y = y.obs,yrep = yrepM, stat = "mean", 
-                                      group = pisa18$STAFFLACK,
-                                      facet_args = list(nrow = 1, scales = "fixed")) + 
-    xlab("probability of ld") + ggtitle("stat = mean, STAFFLACK") +#,facet_args = list(ncol = 2)
-    theme(text = element_text(size = 25), axis.text = element_text(size = 8))
-  return(ppc.plots)
+  ppc.plots[[10]] <- vppc[[1]]
+  pppvals[[10]]  <- vppc[[2]]
+  
+
+  
+  RES4 <- cut_number(pisa18$RES,4)
+  vppc <- visualPPC(y.obs = pisa18$attp, foc = RES4, 
+                               title = "stat = mean, RES",
+                               yrep = yrepM, WITHOUT)
+  
+  ppc.plots[[11]] <- vppc[[1]]
+  pppvals[[11]]  <- vppc[[2]]
+  
+  VAL4 <- cut_number(pisa18$VAL,4)
+  vppc <- visualPPC(y.obs = pisa18$attp, foc = VAL4, 
+                               title = "stat = mean, VAL",
+                               yrep = yrepM, WITHOUT)
+  
+  ppc.plots[[12]] <- vppc[[1]]
+  pppvals[[12]]  <- vppc[[2]]
+  
+  return(list(ppc.plots=ppc.plots,pppvals=pppvals))
 }
 
+
+
+
+#' @title Returns a series of visual PPCs, predictors of model 2
+#' @description The function contains all the PPCs that are included in
+#' candidate model 2. The summary statistic is the mean. 
+#' @param y.obs The outcome
+#' @param yrepM  Matrix with replicated data sets of the corresponding model.
+#' @return PPC plots 
+visualPPC2 <- function(y.obs = pisa18$attp, yrepM = yrepM, WITHOUT = 0){
+  
+  num.plots <- 11
+  ppc.plots <- vector(num.plots, mode = 'list')
+  pppvals <- vector(num.plots, mode = 'list')
+  
+  vppc <- visualPPC(y.obs = pisa18$attp, foc = pisa18$immig, 
+                    title = "stat = mean, immig",
+                    yrep = yrepM, WITHOUT)
+  ppc.plots[[1]] <- vppc[[1]]
+  pppvals[[1]]  <- vppc[[2]]
+  
+
+  
+  vppc <- visualPPC(y.obs = pisa18$attp, foc = pisa18$female, 
+                    title = "stat = mean, female",
+                    yrep = yrepM, WITHOUT)
+  ppc.plots[[2]] <- vppc[[1]]
+  pppvals[[2]]  <- vppc[[2]]
+  
+  escs4 <- cut_number(pisa18$escs,4)
+  vppc <- visualPPC(y.obs = pisa18$attp, foc = escs4, 
+                    title = "stat = mean, escs",
+                    yrep = yrepM, WITHOUT)
+  ppc.plots[[3]] <- vppc[[1]]
+  pppvals[[3]]  <- vppc[[2]]
+  
+  vppc <- visualPPC(y.obs = pisa18$attp, foc = pisa18$RUR, 
+                    title = "stat = mean, RUR",
+                    yrep = yrepM, WITHOUT)
+  ppc.plots[[4]] <- vppc[[1]]
+  pppvals[[4]]  <- vppc[[2]]
+  
+  vppc  <- visualPPC(y.obs = pisa18$attp, foc = pisa18$DISH, 
+                     title = "stat = mean, DISH",
+                     yrep = yrepM, WITHOUT)
+  ppc.plots[[5]] <- vppc[[1]]
+  pppvals[[5]]  <- vppc[[2]]
+  
+  vppc  <- visualPPC(y.obs = pisa18$attp, foc = pisa18$PUBLIC, 
+                     title = "stat = mean, PUBLIC",
+                     yrep = yrepM, WITHOUT)
+  
+  ppc.plots[[6]] <- vppc[[1]]
+  pppvals[[6]]  <- vppc[[2]]
+  
+  STAFFSHORT4 <- cut_number(pisa18$STAFFSHORT,4)
+  vppc  <- visualPPC(y.obs = pisa18$attp, foc = STAFFSHORT4, 
+                     title = "stat = mean, STAFFSHORT",
+                     yrep = yrepM, WITHOUT)
+  
+  ppc.plots[[7]] <- vppc[[1]]
+  pppvals[[7]]  <- vppc[[2]]
+  
+  EDUSHORT2 <- cut_number(pisa18$EDUSHORT,2)
+  vppc  <- visualPPC(y.obs = pisa18$attp, foc = EDUSHORT2, 
+                     title = "stat = mean, EDUSHORT",
+                     yrep = yrepM, WITHOUT)
+  
+  ppc.plots[[8]] <- vppc[[1]]
+  pppvals[[8]]  <- vppc[[2]]
+  
+  FEMFRAC4 <- cut_number(pisa18$FEMFRAC,4)
+  vppc <- visualPPC(y.obs = pisa18$attp, foc = FEMFRAC4, 
+                    title = "stat = mean, FEMFRAC",
+                    yrep = yrepM, WITHOUT)
+  
+  
+  ppc.plots[[9]] <- vppc[[1]]
+  pppvals[[9]]  <- vppc[[2]]
+  
+  SN_SC4 <- cut_number(pisa18$SN,4)
+  vppc  <- visualPPC(y.obs = pisa18$attp, foc = SN_SC4, 
+                     title = "stat = mean, SN",
+                     yrep = yrepM, WITHOUT)
+  ppc.plots[[10]] <- vppc[[1]]
+  pppvals[[10]]  <- vppc[[2]]
+  
+  NN_SC4 <- cut_number(pisa18$NN,4)
+  vppc <- visualPPC(y.obs = pisa18$attp, foc = NN_SC4, 
+                    title = "stat = mean, NN",
+                    yrep = yrepM, WITHOUT)
+  
+  ppc.plots[[11]] <- vppc[[1]]
+  pppvals[[11]]  <- vppc[[2]]
+  
+ return(list(ppc.plots=ppc.plots,pppvals=pppvals))
+}
 
 ##### Plot results ###########################################################
 
@@ -401,22 +418,22 @@ plot.result <- function(gfg=df_condPr1){
   pd <- position_dodge(0.05) # move them .05 to the left and right
   cbp1 <- c( "#00bb6a","#0052bb")
   xlab <- "Quartile (with corres. median)"
-  tit <- tit <- "Prop. of literacy depr.stud. in dep. of quartile"
+  tit <- tit <- "Prop. of attendance problem in dep. of quartile"
   
   ggplot(gfg, aes(x = x, y = mean, colour = group, group = group)) + 
     geom_errorbar(aes(ymin = low, ymax = up), colour = "black", width = .01, position = pd) +
     geom_line(position = pd, size = 1.25, linetype = "dashed") +
     geom_point(position = pd, size = 3, shape = 21) + # 21 is filled circle
     xlab(xlab) +
-    ylab("Prob. of being literacy depr.") +
+    ylab("Prob. of attendance problem") +
     ggtitle(tit) +
-    expand_limits(y = 0.7) +    #expand_limits(x=1.52)   +                 # Expand y range
-    scale_y_continuous(breaks = seq(0,0.8,0.10)) + scale_x_continuous(breaks = seq(-0.5,0.5,0.10)) + 
+    expand_limits(y = 0.5) +    #expand_limits(x=1.52)   +                 # Expand y range
+    scale_y_continuous(breaks = seq(0,0.5,0.10)) + scale_x_continuous(breaks = seq(-1.0,2.0,0.5)) + 
     theme_bw() +
     theme(legend.justification = c(1,0),#c(1,0)
-          legend.position = 'bottom') + geom_hline(yintercept = 0.3,col = "darkgreen",
+          legend.position = 'bottom') + geom_hline(yintercept = 0.1,col = "darkgreen",
                                                    linetype = 3,
-                                                   size = 1) + geom_hline(yintercept = 0.5, col = "darkred",
+                                                   size = 1) + geom_hline(yintercept = 0.3, col = "darkred",
                                                                           linetype = 3,size = 1) + 
     
     theme(text = element_text(size = 19), #change font size of all text
