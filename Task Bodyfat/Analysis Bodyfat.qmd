@@ -1,0 +1,411 @@
+---
+title: "Analysis: bodyfat prediction"
+author:
+  - name: Georg Heinze
+    affiliation: Medical University of Vienna, Center for Medical Data Science
+date: last-modified                            # "`r Sys.Date()`" for system date
+categories: [2024, Contrast-Bayes-Frequentist, STRATOS, R]
+description: "Classification: confidential"
+editor: visual
+theme: cosmo                                   # cosmo bootswatch theme
+toc: true                                      # table of contents  
+number-sections: true
+colorlinks: true                               # ??
+highlight-style: pygments
+#bibliography: references.bib
+format:
+  html: 
+    code-fold: true
+    code-tools: true
+    html-math-method: katex
+    self-contained: true                      # html is self-contained
+  pdf:
+    geometry: 
+      - top=30mm
+      - left=30mm
+  docx: default                               
+---
+
+## Load libraries
+
+```{r}
+library(mfp2)
+
+library(here)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(tidyselect)
+library(gt)
+library(gtExtras)
+library(patchwork)
+library(Hmisc)
+library(sjlabelled)
+```
+
+## Load data
+
+```{r}
+load("Datafiles/bodyfatdata.Rdata")
+```
+
+## Initial data analysis for women data
+
+The description of the IDA plan follows the example in [Regression without regrets](https://stratosida.github.io/regression-regrets/) which accompanies the paper of [Heinze et al (2024)](https://doi.org/10.21203/rs.3.rs-3580334/v1).
+
+### Prerequisites
+
+#### PRE1: research aim
+
+We fit a prediction model for bodyfat using anthropometric measures.
+
+#### PRE2: analysis strategy
+
+The analysis strategy is described in the [Task document](Task%20Bodyfat.html).
+
+#### PRE3: analysis ready data dictionary
+
+The source data dictionary of the college women bodyfat data set is described in the [Task document](Task%20Bodyfat.html).
+
+Here we transform the data into long format for purpose of conducting IDA efficiently.
+
+```{r}
+## transform
+women_long <-
+  women |>
+  mutate(AgeP = Age) |>  ## Create a copy of AGE to store as a predictor
+  pivot_longer(
+    cols = c(-Obs,-Age,-Fat),
+    names_to = "PARAMCD",
+    values_to = "AVAL",
+    values_drop_na = FALSE
+  ) |>
+  mutate(PARAMCD = if_else(PARAMCD == "AgeP", "Age", PARAMCD)) ## rename AGE param code 
+
+```
+
+#### PRE4: domain expertise
+
+-   Age is chosen as the single structural variable.
+
+-   Waist, Height and Weight are the key predictors for IDA.
+
+-   Fat is the dependent variable.
+
+-   All other predictors (BMI, Neck, Chest, Calf, Biceps, Hips, Waist, Forearm, PThigh, MThigh, DThigh, Wrist, Knee, Elbox, Ankle) take on the role of remaining predictor variables.
+
+### IDA domain M: missing values
+
+There are no missing values in this data set.
+
+### IDA Domain U: univariate descriptions
+
+Since there only continuous predictors and a continuous outcome variable involved, we will only consider subdomain U2: continuous variables.
+
+#### Structural variable and key predictors
+
+```{r uni02, message=FALSE, warning =FALSE , echo=FALSE}
+#| layout-ncol: 3
+#| fig-width: 4
+#| fig-height: 2
+
+
+source("R/U2-cont-describe-plot.R")
+
+
+
+
+
+key_plts <- lapply(c("Age", "Waist", "Weight", "Height"), function(X) {
+  dat <- women_long |>
+    filter(PARAMCD == X) 
+  describe_plot(dat, num_bins=20)
+})
+
+for (plts in 1:length(key_plts)) {
+  print(key_plts[[plts]])
+}
+
+```
+
+#### Remaining predictors
+
+```{r}
+#| layout-ncol: 3
+#| fig-width: 4
+#| fig-height: 2
+
+
+rem_plts <- lapply(c("BMI", "Neck", "Chest", "Calf", "Biceps", "Hips", "Waist", "Forearm", "PThigh", "MThigh", "DThigh", "Wrist", "Knee", "Elbow", "Ankle"), function(X) {
+  dat <- women_long |>
+    filter(PARAMCD == X) 
+  describe_plot(dat, num_bins=20)
+})
+
+for (plts in 1:length(rem_plts)) {
+  print(rem_plts[[plts]])
+}
+
+
+```
+
+
+
+
+
+### IDA domain V: multivariate descriptions
+
+#### Key predictors vs. structural variable
+
+
+
+```{r}
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(purrr)
+library(tidyselect)
+library(corrr) ## tidy correlation
+library(patchwork)
+library(ggpubr)
+library(ggrepel)
+library(here)
+library(dendextend)
+library(gt)
+library(gtExtras)
+
+## for network plot
+options(ggrepel.max.overlaps = 100)
+
+source("R/fun_compare_dist_plot.R")
+source("R/fun_compare_mult_dists.R")
+source("R/fun_ida_trans.R")
+
+women_long <- women_long %>%
+  mutate(AGE = Age, SEXC = "female", PARAM = PARAMCD) 
+
+key_plts <- lapply(c("Waist", "Weight", "Height"), function(X) {
+  dat <- women_long |>
+    filter(PARAMCD == X) 
+  plot_assoc_by(dat)
+})
+
+for (plts in 1:length(key_plts)) {
+  print(key_plts[[plts]])
+}
+
+```
+
+#### Remaining predictors vs. structural variable
+
+```{r}
+key_plts <- lapply(c("BMI", "Neck", "Chest", "Calf", "Biceps", "Hips", "Waist", "Forearm", "PThigh", "MThigh", "DThigh", "Wrist", "Knee", "Elbow", "Ankle"), function(X) {
+  dat <- women_long |>
+    filter(PARAMCD == X) 
+  plot_assoc_by(dat)
+})
+
+for (plts in 1:length(key_plts)) {
+  print(key_plts[[plts]])
+}
+```
+
+#### Summary of IDA
+
+There seem to be some mismeasured data points in the following variables:
+
+| Subject | Variable | Problem | Solution |
+|---------|----------|---------|----------|
+| 120     | Age      | Age == 1| set to NA|
+| 42, 145 | Chest    | Chest < 60| set to NA |
+| 31      | Calf     |  Calf == 66 | set to NA |
+| 124     | Knee     | Knee ==24.7 | set to NA |
+| 136     | Elbow    | Elbow == 15.5 | set to NA |
+ 
+
+```{r}
+# we first copy the data into an analysis set women_AS
+women_AS <- women
+
+# we now create NAs where data was implausible
+women_AS$Age[women_AS$Age ==1] <- NA
+women_AS$Chest[women_AS$Chest < 60] <- NA
+women_AS$Calf[women_AS$Calf == 66] <- NA
+women_AS$Knee[women_AS$Knee ==24.7] <-  NA
+women_AS$Elbow[women_AS$Elbow == 15.5] <- NA
+```
+ 
+After this data cleaning, we repeat the IDA with the clean data. 
+Since the missing values are not overlapping, we don't have to pay special attention to their description.
+
+```{r}
+## transform
+women_long_AS <-
+  women_AS |>
+  mutate(AgeP = Age) |>  ## Create a copy of AGE to store as a predictor
+  pivot_longer(
+    cols = c(-Obs,-Age,-Fat),
+    names_to = "PARAMCD",
+    values_to = "AVAL",
+    values_drop_na = FALSE
+  ) |>
+  mutate(PARAMCD = if_else(PARAMCD == "AgeP", "Age", PARAMCD)) ## rename AGE param code 
+
+```
+
+#### IDA domain U: univariate descriptions
+
+```{r uni03, message=FALSE, warning =FALSE , echo=FALSE}
+#| layout-ncol: 3
+#| fig-width: 4
+#| fig-height: 2
+
+
+source("R/U2-cont-describe-plot.R")
+
+
+
+
+
+key_plts <- lapply(c("Age", "Waist", "Weight", "Height"), function(X) {
+  dat <- women_long_AS |>
+    filter(PARAMCD == X) 
+  describe_plot(dat, num_bins=20)
+})
+
+for (plts in 1:length(key_plts)) {
+  print(key_plts[[plts]])
+}
+
+
+rem_plts <- lapply(c("BMI", "Neck", "Chest", "Calf", "Biceps", "Hips", "Waist", "Forearm", "PThigh", "MThigh", "DThigh", "Wrist", "Knee", "Elbow", "Ankle"), function(X) {
+  dat <- women_long_AS |>
+    filter(PARAMCD == X) 
+  describe_plot(dat, num_bins=20)
+})
+
+for (plts in 1:length(rem_plts)) {
+  print(rem_plts[[plts]])
+}
+
+
+```
+
+ #### IDA domain V: Correlation between predictors
+ 
+ Calculate correlation matrix using Spearman correlation coefficient. 
+
+```{r mcorrs, message=FALSE, warning=FALSE, echo=FALSE, fig.height=3}
+
+## tidy parameters in to a wide data set
+
+## calculate corr matrix using spearman cc
+corr_spearman <- 
+  women_AS |> 
+  select(-Obs, -Fat) |>
+  correlate(use = "pairwise.complete.obs",
+            method = "spearman",
+            diagonal = NA)
+
+
+```
+
+The Spearman correlation coefficients are depicted in a quadratic heat map:
+
+```{r plotcorr, message=FALSE, warning=FALSE, echo=FALSE, fig.width = 16, fig.height=16}
+
+
+corr_spearman |> rearrange(method = "HC") |>
+  autoplot(
+#         method = "PCA",
+         triangular = "lower",
+         barheight = 20) +
+  theme(
+    axis.text.x = ggplot2::element_text(angle = 45, vjust = 1, hjust = 1, size = 8),
+    axis.text.y = ggplot2::element_text(vjust = 1, hjust = 1, size = 9)
+  )
+
+```
+
+```{r}
+corr_spearman_disp <- cbind(term=corr_spearman$term, round(corr_spearman[,-1]*100,0))
+print(corr_spearman_disp)
+```
+
+
+
+### Summary from IDA
+
+We see very high correlations between all variables except of Age (which has a small range anyway). Moreover, BMI does not seem to have any correlation with Height.
+
+The key predictors Waist, Weight and Height have correlations of:
+
+- Waist and Weight: 0.87
+- Waist and Height: 0.18
+- Weight and Height: 0.44
+
+## Main analysis
+
+### Model M1
+
+```{r}
+library(mfp2)
+
+x <- as.matrix(women_AS[, c("Waist", "Height", "Weight")])
+y <- as.numeric(women_AS$Fat)
+
+M1 <- mfp2(x=x, y=y, select=1, df=4, criterion="aic")
+summary(M1)
+```
+```{r}
+x <- as.matrix(women_AS[, c("Waist", "Height", "Weight", "BMI")])
+y <- as.numeric(women_AS$Fat)
+
+M2 <- mfp2(x=x, y=y, df=c(4,4,4,2), criterion="aic")
+summary(M2)
+
+```
+```{r}
+# refit M2
+women_AS_nona <- women_AS[complete.cases(women_AS),]
+
+M2 <- lm(data=women_AS_nona, Fat ~ Waist + Height + Weight)
+
+M3 <- step(M2, direction="forward", scope=c(lower=~Waist + Height + Weight, upper=~Waist + Height + Weight + Neck + Chest + Calf + Biceps + Hips + Waist + Forearm + PThigh + MThigh + DThigh + Wrist + Knee + Elbow + Ankle))
+```
+```{r}
+# refit M3 with complete cases
+
+M3 <- lm(Fat ~ Waist + Height + Weight + Hips + Wrist + Knee + Ankle, data=women_AS)
+
+M4.it <- update(M3, formula=Fat ~ Waist + Height + Weight + Hips  + Knee + 
+    Ankle)
+
+summary(M4.it)
+
+# next step removes Ankle, as Weight should be given priority
+
+M4.it2 <- update(M4.it, formula=Fat ~ Waist + Height + Weight + Hips  + Knee )
+
+summary(M4.it2)
+
+anova(M4.it, M4.it2)
+```
+```{r}
+# Check model for nonlinearities
+
+x <- as.matrix(women_AS[, c("Waist","Height","Weight", "Hips", "Knee")])
+y <- y[complete.cases(x)]
+x <- x[complete.cases(x),]
+
+M4.refit <- mfp2(x=x, y=y, criterion="aic", df=c(4,4,4,2,2))
+```
+## SAP amendments
+
+### Problems encountered
+
+- forward selection not possible with mfp2
+ 
+- not possible to use AIC for functional form selection, but no variable selection 
+
+- according to the SAP, a very insiginficant variable (Weight) had to be kept in in favor of a significant one (Ankle)

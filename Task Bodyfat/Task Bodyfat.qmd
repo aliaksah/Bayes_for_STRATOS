@@ -145,3 +145,9 @@ men <- bodyfat_corr %>%
 The goal is to find a 5-predictor model for which we can find the highest possible lower bound of prediction performance when applying the model to adult men of any age.
 
 Since the proportion of the `men` data used for tuning and for testing can be chosen ad lib, the analyst can decide whether to put more emphasis on accurate performance evaluation (more data in test set, less variance when testing the model) or on calibrating the model for men (more data in validation set, probably better expected performance).
+
+## Save data sets
+
+```{r}
+save(list=c("men", "women"), file="Datafiles/bodyfatdata.Rdata")
+```
