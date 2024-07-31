@@ -43,6 +43,8 @@ library(Hmisc)
 library(sjlabelled)
 ```
 
+# Model estimation
+
 ## Load data
 
 ```{r}
@@ -332,6 +334,13 @@ corr_spearman_disp <- cbind(term=corr_spearman$term, round(corr_spearman[,-1]*10
 print(corr_spearman_disp)
 ```
 
+### Plot of the variables PThigh, MThigh, DThigh
+
+```{r}
+ggplot(data=women_AS, aes(x=PThigh, y=MThigh)) + geom_point()
+ggplot(data=women_AS, aes(x=PThigh, y=DThigh)) + geom_point()
+ggplot(data=women_AS, aes(x=DThigh, y=MThigh)) + geom_point()
+```
 
 
 ### Summary from IDA
@@ -361,7 +370,7 @@ summary(M1)
 x <- as.matrix(women_AS[, c("Waist", "Height", "Weight", "BMI")])
 y <- as.numeric(women_AS$Fat)
 
-M2 <- mfp2(x=x, y=y, df=c(4,4,4,2), criterion="aic")
+M2 <- mfp2(x=x, y=y, df=c(4,4,4,2), criterion="aic", keep=c(T, T, T, F))
 summary(M2)
 
 ```
@@ -369,43 +378,84 @@ summary(M2)
 # refit M2
 women_AS_nona <- women_AS[complete.cases(women_AS),]
 
-M2 <- lm(data=women_AS_nona, Fat ~ Waist + Height + Weight)
+# instead of forward, use backward but keep Waist, Height and Weight from exclusion
 
-M3 <- step(M2, direction="forward", scope=c(lower=~Waist + Height + Weight, upper=~Waist + Height + Weight + Neck + Chest + Calf + Biceps + Hips + Waist + Forearm + PThigh + MThigh + DThigh + Wrist + Knee + Elbow + Ankle))
+xM3 <- as.matrix(women_AS_nona[,-c(1,2,5)])
+yM3 <- women_AS_nona[,2]
+
+M3 <- mfp2(y=yM3, x=xM3, keep=c("Height","Weight","Waist"), df=c(4, 4, 2, 2, 2, 2, 2, 2, 4, 2, 2, 2, 2, 2, 2, 2, 2))
+summary(M3)
 ```
 ```{r}
 # refit M3 with complete cases
 
-M3 <- lm(Fat ~ Waist + Height + Weight + Hips + Wrist + Knee + Ankle, data=women_AS)
+women_AS_M3 <- women_AS[complete.cases(women_AS[,c("Height","Waist","Knee","Hips","Weight","Wrist")]),]
 
-M4.it <- update(M3, formula=Fat ~ Waist + Height + Weight + Hips  + Knee + 
-    Ankle)
+xM3r <- as.matrix(women_AS_M3[,c("Height","Waist","Knee","Hips","Weight","Wrist")])
+yM3r <- women_AS_M3[,"Fat"]
+M3.refit <- mfp2(y=yM3r, x=xM3r, keep=c("Height","Waist","Knee","Hips","Weight","Wrist"), df=c(4, 4, 2, 2, 4, 2))
+summary(M3.refit)
 
-summary(M4.it)
+M4.fp1 <- mfp2(y=yM3r, x=xM3r, keep=NULL, select=0.084, df=c(2, 2, 2, 2, 2, 2), cycles=1)
 
-# next step removes Ankle, as Weight should be given priority
+summary(M4.fp1)
 
-M4.it2 <- update(M4.it, formula=Fat ~ Waist + Height + Weight + Hips  + Knee )
+M4.lin <- mfp2(y=yM3r, x=xM3r, keep=NULL, select=0.084, df=c(1, 1, 1, 1, 1, 1), cycles=1)
 
-summary(M4.it2)
-
-anova(M4.it, M4.it2)
+summary(M4.lin)
 ```
-```{r}
-# Check model for nonlinearities
 
-x <- as.matrix(women_AS[, c("Waist","Height","Weight", "Hips", "Knee")])
-y <- y[complete.cases(x)]
-x <- x[complete.cases(x),]
-
-M4.refit <- mfp2(x=x, y=y, criterion="aic", df=c(4,4,4,2,2))
-```
 ## SAP amendments
 
 ### Problems encountered
 
 - forward selection not possible with mfp2
  
-- not possible to use AIC for functional form selection, but no variable selection 
 
-- according to the SAP, a very insiginficant variable (Weight) had to be kept in in favor of a significant one (Ankle)
+### Solutions
+
+- Because forward selection is not possible with the `mfp2` package, we performed backward selection to arrive at model M3.
+
+- M3 selected 6 variables which had to be reduced to 5 for M4. In M3 there were only linear effects involved. When performing backward elimination to remove 1 variable, we assumed these linear effects, but backed up with assuming FP1s for all variables.
+
+
+# Model validation
+
+## Apparent validity
+
+### Check local bias
+
+
+```{r}
+ggplot(data.frame(fitted.values=M4.fp1$fitted.values, y=M4.fp1$y), aes(x=fitted.values, y=y)) + geom_point() + geom_smooth() + geom_abline(slope=1, intercept=0)
+```
+Observation: There seems to be only little local bias at the very lower end of the distribution of fitted values.
+
+### Check heteroskedasticity
+
+```{r}
+ggplot(data.frame(fitted.values=M4.fp1$fitted.values, y=sqrt(abs(M4.fp1$residuals))), aes(x=fitted.values, y=y)) + geom_point() + geom_smooth() 
+```
+Observation: there is a little bit of higher variability of residuals when predictions are around 15%.
+
+### Check association with excluded predictors
+
+The MFP algorithm iteratively checks for possible inclusion of previously excluded predictors. Hence, we do not expect that any predictor might show an relevant association with the model residuals. Still, we will check this for Weight, which was excluded when moving from M3 to M4.
+
+```{r}
+ggplot(data.frame(Weight=women_AS_M3$Weight, Residuals=M4.fp1$residuals), aes(x=Weight, y=Residuals)) + geom_point() + geom_smooth() 
+```
+Observation: No residual association with Weight can be noted.
+
+### Check normality of residuals
+
+```{r}
+ggplot(data.frame(residuals=M4.fp1$residuals), aes(sample=residuals)) +
+  stat_qq(distribution = qnorm) +
+  stat_qq_line(distribution = qnorm)
+
+ggplot(data=data.frame(residuals=M4.fp1$residuals), aes(x=residuals)) + geom_histogram(bins=20)
+```
+
+Conclusion: there are only little deviations from the normality assumption for residuals, probably more on the left tail.
+
