@@ -426,7 +426,7 @@ summary(M4.lin)
 
 - Because forward selection is not possible with the `mfp2` package, we performed backward selection to arrive at model M3.
 
-- M3 selected 6 variables which had to be reduced to 5 for M4. In M3 there were only linear effects involved. When performing backward elimination to remove 1 variable, we assumed these linear effects, but backed up with assuming FP1s for all variables.
+- M3 selected 6 variables which had to be reduced to 5 for M4. In M3 there were only linear effects involved. Since `mfp2` does not allow to select a fixed number of predictors out of a larger set of candidate predictors, we tuned the  significance level for selection in `mfp2` in order to yield exactly 5 predictors. We accepted that it might not always be possible to find a significance level that yields 5 predictors. 
 
 
 
@@ -502,9 +502,9 @@ sd.beta <- coef(M4.fp1) * apply(M4.fp1$x, 2, sd)
 sd.beta
 ```
 
-## Internal validation
+# Internal validation
 
-### Performing bootstrap replications of model building
+## Performing bootstrap replications of model building
 
 ```{r, message=FALSE}
 # define a function that automates the complex model building process. The function returns the model M4.
@@ -672,41 +672,45 @@ powers_sf <- lapply(candidate_predictors, function(X) {
 names(powers_sf) <- candidate_predictors
 ```
 
-#### Optimism-corrected root mean squared preidction error
+## Optimism-corrected measures of performance
+
+### Optimism-corrected root mean squared preidction error
 
 ```{r, message=FALSE}
 rmspe_optcorr
 rmspe_optcorr_ci
 ```
 
-#### Optimism-corrected R-squared
+### Optimism-corrected R-squared
 
 ```{r, message=FALSE}
 rsqu_optcorr
 rsqu_optcorr_ci
 ```
 
-#### Calibration slope
+### Calibration slope
 
 ```{r, message=FALSE}
 mean_calib_slope
 calib_slope_ci
 ```
 
-#### Predictor selection frequencies
+## Model instability
+
+### Predictor selection frequencies
 
 ```{r, message=FALSE}
 -sort(-predictor_sf)
 ```
 
-#### FP power selection frequencies per predictor
+### FP power selection frequencies per predictor
 
 
 ```{r, message=FALSE}
 powers_sf
 ```
 
-#### Spaghetti plots of bootstrapped and original predictor-outcome relations
+### Spaghetti plots of bootstrapped and original predictor-outcome relations
 
 ```{r, message=FALSE}
 for(predictor in sel.predictors.M4.fp1){
@@ -723,7 +727,11 @@ for(predictor in sel.predictors.M4.fp1){
 
 ```
 
-### Recalibration
+
+
+## Recalibration
+
+### Recalibrated coefficients
 
 Recalibrate the model with the estimated calibration slope.
 
@@ -742,7 +750,7 @@ M4.recalib$coefficients[1] <- M4.refit$coefficients[1] - mean(predict(M4.recalib
 ```
 
 
-#### Check the coefficients
+### Check the coefficients
 
 ```{r}
 cbind(M4.recalib$coefficients, M4.refit$coefficients)
@@ -750,18 +758,21 @@ cbind(M4.recalib$coefficients, M4.refit$coefficients)
 
 ```
 
-#### Check the mean prediction against the mean Fat value of training set
+### Check the mean prediction against the mean Fat value of training set
 
 ```{r}
+cat("Mean prediction:\n")
 mean(predict(M4.recalib, women_AS[,sel.predictors.M4.fp1]), na.rm=T)
+
+cat("Mean of Fat in training set:\n")
 mean(M4.refit$y)
 ```
 
 
 
-## External validation
+# External validation
 
-### Apply the fitted model to men data set
+## Apply the fitted, recalibrated model to men data set
 
 ```{r}
 men2 <- men |>
@@ -772,7 +783,7 @@ pred_ext <- predict(M4.recalib, newdata=men2)
 eval_men <- data.frame(men2, Prediction=pred_ext)
 ```
 
-
+## Performance measures at external validation
 
 ### Root mean squared prediction error
 
@@ -814,6 +825,8 @@ calib_inter_ext
 
 #### Local bias
 
+Plot the residuals vs. the predictions.
+
 ```{r}
 ggplot(eval_men, aes(x=Prediction, y=Fat-Prediction)) + geom_point() + geom_smooth()
 
@@ -822,11 +835,15 @@ ggplot(eval_men, aes(x=Prediction, y=Fat-Prediction)) + geom_point() + geom_smoo
 
 #### Heteroskedasticity
 
+Plot the square root of absolute residuals vs. predictions.
+
 ```{r}
 ggplot(eval_men, aes(x=Prediction, y=sqrt(abs(Fat-Prediction)))) + geom_point() + geom_smooth()
 
 ```
 #### Residual nonlinear association with predictors
+
+Plot residuals vs. predictors.
 
 ```{r}
 ggplot(eval_men, aes(x=Height, y=Fat-Prediction)) + geom_point() + geom_smooth() 
@@ -838,6 +855,8 @@ ggplot(eval_men, aes(x=Knee, y=Fat-Prediction)) + geom_point() + geom_smooth()
 ```
 
 #### Residual association with non-predictors
+
+Plot residuals vs. variables not used for predictions.
 
 ```{r}
 nonpredictors <- colnames(eval_men)[is.na(match(candidate_predictors, sel.predictors.M4.fp1))]
@@ -851,7 +870,9 @@ for(p in nonpredictors){
 ```
 
 
-### Conclusion from external validation
+## Conclusion from external validation
 
-When applying the model that was trained on women to men, we find that it underpredicts the bodyfat percentage by about 10% (9.33% precisely). This is not caused by the restricted age range in women, as the model seems to predict slightly better for old men compared to young men. It is also not caused by overfit, because the calibration slope in the external data is very close to 1. There is also no seemingly unaccounted linear or nonlinear association with any predictor or any variable not used in the model except of age. For age, as described above, the association however indicates that the model fitted with young women works better for old men than for young men. Refitting the model with age, however, does not seem to be sensible as the age range is very restricted in the training set.
+When applying the model that was trained on women to men, we find that it underpredicts the bodyfat percentage by about 10% (9.33% precisely). This is not caused by the restricted age range in women, as the model seems to predict slightly better for old men compared to young men. It is also not caused by overfit, because the calibration slope in the external data is very close to 1. There is also no seemingly unaccounted linear or nonlinear association with any predictor or any variable not used in the model except of age. Refitting the model with age, however, does not seem to be sensible as the age range is very restricted in the training set, and age may play a different role in predicting percentage body fat in men than in women. 
+
+When discounting the effect of miscalibration-in-the-large, the root mean squared prediction error (root MSPE) at external validation is `r sqrt(rmspe_ext^2 - calib_inter_ext^2)`. The $R^2$ (calculated as $1 - MSPE/Var(Y))$), where $Var(Fat)$ = `r var(men$Fat)` with the recalibrated predictions would be estimated at $R^2$ = `r 1 - (rmspe_ext^2 - calib_inter_ext^2)/var(men$Fat)`. This number is also very well approximated by the squared correlation of predictions and observed outcomes given as `r cor(pred_ext, men$Fat)^2`, which does not account for miscalibration-in-the-large.
 
