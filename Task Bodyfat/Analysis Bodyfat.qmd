@@ -424,9 +424,11 @@ summary(M4.lin)
 - Forward selection not possible with mfp2
  
 
-- Because forward selection is not possible with the `mfp2` package, we performed backward selection to arrive at model M3.
+- Because forward selection is not possible with the `mfp2` package, we the MFP algorithm is performed using M2 as starting model, and using all remaining predictors in the scope to obtain M3.
 
 - M3 selected 6 variables which had to be reduced to 5 for M4. In M3 there were only linear effects involved. Since `mfp2` does not allow to select a fixed number of predictors out of a larger set of candidate predictors, we tuned the  significance level for selection in `mfp2` in order to yield exactly 5 predictors. We accepted that it might not always be possible to find a significance level that yields 5 predictors. 
+
+- At external validation, in addition to calculating all performance measures, the prediction error, calibration slope and R-squared was also computed after correcting for miscalibration-in-the-large.
 
 
 
