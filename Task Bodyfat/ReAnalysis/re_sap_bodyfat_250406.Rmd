@@ -202,7 +202,7 @@ result <- fbms(modelFBMS, data = women, method = "gmjmcmc.parallel",
 ##### The final model, which includes five predictors, is  identical
 ```{r formula_male}
 
-summary(result, labels = c("Waist","Height","Weight","Age","Neck","Chest","Biceps","Hips","Forearm","Knee","Ankle","BMI"),tol = 0.1)
+summary(result, labels = c("Waist","Height","Weight","Age","Neck","Chest","Biceps","Hips","Forearm","Knee","Ankle","BMI"),tol = 0.01)
 
 formula_male <- as.formula(Fat ~ Waist  + Hips + Height + Knee + Ankle)
 ```
