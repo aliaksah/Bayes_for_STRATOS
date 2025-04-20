@@ -1,0 +1,467 @@
+---
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+  html_notebook: default
+---
+---
+title: "Statistical Patterns of Sense of School-Belonging"
+author: "Mariana Nold" 
+---
+##### Load R packages
+```{r load package, message = FALSE, warning = FALSE}
+source("RFiles/packages.r")
+```
+
+##### Load single imputed PISA data.
+```{r  read path and load data}
+PPath <- "C:/Users/zo95yup/Documents/GitHub/Bayes_for_STRATOS/Task_Truancy"
+load(file = file.path(PPath,"Orgdata/IMPDAT_PISA.RData"))
+PPath2 <- "C:/Users/zo95yup/Nextcloud/Statistik_SoSe24/Forschung/STRATOS/P6/Code_A/Results"
+```
+
+##### Prepare data, thus build PISA scales 
+```{r prepare data, message = FALSE, warning = FALSE}
+source(file.path(PPath,"RFiles/01data_preperation.r"))
+to.rm <- objects()[!objects() %in% c("PPath","pisa18")]
+rm(list = to.rm)
+# head(pisa18)
+# dim(pisa18)
+```
+
+
+##### There should be at least ten students per school. Schools with fewer observations are excluded from the analysis. 
+
+```{r  exclude small schools}
+pisa18$school.id <- as.factor(pisa18$school.id)
+help <- split(pisa18,pisa18$school.id)
+nst <- lapply(help, function(x) length(x[[1]]))
+tf <- lapply(nst, function(x) x[[1]] > 9)
+utf <- unlist(tf)
+large_school <- help[utf]
+pisa2018 <- list.rbind(large_school)
+pisa2018$school.id <- droplevels(pisa2018$school.id)
+#table(pisa2018$school.id)
+
+rm(pisa18,tf,nst,help,large_school,utf)
+
+save(pisa2018,file = file.path(PPath,"Files/pisa2018.RData")) #file = file.path(PPath,"File/fits0.RData")
+#load(file.path(PPath,"Files/pisa2018.RData"))
+```
+
+##### Simple random intercept model as starting point: Iteration 1 (Step 1 to 4 in SAP)
+
+```{r  define model}
+# Compute quartiles of being bullied at school level
+pisa2018$ATT4 <- cut_number(pisa2018$ATT01,4)
+# model with multilevel structure
+model1 <- as.formula(belong ~ female + nld + scie_std + aca  + val  + comp + ndiff + nfof  + native + nfewbooks  +  joyread + goal + mot + res    + swbp + mean +  parent_sup +  ndis_clim + GYM + UNI  + ATT4 + bull   + ATT4:bull + (1 | school.id))
+
+```
+
+##### Fit model of iteration 1
+
+```{r  fit model,results='hide'}
+a.seed <- 12345 
+a.iter <-  2000 
+a.chains <- 4  
+warmup <- 1000
+
+
+fit1 <- stan_glmer(model1, data = pisa2018, seed = a.seed, iter = a.iter, chains = a.chains, warmup = warmup) 
+ 
+save(fit1, file = file.path(PPath,"Files/fit1.RData"))
+
+```
+##### Check the convergence criteria (Step 5 in SAP)
+##### post: which diagnostics to use: mcse Rhat < 1.1 n_eff > 1000 and mean_PPD use launch_shinystan
+##### post: how to summarize the prior -> large sample size, check if prior_summary is reasonable
+
+
+```{r MCMC diagnostic, message = FALSE, warning = FALSE}
+mean(pisa2018$belong)
+sd(pisa2018$belong)
+prior_summary(fit1)
+
+#summary(fit1) # mcse Rhat n_eff
+# soo_fit1 <- launch_shinystan(fit1)
+# save(soo_fit1, file = file.path(PPath,"Files/soo_fit1.RData"))
+# launch_shinystan(soo_fit1) # to open it
+```
+##### Results of fit 1
+```{r model 1 summary}
+summaryTwoLevel <- tidy(fit1,   conf.int =TRUE, conf.level=.95,
+effects = "fixed")
+print(summaryTwoLevel, digits = 2, n = 28)
+
+summaryTwoLevelModelSchools <- tidy(fit1,   conf.int =TRUE, conf.level=.95,
+effects = "ran_vals")
+print(summaryTwoLevelModelSchools, digits = 2)
+
+summaryTwoLevelModelVar <- tidy(fit1,   conf.int =TRUE, conf.level=.95,
+effects = "ran_pars")
+print(summaryTwoLevelModelVar, digits = 2)
+```
+
+
+##### Conclusion Step 5: No indications of convergence problems
+##### Conclusion PPCs in launch_shinystan, in particular histograms and min and max of mean suggest to transform the outcome
+##### Refinement of model building (Step 6 in SAP) fist look a PPCs in launch_shinystan, LOO-PIT
+
+```{r refinement of model building, message = FALSE, warning = FALSE, echo = FALSE}
+# https://mc-stan.org/bayesplot/reference/PPC-loo.html
+# https://discourse.mc-stan.org/t/understanding-loo-pit-graphical-diagnostics/22633/2
+y_rep <- posterior_predict(fit1)
+loo_fit1 <- loo(fit1, save_psis = TRUE, cores = 4)
+psis1 <- loo_fit1$psis_object
+lw <- weights(psis1)
+
+ppc_loo_pit_overlay(y=pisa2018$belong,yrep=y_rep,lw=lw)
+
+```
+
+
+
+##### load functions to do more specific PPCs within levels of grouping variables
+```{r  load functions}
+source(file.path(PPath, "RFiles/02functions.r"))
+```
+
+
+##### Posterior predictive checks for fit 1, within grouping levels of focal predictors
+```{r PPC within grouping levels, echo = FALSE}
+color_scheme_set("red")
+ppc.plot1 <-  ppc_stat_grouped(y = pisa2018$belong,
+                                yrep = y_rep, stat = "mean", 
+                     group = interaction(pisa2018$bull,pisa2018$ATT4),
+                     facet_args = list(nrow = 2, scales = "fixed")) #+ 
+   # xlab("belong") + ggtitle(title)# +#,facet_args = list(ncol = 2)
+   # theme(text = element_text(size = 25), axis.text = element_text(size = 8))
+
+ppc.plot2 <-  ppc_stat_grouped(y = pisa2018$belong,
+                                yrep = y_rep, stat = "sd", 
+                     group = interaction(pisa2018$bull,pisa2018$ATT4),
+                     facet_args = list(nrow = 2, scales = "fixed"))
+
+# Bayesian p-values for mean
+  ng <-length(levels(interaction(interaction(pisa2018$bull,pisa2018$ATT4))))
+  pppvMean <- rep(-1,ng)
+  for (i in 1:ng){
+    pppvMean [i] <- pppval_group(group_nr = i, 
+                            groups = interaction(pisa2018$bull,pisa2018$ATT4), 
+                            pisa2018$belong, y_rep, alternative = "two.sided")
+  }
+  
+   pppvSD <- rep(-1,ng)
+  for (i in 1:ng){
+    pppvSD [i] <- pppval_group(group_nr = i, 
+                            groups = interaction(pisa2018$bull,pisa2018$ATT4), 
+                            pisa2018$belong, y_rep, alternative = "two.sided",teststatistic = sd)
+  }
+
+#pdf(file.path(PPath, "Result/focPPC.pdf"))
+ppc.plot1
+ppc.plot2
+  
+color_scheme_set("yellow")
+ppc_dens_overlay(y = fit1$y,
+                 yrep = posterior_predict(fit1, draws = 50))
+
+
+color_scheme_set("brightblue")
+
+fit1 %>%
+  posterior_predict(draws = 500) %>%
+  ppc_stat_grouped(y = pisa2018$belong,
+                   group = pisa2018$bull,
+                   stat = "mean")
+
+fit1 %>%
+  posterior_predict(draws = 500) %>%
+  ppc_stat_grouped(y = pisa2018$belong,
+                   group = pisa2018$bull,
+                   stat = "sd")
+
+color_scheme_set("green")
+
+fit1 %>%
+  posterior_predict(draws = 500) %>%
+  ppc_stat_grouped(y = pisa2018$belong,
+                   group = pisa2018$ATT4,
+                   stat = "mean")
+
+fit1 %>%
+  posterior_predict(draws = 500) %>%
+  ppc_stat_grouped(y = pisa2018$belong,
+                   group = pisa2018$ATT4,
+                   stat = "sd")
+
+
+```
+###### Conclusion: LOOPIT indicates bad model fit of iteration 1 -> iteration 2: log-transform outcome
+
+```{r  log-transform outcome}
+# better multiplicative model log(4)/2 = log(2)
+# A large proportion of the values are between 3.25 and 4.
+# log(5-pisa2018$belong): large prop. between 1 and 1.75
+# log(5.25-pisa2018$belong): large prop. between 1.25 and 2
+
+pisa2018$revBelong <- 5-pisa2018$belong
+pisa2018$belongLogA <- log(pisa2018$revBelong)
+model2A <- update(model1,belongLogA ~ . )
+
+```
+##### Check skewness and kurtusis of differnt log-transformations, post: Use r-package trafo
+```{r check skewness and kurtusis for different log-transformed models}
+library("trafo")
+model2B <- update(model1,belong ~ . -(1 | school.id)) #intraclass very low,use only Skewness and Kurtosis
+lm_model2B <- lm(model2B, data = pisa2018)
+linMod_trafoB <- trafo_lm(object = lm_model2B , trafo = "logshiftopt",method = "skew")
+diagnostics(linMod_trafoB) # bad transformed model, keep 5 -
+
+model2C <- update(model1, revBelong ~ . -(1 | school.id))
+lm_model2C <- lm(model2C, data = pisa2018)
+linMod_trafoC <- trafo_lm(object = lm_model2C , trafo = "logshiftopt",method = "skew")
+diagnostics(linMod_trafoC) # good transformed model 
+
+# try ml
+linMod_trafoC <- trafo_lm(object = lm_model2C , trafo = "logshiftopt",method = "ml")
+diagnostics(linMod_trafoC) # nearly the same as for method = "skew"
+
+linMod_trafoC <- trafo_lm(object = lm_model2C , trafo = "logshiftopt",method = "kurt")
+diagnostics(linMod_trafoC) # nearly the same as for method = "skew"
+# Conclusion: Go on with model model2A 
+```
+
+```{r fit best model with log-transformed outcome, results='hide'}
+a.seed <- 12345 
+a.iter <-  2000 
+a.chains <- 4  
+warmup <- 1000
+
+fit2A <- stan_glmer(model2A, data = pisa2018, seed = a.seed,
+                      iter = a.iter, chains = a.chains, warmup =  warmup)
+
+save(fit2A, file = file.path(PPath,"Files/fit2A.RData"))
+
+# soo_fit2A <- launch_shinystan(fit2A)
+# save(soo_fit2A, file = file.path(PPath,"Files/soo_fit2A.RData"))
+
+
+ # not perfect, but okay
+
+# launch_shinystan(fit2A) # the predicted distribution underestimates the minimum and overestimates the maximum
+
+```
+#### Results of model 2A
+```{r MCMC diagnostic 2A, message = FALSE, warning = FALSE}
+mean(pisa2018$belongLogA)
+sd(pisa2018$belongLogA)
+prior_summary(fit2A)
+
+
+```
+
+#### LOOPIT for best model with log-transformed outcome
+```{r loopit for best model with log-transformed outcome}
+color_scheme_set("purple")
+y_rep_logA <- posterior_predict(fit2A)
+loo_fit2_logA <- loo(fit2A, save_psis = TRUE, cores = 4)
+psis2_logA <- loo_fit2_logA$psis_object
+lw_logA <- weights(psis2_logA)
+#pdf(file.path(PPath, "Result/LOOPIT_fit2A.pdf"))
+pp_check(fit2A)
+ppc_loo_pit_overlay(y=pisa2018$belongLogA,yrep=y_rep_logA,lw=lw_logA)
+```
+
+
+
+##### PPC for best model with log-transformed outcome
+```{r  PPC for improved model}
+y_rep_log <- posterior_predict(fit2A)
+color_scheme_set("darkgray")
+
+ppc.plot1_2 <-  ppc_stat_grouped(y = pisa2018$belongLogA,
+                                yrep = y_rep_log, stat = "mean", 
+                     group = interaction(pisa2018$bull,pisa2018$ATT4),
+                     facet_args = list(nrow = 2, scales = "fixed")) 
+ 
+
+ppc.plot2_2 <-  ppc_stat_grouped(y = pisa2018$belongLogA,
+                                yrep = y_rep_log, stat = "sd", 
+                     group = interaction(pisa2018$bull,pisa2018$ATT4),
+                     facet_args = list(nrow = 2, scales = "fixed"))
+
+
+ppc.plot1_2
+ppc.plot2_2
+
+y_rep_log  %>% ppc_stat_grouped(y = pisa2018$belongLogA,
+                   group = pisa2018$bull,
+                   stat = "mean")
+
+y_rep_log  %>% ppc_stat_grouped(y = pisa2018$belongLogA,
+                   group = pisa2018$bull,
+                   stat = "sd")
+
+y_rep_log  %>% ppc_stat_grouped(y = pisa2018$belongLogA,
+                   group = pisa2018$ATT4,
+                   stat = "mean")
+
+y_rep_log  %>% ppc_stat_grouped(y = pisa2018$belongLogA,
+                   group = pisa2018$ATT4,
+                   stat = "sd")
+
+
+# sd much better
+
+
+```
+##### Model summary best model with log-transformed outcome
+```{r model 2A summary}
+summaryTwoLevel <- tidy(fit2A,   conf.int =TRUE, conf.level=.95,
+effects = "fixed")
+print(summaryTwoLevel, digits = 2, n = 28)
+
+summaryTwoLevelModelSchools <- tidy(fit2A,   conf.int =TRUE, conf.level=.95,
+effects = "ran_vals")
+print(summaryTwoLevelModelSchools, digits = 2)
+
+summaryTwoLevelModelVar <- tidy(fit2A,   conf.int =TRUE, conf.level=.95,
+effects = "ran_pars")
+print(summaryTwoLevelModelVar, digits = 2)
+```
+
+
+
+##### Sens. analysis: fit model with random slope (part of step 6 in SAP)
+```{r  sens. analysis, results='hide'}
+# bull-predictor seems to be the only important predictor, thus consider
+# random slope for bull
+
+model2A_sens <- update(model2A,  ~ .+  (1 + bull| school.id) - (1 | school.id))
+
+
+fit2A_sens <- stan_glmer(model2A_sens, data = pisa2018, seed = a.seed,
+                      iter = 2*a.iter, chains = a.chains, warmup =  warmup)
+
+save(fit2A_sens, file = file.path(PPath,"Files/fit2A_sens.RData"))
+
+# soo_fit2A_sens <- launch_shinystan(fit2A_sens)
+# save(soo_fit2A_sens, file = file.path(PPath,"Files/soo_fit2A_sens.RData"))
+
+```
+##### Results of model with random slope: comparison
+```{r sens compare}
+# see results
+summaryTwoLevel_sens <- tidy(fit2A_sens,   conf.int =TRUE, conf.level=.95,
+effects = "fixed")
+print(summaryTwoLevel_sens, digits = 2, n = 28)
+
+summaryTwoLevelModelSchools_sens <- tidy(fit2A_sens, conf.int =TRUE, conf.level=.95,
+effects = "ran_vals")
+print(summaryTwoLevelModelSchools_sens, digits = 2)
+
+summaryTwoLevelModelVar_sens <- tidy(fit2A_sens, conf.int =TRUE, conf.level=.95,
+effects = "ran_pars")
+print(summaryTwoLevelModelVar_sens, digits = 2)
+
+fits <- list(fit2A,fit2A_sens)
+loo_list <- list()
+# Compute loo
+
+loo_list <- lapply(fits, loo, cores = 1)
+# Save loo
+
+save("loo_list", file = file.path(PPath,"Files","loo_list.RData"))
+#load(file.path("Files2","loo_list.RData"))
+n01.models <- 2
+#sink(file = file.path(PPath,"Files","loo_info.txt"))
+for (i in 1:n01.models) {
+  print(paste("******** "))
+  print(paste("model ", i))
+  print(loo_list[[i]])
+  print(paste("******** "))
+}
+
+
+looc <- loo_compare(loo_list) 
+print(looc)
+save(looc, file = file.path(PPath,"Files/looc.RData"))
+# No notable difference
+##### Stacking, only if continous model extension is not possible, not needed here
+```
+
+##### Result of focal interest: use graphic to summarize posterior knowledge
+```{r summarize results}
+squcondPr <- split(pisa2018,f = list(pisa2018$ATT4,pisa2018$bull))
+cnt.path <- file.path(PPath,"Files")
+#t<-lapply(squcondPr1_gap, function(x) length(x[[1]]))
+#
+fits <- fit2A
+pint_condPr25 <- comp.int(sgr = squcondPr,fit = fits,
+                                       cnt.path = cnt.path, p = 0.25)
+t25<-read.table(file = file.path(cnt.path,paste(0.25,"group_meds.txt")))
+
+pint_condPr50 <- comp.int(sgr = squcondPr,fit = fits,
+                                     cnt.path = cnt.path, p = 0.5)
+
+pint_condPr75 <- comp.int(sgr = squcondPr,fit = fits,
+                                       cnt.path = cnt.path, p = 0.75)
+#t <- unlist(lapply(squcondPr, function(x) length(x[[1]])))
+
+brE <- 4
+
+condPr1 <- pisa2018 %>%
+  group_by(ATT4) %>%
+  summarise(mATT = median(ATT01), sd = sd(ATT01),min = min(ATT01),max = max(ATT01))
+
+meancondPr1 <- condPr1$mATT
+#h <- round(meancondPr1,2)
+#h2 <- c(h[1],h[1],h[2],h[2],h[3],h[3],h[4],h[4])
+#meancondPr1 <- h2
+# c(rep("m.",brE),rep("f.",brE))
+df_condPr25 <- data.frame(x = rep(round(meancondPr1,2),2),
+                          group = c(rep("nbv.",brE),rep("bv.",brE)),
+                          mean =  pint_condPr25[,2],low = pint_condPr25[,1], 
+                          up = pint_condPr25[,3])#here
+
+df_condPr50 <- data.frame(x = rep(round(meancondPr1,2),2),
+                        group = c(rep("nbv.",brE),rep("bv.",brE)),
+                        mean =  pint_condPr50[,2],low = pint_condPr50[,1], 
+                        up = pint_condPr50[,3])
+
+df_condPr75 <- data.frame(x = rep(round(meancondPr1,2),2),
+                          group = c(rep("nbv.",brE),rep("bv.",brE)),
+                          mean =  pint_condPr75[,2],low = pint_condPr75[,1], 
+                          up = pint_condPr75[,3])
+
+lowQ <- c(pint_condPr25[,1],pint_condPr50[,1],pint_condPr75[,1])
+med <-  c(pint_condPr25[,2],pint_condPr50[,2],pint_condPr75[,2])
+upQ <-  c(pint_condPr25[,3],pint_condPr50[,3],pint_condPr75[,3])
+
+df_condPr1 <- data.frame(x = rep(round(meancondPr1,2),6),
+                         group = c(rep("25 % nbv.",brE),rep("25 % bv.",brE),
+                                   rep("50 % nbv.",brE),rep("50 % bv.",brE),
+                                   rep("75 % nbv.",brE),rep("75 % bv.",brE)),
+                                   mean =  med,low = lowQ, 
+                                   up = upQ)
+
+#sink(file = file.path(cnt.path,"interval.txt"))
+df_condPr1 # kable(df_condPr1,format = "latex", digits = 3)
+#sink(file = NULL)
+#library("kableExtra")
+#sink(file = file.path(cnt.path,"intervalLatex.txt"))
+#kable(df_condPr1,format = "latex", digits = 3)
+#sink(file = NULL)
+
+p_condPr <- plot.result(df_condPr1)
+
+
+
+p_condPr
+
+
+
+```
