@@ -388,7 +388,7 @@ degenerate in all models.
 
 ## Bootstrap
 
-Simulate 1000 bootstraps for chosen model. 
+Simulate 1000 bootstraps for chosen model.
 
 ### Bootstrap indices
 
@@ -420,9 +420,13 @@ do_bootstrap <- function(df, ind, f_b, VARIABLES) {
             quantile = 1:3
         )
     preddf_bi$pred_bi = predict(m_bi, newdata = preddf, re.form = NA)
+    # take random effect variation into account
+    preddf_bi$sim_bi = simulate(m_bi, nsim = 1, newdata = preddf %>% 
+                                    mutate(school.id = 0), re.form = NA, 
+                                allow.new.levels = TRUE)[[1]]
     
     list(
-        preddf_bi = preddf_bi %>% select(bull, ATT4, pred_bi, quantile)
+        preddf_bi = preddf_bi %>% select(bull, ATT4, pred_bi, sim_bi, quantile)
     )
 }
 ```
@@ -458,6 +462,8 @@ summary(map_dbl(res_b, 'runtime')) / 3600
 
 Display target estimands and variability as table. We sort by bullying, 
 to ease comparison across levels of ATT and quantiles. 
+
+Prediction intervals not accounting for random effect variation.
 
 ```{r rows.print=50}
 #| message: false
@@ -497,7 +503,82 @@ res %>%
     tab_options(quarto.disable_processing = TRUE)
 ```
 
+Prediction intervals accounting for random effect variation.
+
+```{r rows.print=50}
+#| message: false
+#| warning: false
+
+res_b_summary = bind_rows(map(res_b, "preddf_bi")) %>% 
+    group_by(bull, ATT4, quantile) %>% 
+    reframe(
+        pred = quantile(sim_bi, probs = c(0.025, 0.25, 0.75, 0.975)), 
+        pred_quantile = c("q2.5", "q25", "q75", "q97.5")
+    ) %>% 
+    pivot_wider(id_cols = c(bull, ATT4, quantile), 
+                names_from = pred_quantile, values_from = pred)
+
+res = preddf %>% 
+    select(bull, ATT4, quantile, pred = pred_m) %>% 
+    left_join(res_b_summary, by = c("bull", "ATT4", "quantile"))
+
+res$result = sprintf("%s<br>50%% [%s, %s]<br>95%% [%s, %s]", 
+                   round(res$pred, 2), 
+                   round(res$q25, 2), round(res$q75, 2), 
+                   round(res$q2.5, 2), round(res$q97.5, 2))
+
+res %>% 
+    select(bull, ATT4, quantile, result) %>% 
+    pivot_wider(id_cols = c(ATT4, quantile), 
+                names_from = bull, values_from = result) %>% 
+    arrange(ATT4, quantile) %>%
+    gt() %>% 
+    tab_style(
+        style = list(cell_fill("#EEEEEE")), 
+        locations = cells_body(rows = ATT4 %in% c(2, 4))
+    ) %>% 
+    fmt_markdown(columns = everything()) %>%
+    cols_align("center", c("0", "1")) %>% 
+    tab_spanner(label = "bull", columns = c("0", "1")) %>% 
+    tab_options(quarto.disable_processing = TRUE)
+```
+
 # Exploration
+
+## Prediction intervals alternatives
+
+Alternatively also `bootMer` and `merTools::predictIntervals` can be used 
+to obtain prediction intervals. Both methods yield comparable results to our
+approach. 
+
+```{r rows.print=50}
+res_1 = merTools::predictInterval(m, newdata = preddf %>% mutate(school.id = 0) %>% 
+                              data.frame(), 
+                          n.sims = 1000, level = 0.95, stat = "mean", 
+                          type = "linear.prediction")
+preddf %>% 
+    select(bull, ATT4, quantile) %>% 
+    bind_cols(res_1)
+```
+
+```{r rows.print=50}
+predfun <- function(.) {
+    simulate(., newdata = preddf %>% mutate(school.id = 0), re.form = NULL, 
+             allow.new.levels = TRUE)[[1]]
+}
+
+res_2 = bootMer(m, predfun, nsim = 1000, use.u = FALSE, type = "parametric", 
+                seed = 1)
+
+preddf %>% 
+    select(bull, ATT4, quantile) %>% 
+    mutate(
+        lower = res_2$t %>% apply(2, quantile, probs = 0.025), 
+        upper = res_2$t %>% apply(2, quantile, probs = 0.975)
+    )
+```
+
+## Random effect predictability
 
 Note that the variables are very informative for the school, as can be 
 demonstrated by fitting a model for `school.id`. A simple random forest model
@@ -545,6 +626,8 @@ sum(pisa2018$school.id_f == mr$predictions)
 - It was not clear how to decide for a single model from the SAP. Here I 
     have opted to use prediction rmse, although this was initially not my idea.
 - Number of bootstrap resamples was set to 1000.
+- The SAP does not fully specify how prediction intervals were to be computed. 
+    We opted for an approach comparable to common approaches for mixed models. 
 - The SAP also comprises reporting of SDs and CIs for coefficients. However, 
     due to the bad fit (residuals) of the data for the main model used for 
     predictions we omit these here. 
@@ -580,8 +663,10 @@ random effect structure.
 To build this notebook:
 
 - install `quarto`
-- make sure the data is in the correct folder (`Data/Raw`)
-- build using "Render" in RStudio, or using the quarto package.
+- make sure the data is in the correct folder (either in global Data folder, 
+    or as subfolder of the folder containing this notebook).
+- build using the `make.R` script (global Data), or using the Render button in 
+    RStudio (subfolder Data).
 
 ```{r}
 params
