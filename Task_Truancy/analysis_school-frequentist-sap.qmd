@@ -1,0 +1,605 @@
+---
+title: "School belonging data analysis"
+author: 
+  - Michael Kammer
+date: now
+date-format: iso
+title-block-banner: "#828282"
+format:
+  html:
+    code-fold: true
+    code-tools: true
+    theme: default
+    toc: true
+    number-sections: true
+    toc-location: right
+    embed-resources: true
+    self-contained: true
+    df-print: kable
+params: 
+  folder_analysis: Data/Processed
+---
+
+# Background 
+
+This frequentist analysis for the school belonging analysis task follows the 
+statistical analysis plan by Michael Kammer dated 16.4.2025 (and referring
+to the task description for the school belonging task with the same date).
+
+# Setup and data
+
+Data were provided by Mariana Nold by mail on 3.1.2025 (`pisa2018.RData`). This
+dataset is already pre-processed with one small exception.
+
+- ATT4 is computed as the quartile of the mean level of truancy (ATT01) in the 
+    individuals school as per the SAP. 
+
+```{r message=FALSE, warning=FALSE}
+#| code-fold: true
+
+T_START = Sys.time()
+SUFFIX = ""
+
+# data handling and printing
+library(tidyverse)
+library(glue)
+library(magrittr)
+library(patchwork)
+library(gtsummary)
+library(gt)
+
+# modelling
+library(lme4)
+library(MuMIn)
+library(DHARMa)
+
+# plotting
+library(GGally)
+
+# parallel
+library(doFuture)
+
+# required bot not loaded
+# ranger
+# pracma
+
+rm(list = c("pisa2018"))
+load("Data/Raw/pisa2018.Rdata")
+
+pisa2018 %<>% 
+    group_by(school.id) %>% 
+    mutate(ATTMEAN = mean(ATT01)) %>% 
+    ungroup() %>% 
+    mutate(
+        ATT4 = cut(ATTMEAN, 
+                   breaks = quantile(ATTMEAN, probs = c(0, 0.25, 0.5, 0.75, 1)), 
+                   labels = 1:4, 
+                   include.lowest = TRUE)
+    )
+```
+
+## Helper functions
+
+Code for helper functions.
+
+```{r}
+#| code-fold: true
+
+pseudo_log <- function(x, sigma = 1, base = 10) {
+    asinh(x / (2 * sigma)) / log(base)
+}
+
+optimise_pseudo_log <- function(x, base = 10, sigmas = 2^seq(-10, 10, 1)) {
+    qnormx = qnorm((1:length(x) - 0.5) / length(x))
+    correlations = map_dbl(sigmas, ~ cor(qnormx, sort(pseudo_log(x, .x))))
+    sigmas[correlations == max(correlations)]
+}
+
+plot_density_and_box <- function(plotdf, v) {
+    list(
+        ggplot(plotdf, aes(x = .data[[v]])) + 
+            geom_density() + 
+            theme_bw() +
+            theme(axis.title.x = element_blank(), 
+                  axis.text.x = element_blank(), 
+                  axis.ticks.x = element_blank(),
+                  plot.margin = margin()), 
+        ggplot(plotdf, aes(x = .data[[v]], y = 0)) + 
+            geom_boxplot(outlier.shape = NA) +
+            geom_jitter(height = 0.25, width = 0, alpha = 0.1) +
+            theme_bw() + 
+            theme(axis.text.y = element_blank(), 
+                  axis.title.y = element_blank(),
+                  axis.ticks.y = element_blank(),
+                  panel.grid.minor.y = element_blank(), 
+                  panel.grid.major.y = element_blank(), 
+                  plot.margin = margin(0))
+    ) %>% 
+        wrap_plots(nrow = 2, heights = c(0.8, 0.2))
+}
+
+#' @title Data.frame with residuals for lme4 model
+#' 
+#' @details 
+#' See e.g. https://support.sas.com/documentation/cdl/en/statug/63033/HTML/default/viewer.htm#statug_mixed_sect024.htm
+#' Results are equal to SAS output via outp (conditional) and outpm (marginal)
+#' options.
+#' 
+#' Note that the computation of the hatvalues can be really slow with large
+#' datasets.
+#' 
+#' @return 
+#' Data.frame with columns
+#' 
+#' - pred_conditional: conditional prediction, i.e. using random effects
+#' - pred_marginal: marginal prediction, i.e. only using fixed effects
+#' - resid_conditional: conditional residuals, i.e. outcome - pred_conditional
+#' - resid_marginal: marginal residuals, i.e. outcome - pred_marginal
+#' - resid_conditional_stud: studentized conditional residuals, i.e. scaled
+#'     by estimated variances
+residuals_merMod <- function(m) {
+    dresid = data.frame(pred_conditional = predict(m), 
+                      pred_marginal = predict(m, re.form = ~ 0))
+    dresid$resid_conditional = m@resp$y - dresid$pred_conditional
+    dresid$resid_marginal = m@resp$y - dresid$pred_marginal
+    dresid$resid_conditional_stud = dresid$resid_conditional / 
+        summary(m)$sigma * sqrt(1 - hatvalues(m))
+    return(dresid)    
+}
+
+#' @title SAS style diagnostics for lme4 model
+#' 
+#' @return 
+#' Plot object from ggplot2
+diagnostics_residuals <- function(m, pt_alpha = 0.3) {
+    dout = residuals_merMod(m)   
+    
+    pm = ggplot(dout, aes(x = pred_marginal, y = resid_marginal)) + 
+        geom_point(shape = 1, alpha = pt_alpha) + 
+        geom_abline(intercept = 0, slope = 0) +
+        theme_bw()
+    
+    pmd = ggplot(dout, aes(x = resid_marginal)) + 
+        geom_histogram(aes(y = ..density..), 
+                       binwidth = bw.nrd0(dout$resid_marginal) * 2, 
+                       fill = "#aaaaaa", color = "black") +
+        geom_density(aes(y = ..density..), 
+                     size = 1.5) +
+        theme_bw()
+    
+    pmq = ggplot(dout, aes(sample = resid_marginal)) + 
+        stat_qq() + 
+        stat_qq_line() + 
+        ylab("resid_marginal") +
+        theme_bw()
+    
+    pc = ggplot(dout, aes(x = pred_conditional, y = resid_conditional_stud)) + 
+        geom_point(shape = 1, alpha = pt_alpha) + 
+        geom_abline(intercept = 0, slope = 0) +
+        theme_bw()
+    
+    pcd = ggplot(dout, aes(x = resid_conditional_stud)) + 
+        geom_histogram(aes(y = ..density..), 
+                       binwidth = bw.nrd0(dout$resid_conditional_stud) * 2, 
+                       fill = "#aaaaaa", color = "black") +
+        geom_density(aes(y = ..density..), 
+                     size = 1.5) +
+        theme_bw()
+    
+    pcq = ggplot(dout, aes(sample = resid_conditional_stud)) + 
+        stat_qq() + 
+        stat_qq_line() + 
+        ylab("resid_conditional_stud") +
+        theme_bw()
+    
+    p = wrap_plots(pm, pmd, pmq, pc, pcd, pcq)
+    
+    return(list(dresid = dout, p = p))
+}
+
+diagnostics_calibration <- function(m) {
+    plotdf = data.frame(
+        fitted_marginal = predict(m, re.form = NA), 
+        fitted_conditional = predict(m, re.form = NULL),
+        observed = model.frame(m)[, 1]
+    )
+    
+    wrap_plots(
+        ggplot(plotdf, aes(x = observed, y = fitted_marginal)) + 
+            geom_point(shape = 21) + 
+            theme_bw(), 
+        ggplot(plotdf, aes(x = observed, y = fitted_conditional)) + 
+            geom_point(shape = 21) + 
+            theme_bw()
+    )
+}
+
+metrics_merMod <- function(m, observed, trafo = identity, 
+                           duan = FALSE) {
+    fitted_marginal = predict(m, re.form = NA)
+    fitted_conditional = predict(m, re.form = NULL)
+    
+    if (duan) {
+        dr = residuals_merMod(m)
+        for (i in 1:nrow(dr)) {
+            fitted_marginal[i] = mean(trafo(fitted_marginal[i] + dr$resid_marginal))
+            fitted_conditional[i] = mean(trafo(fitted_conditional[i] + dr$resid_conditional))
+        }
+    } else {
+        fitted_marginal = trafo(fitted_marginal)
+        fitted_conditional = trafo(fitted_conditional)
+    }
+    
+    c(
+        rmse_marginal = sqrt(mean((fitted_marginal - observed)^2)), 
+        rmse_conditional = sqrt(mean((fitted_conditional - observed)^2)), 
+        mean_bias_marginal = mean(fitted_marginal - observed), 
+        mean_bias_conditional = mean(fitted_conditional - observed) 
+    )
+}
+```
+
+# Variables
+
+As outlined in Table 1 in the task description. 
+
+```{r}
+VARIABLES = list(
+    outcome = "belong", 
+    focal = c("bull", "ATT4"), 
+    nonfocal = c("female", "nld", "scie_std", "aca", "val", "comp", "ndiff", 
+                 "nfof", "native", "nfewbooks", "joyread", "goal", "mot", 
+                 "res", "swbp", "mean", "parent_sup", "ndis_clim", "GYM", "UNI")
+)
+
+glue("{length(VARIABLES$nonfocal)} non-focal variables used for modeling according to SAP: 
+     {VARIABLES$nonfocal |> paste0(collapse = ', ')}")
+```
+
+## Overview
+
+Elementary overview of distributions and correlations. 
+
+```{r}
+plot_density_and_box(pisa2018, "belong")
+plot_density_and_box(pisa2018 %>% mutate(log_belong = log(belong)), "log_belong")
+plot_density_and_box(pisa2018 %>% mutate(belong_3 = belong^3), "belong_3")
+
+pisa2018 %>% 
+    select(one_of(unlist(VARIABLES))) %>% 
+    tbl_summary(
+        type = all_continuous() ~ "continuous2",
+        statistic = list(all_continuous() ~ c("{median} ({p25}, {p75})",
+                                              "{mean} ({sd})",
+                                             "{min}, {max}"))
+    )
+```
+
+```{r fig.width=8, fig.height=8}
+cormat = pisa2018 %>% 
+    select(one_of(unlist(VARIABLES))) %>% 
+    mutate(across(where(is.factor), as.numeric)) %>% 
+    cor(use = "pairwise.complete.obs", method = "spearman")
+
+ggcorrplot::ggcorrplot(cormat)
+```
+
+Focal predictors - important for target estimands.
+
+```{r}
+tbl_cross(pisa2018, bull, ATT4)
+```
+
+# Analysis
+
+## Model without transformation
+
+```{r}
+f_m = sprintf("belong ~ bull * ATT4 + %s + (1 | school.id)", 
+              paste0(VARIABLES$nonfocal, collapse = " + ")) %>% 
+    as.formula()
+
+m = lmer(f_m, data = pisa2018, REML = FALSE)
+summary(m)
+diagnostics_residuals(m)$p
+diagnostics_calibration(m)
+r.squaredGLMM(m)
+metrics_merMod(m, pisa2018$belong)
+# quantile residuals
+s = simulateResiduals(m, seed = 26, plot = TRUE)
+```
+
+## Model with log transformation
+
+This model does not really improve the prediction capabilities or the 
+residuals. 
+
+```{r}
+f_mt = sprintf("log(belong) ~ bull * ATT4 + %s + (1 | school.id)", 
+              paste0(VARIABLES$nonfocal, collapse = " + ")) %>% 
+    as.formula()
+
+mt = lmer(f_mt, data = pisa2018, REML = FALSE)
+summary(mt)
+diagnostics_residuals(mt)$p
+diagnostics_calibration(mt)
+r.squaredGLMM(mt)
+metrics_merMod(mt, pisa2018$belong, exp)
+metrics_merMod(mt, pisa2018$belong, exp, duan = TRUE)
+# quantile residuals
+s = simulateResiduals(mt, seed = 26, plot = TRUE)
+```
+
+## Model with cube transformation
+
+As the outcome has negative skew, power transformations may work well, although
+it does not improve predictive capabilities. 
+
+```{r}
+pisa2018 %<>% mutate(belong_3 = belong^3)
+f_mt1 = sprintf("belong_3 ~ bull * ATT4 + %s + (1 | school.id)", 
+              paste0(VARIABLES$nonfocal, collapse = " + ")) %>% 
+    as.formula()
+
+mt1 = lmer(f_mt1, data = pisa2018, REML = FALSE)
+summary(mt1)
+diagnostics_residuals(mt1)$p
+diagnostics_calibration(mt1)
+r.squaredGLMM(mt1)
+metrics_merMod(mt1, pisa2018$belong, function(x) {pracma::nthroot(x, 3)})
+metrics_merMod(mt1, pisa2018$belong, function(x) {pracma::nthroot(x, 3)}, 
+               duan = TRUE)
+# quantile residuals
+s = simulateResiduals(mt1, seed = 26, plot = TRUE)
+```
+
+## Target estimands
+
+Follow SAP to create representative students. We compute this for all models, 
+but finally only use the one with lowest prediction RMSE (not clarified in 
+SAP but adopted here). This is not a clear choice however, since the different
+models are better in different aspects and the rmse is only apparent performance
+(i.e. model fit). Here it would lead to choose the simplest model without
+transformation. 
+
+```{r}
+preddf = pisa2018 %>% 
+    select(bull, ATT4, one_of(VARIABLES$nonfocal)) %>% 
+    # 1) create subsets of data by focal predictors
+    group_by(bull, ATT4) %>% 
+    # 2) compute 1st, 2nd, 3rd quartiles in subsets
+    reframe(
+        across(everything(), ~ quantile(.x, probs = c(0.25, 0.5, 0.75))),
+        quantile = 1:3
+    )
+
+# 3) apply models
+# note that random intercepts are degenerate, so no need to marginalize results
+preddf$pred_m = predict(m, newdata = preddf, re.form = NA)
+preddf$pred_mt = predict(mt, newdata = preddf, re.form = NA)
+preddf$pred_mt1 = predict(mt1, newdata = preddf, re.form = NA)
+```
+
+## Model comparison
+
+Compare predictions (demonstrates high correlation between models and only
+minimal differences besides scaling). 
+
+```{r}
+ggpairs(preddf %>% select(starts_with("pred")), 
+                lower = list(continuous = wrap(ggally_points, alpha = 0.3))) + 
+    theme_bw()
+```
+
+## Simulate from random intercepts
+
+This step will be skipped, since the random intercept distribution is 
+degenerate in all models. 
+
+## Bootstrap
+
+Simulate 1000 bootstraps for chosen model. 
+
+### Bootstrap indices
+
+```{r}
+set.seed(13376)
+b = 1000
+bootstraps = map(1:b, ~ sample(1:nrow(pisa2018), nrow(pisa2018), replace = TRUE))
+
+glue("Statistics of relative frequency of unique samples per bootstrap:")
+(map_dbl(bootstraps, n_distinct) / nrow(pisa2018)) %>% summary()
+```
+
+### Run bootstrap
+
+```{r}
+f_b = sprintf("belong ~ bull * ATT4 + %s + (1 | school.id)", 
+              paste0(VARIABLES$nonfocal, collapse = " + ")) %>% 
+    as.formula()
+
+do_bootstrap <- function(df, ind, f_b, VARIABLES) {
+    df_bi = df[ind, ]
+    m_bi = lmer(f_b, data = df_bi, REML = FALSE)
+    
+    preddf_bi = df_bi %>% 
+        select(bull, ATT4, one_of(VARIABLES$nonfocal)) %>% 
+        group_by(bull, ATT4) %>% 
+        reframe(
+            across(everything(), ~ quantile(.x, probs = c(0.25, 0.5, 0.75))),
+            quantile = 1:3
+        )
+    preddf_bi$pred_bi = predict(m_bi, newdata = preddf, re.form = NA)
+    
+    list(
+        preddf_bi = preddf_bi %>% select(bull, ATT4, pred_bi, quantile)
+    )
+}
+```
+
+```{r warning=FALSE}
+file_bootstrap = file.path(params$folder_analysis, 
+                           sprintf("bootstrap%s.rds", SUFFIX))
+if (!file.exists(file_bootstrap)) {
+    glue("Running bootstraps and saving to {file_bootstrap}") %>% print()
+    
+    plan(multisession, workers = 10)
+    res_b = foreach(
+        i = seq_along(bootstraps), 
+        .errorhandling = "pass", 
+        .options.future = list(seed = 15)
+    ) %dofuture%  {
+        t_start = Sys.time()
+        res = do_bootstrap(pisa2018, bootstraps[[i]], f_b, VARIABLES)
+        res$runtime = difftime(now(), t_start, units = "s") %>% as.numeric()
+        res
+    }
+    plan(sequential)
+    saveRDS(res_b, file_bootstrap)    
+} else {
+    glue("Reading bootstrap results from {file_bootstrap}") %>% print()
+    res_b = readRDS(file_bootstrap)
+}
+
+glue("Runtime per bootstrap in hours:")
+summary(map_dbl(res_b, 'runtime')) / 3600
+```
+# Final result
+
+Display target estimands and variability as table. We sort by bullying, 
+to ease comparison across levels of ATT and quantiles. 
+
+```{r rows.print=50}
+#| message: false
+#| warning: false
+
+res_b_summary = bind_rows(map(res_b, "preddf_bi")) %>% 
+    group_by(bull, ATT4, quantile) %>% 
+    reframe(
+        pred = quantile(pred_bi, probs = c(0.025, 0.25, 0.75, 0.975)), 
+        pred_quantile = c("q2.5", "q25", "q75", "q97.5")
+    ) %>% 
+    pivot_wider(id_cols = c(bull, ATT4, quantile), 
+                names_from = pred_quantile, values_from = pred)
+
+res = preddf %>% 
+    select(bull, ATT4, quantile, pred = pred_m) %>% 
+    left_join(res_b_summary, by = c("bull", "ATT4", "quantile"))
+
+res$result = sprintf("%s<br>50%% [%s, %s]<br>95%% [%s, %s]", 
+                   round(res$pred, 2), 
+                   round(res$q25, 2), round(res$q75, 2), 
+                   round(res$q2.5, 2), round(res$q97.5, 2))
+
+res %>% 
+    select(bull, ATT4, quantile, result) %>% 
+    pivot_wider(id_cols = c(ATT4, quantile), 
+                names_from = bull, values_from = result) %>% 
+    arrange(ATT4, quantile) %>%
+    gt() %>% 
+    tab_style(
+        style = list(cell_fill("#EEEEEE")), 
+        locations = cells_body(rows = ATT4 %in% c(2, 4))
+    ) %>% 
+    fmt_markdown(columns = everything()) %>%
+    cols_align("center", c("0", "1")) %>% 
+    tab_spanner(label = "bull", columns = c("0", "1")) %>% 
+    tab_options(quarto.disable_processing = TRUE)
+```
+
+# Exploration
+
+Note that the variables are very informative for the school, as can be 
+demonstrated by fitting a model for `school.id`. A simple random forest model
+can predict the school label with quite high accuracy (for a 221-class 
+classification problem; 3700 out of 6489 school.ids are correctly predicted by a 
+default random forest). This may explain why the random effect variance is 
+zero. (Random forest not run here, but code is given below.)
+
+```{r eval=FALSE}
+pisa2018 %<>% 
+    mutate(school.id_f = as_factor(school.id))
+f_r = sprintf("school.id_f ~ belong + bull + ATT4 + %s", 
+              paste0(VARIABLES$nonfocal, collapse = " + ")) %>% 
+    as.formula()
+
+mr = ranger::ranger(f_r, pisa2018, seed = 12)
+plot(as.numeric(pisa2018$school.id), as.numeric(mr$predictions))
+sum(pisa2018$school.id_f == mr$predictions)
+```
+
+
+
+
+# Clarifications / deviations from SAP
+
+- ATT4 is handled as categorical variable. This is not explicitly stated in the 
+    SAP but at the same time clear from the wording. 
+- The default optimizer for lmer yields a boundary (singular) fit. This is also
+    the case with several others, as the variance for the random intercept term
+    is 0. This is because the (many) variables make the random effect obsolete. 
+    In case only few are used the random intercept variance is not 0 (although
+    still small compared to residual error). Essentially it does not make a 
+    difference here if the parameter is left in the model or not - it will not
+    impact coefficients or predictions (only e.g. AIC is impacted).
+- The random effect distribution were not assessed or used for predictions 
+    as it is degenerate.
+- Residuals are difficult to interpret due to the nature of the outcome, but
+    may indicate a bad fit of the model (even if normality of residuals is 
+    not required). The log-transformation is also not really helpful. 
+    Better transformation would be e.g. cubing (symmetric
+    residuals, quantile quantile plot a lot less troublesome). This was 
+    added here. The model fit R2 remains low, however.
+- RMSEs were computed after back-transformation to the original scale, if 
+    necessary (not specified in SAP, but has to be done to ensure comparability).
+    Also, back-transformation may need to be done using the smearing estimate 
+    by Duan to remove bias, this complexity was not discussed in the SAP 
+    (and was not used here for decision making).
+- It was not clear how to decide for a single model from the SAP. Here I 
+    have opted to use prediction rmse, although this was initially not my idea.
+- Number of bootstrap resamples was set to 1000.
+- The SAP also comprises reporting of SDs and CIs for coefficients. However, 
+    due to the bad fit (residuals) of the data for the main model used for 
+    predictions we omit these here. 
+
+# Further notes
+
+- The near-discrete outcome results in "streaks" in the residuals, 
+    since the outcome is constant per school. This makes the interpretation
+    of the residuals-vs-fitted plot quite uninformative.
+    - Note that a Bayesian version of the model should show the same streaked 
+        residual plots.
+    - quantile residuals were implemented using the DHARMa package. These 
+        residuals "smear" the streaks due to the integer like outcome, but
+        interpretation is still not that easy. It does seem to indicate
+        that the cubic model would have the best residuals, and the log model
+        the worst. Tests for normality of residuals are likely significant due
+        to the large sample size and the sensitivity of the KS test. 
+- An ordinal regression model may be a better fit overall for the data. 
+
+# Conclusions
+
+Bullying consistently leads to a drop in sense of belonging across all levels
+of school truancy and all representative student values (i.e. subset quartiles).
+These differences are are also demonstrated by non-overlapping prediction
+intervals in all scenarios.
+
+Overall the transformation of the outcome likely does not matter very much, as
+the predictions from all models are highly correlated and all have degenerate
+random effect structure.
+
+# Sessioninfo
+
+To build this notebook:
+
+- install `quarto`
+- make sure the data is in the correct folder (`Data/Raw`)
+- build using "Render" in RStudio, or using the quarto package.
+
+```{r}
+params
+
+glue("Runtime {difftime(Sys.time(), T_START, units = 'm') / 60} hours.")
+
+sessioninfo::session_info()
+```
