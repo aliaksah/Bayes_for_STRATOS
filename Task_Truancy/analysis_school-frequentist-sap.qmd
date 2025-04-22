@@ -420,7 +420,7 @@ do_bootstrap <- function(df, ind, f_b, VARIABLES) {
             quantile = 1:3
         )
     preddf_bi$pred_bi = predict(m_bi, newdata = preddf, re.form = NA)
-    # take random effect variation into account
+    # take random effect variation and residual variance into account
     preddf_bi$sim_bi = simulate(m_bi, nsim = 1, newdata = preddf %>% 
                                     mutate(school.id = 0), re.form = NA, 
                                 allow.new.levels = TRUE)[[1]]
@@ -463,7 +463,8 @@ summary(map_dbl(res_b, 'runtime')) / 3600
 Display target estimands and variability as table. We sort by bullying, 
 to ease comparison across levels of ATT and quantiles. 
 
-Prediction intervals not accounting for random effect variation.
+Prediction intervals based on prediction without residual variance or random 
+effect variation.
 
 ```{r rows.print=50}
 #| message: false
@@ -503,7 +504,8 @@ res %>%
     tab_options(quarto.disable_processing = TRUE)
 ```
 
-Prediction intervals accounting for random effect variation.
+Prediction intervals accounting for random effect variation and residual 
+variance.
 
 ```{r rows.print=50}
 #| message: false
@@ -548,7 +550,8 @@ res %>%
 ## Prediction intervals alternatives
 
 Alternatively also `bootMer` and `merTools::predictIntervals` can be used 
-to obtain prediction intervals. Both methods yield comparable results to our
+to obtain prediction intervals (accounting for random effect variation and 
+residual variance). Both methods yield comparable results to our
 approach. 
 
 ```{r rows.print=50}
