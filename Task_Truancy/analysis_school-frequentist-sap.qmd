@@ -85,16 +85,6 @@ Code for helper functions.
 ```{r}
 #| code-fold: true
 
-pseudo_log <- function(x, sigma = 1, base = 10) {
-    asinh(x / (2 * sigma)) / log(base)
-}
-
-optimise_pseudo_log <- function(x, base = 10, sigmas = 2^seq(-10, 10, 1)) {
-    qnormx = qnorm((1:length(x) - 0.5) / length(x))
-    correlations = map_dbl(sigmas, ~ cor(qnormx, sort(pseudo_log(x, .x))))
-    sigmas[correlations == max(correlations)]
-}
-
 plot_density_and_box <- function(plotdf, v) {
     list(
         ggplot(plotdf, aes(x = .data[[v]])) + 
@@ -527,9 +517,6 @@ mr = ranger::ranger(f_r, pisa2018, seed = 12)
 plot(as.numeric(pisa2018$school.id), as.numeric(mr$predictions))
 sum(pisa2018$school.id_f == mr$predictions)
 ```
-
-
-
 
 # Clarifications / deviations from SAP
 
