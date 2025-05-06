@@ -355,9 +355,11 @@ The key predictors Waist, Weight and Height have correlations of:
 
 ## Main analysis
 
-### Model M1
+### Model building
 
-```{r}
+#### Model M1
+
+```{r, message=FALSE}
 library(mfp2)
 
 x <- as.matrix(women_AS[, c("Waist", "Height", "Weight")])
@@ -366,15 +368,21 @@ y <- as.numeric(women_AS$Fat)
 M1 <- mfp2(x=x, y=y, select=1, df=4, criterion="aic")
 summary(M1)
 ```
-```{r}
+#### Model M2
+
+```{r, message=FALSE}
 x <- as.matrix(women_AS[, c("Waist", "Height", "Weight", "BMI")])
 y <- as.numeric(women_AS$Fat)
 
 M2 <- mfp2(x=x, y=y, df=c(4,4,4,2), criterion="aic", keep=c(T, T, T, F))
 summary(M2)
 
+
 ```
-```{r}
+
+#### Model M3
+
+```{r, message=FALSE}
 # refit M2
 women_AS_nona <- women_AS[complete.cases(women_AS),]
 
@@ -386,7 +394,9 @@ yM3 <- women_AS_nona[,2]
 M3 <- mfp2(y=yM3, x=xM3, keep=c("Height","Weight","Waist"), df=c(4, 4, 2, 2, 2, 2, 2, 2, 4, 2, 2, 2, 2, 2, 2, 2, 2))
 summary(M3)
 ```
-```{r}
+#### Model M4
+
+```{r, message=FALSE}
 # refit M3 with complete cases
 
 women_AS_M3 <- women_AS[complete.cases(women_AS[,c("Height","Waist","Knee","Hips","Weight","Wrist")]),]
@@ -400,30 +410,31 @@ M4.fp1 <- mfp2(y=yM3r, x=xM3r, keep=NULL, select=0.084, df=c(2, 2, 2, 2, 2, 2), 
 
 summary(M4.fp1)
 
+sel.predictors.M4.fp1 <- rownames(M4.fp1$fp_terms[M4.fp1$fp_terms[,"selected"],])
+
 M4.lin <- mfp2(y=yM3r, x=xM3r, keep=NULL, select=0.084, df=c(1, 1, 1, 1, 1, 1), cycles=1)
 
 summary(M4.lin)
 ```
 
-## SAP amendments
+### SAP amendments
 
-### Problems encountered
+#### Problems encountered and solutions
 
-- forward selection not possible with mfp2
+- Forward selection not possible with mfp2
  
 
-### Solutions
+- Because forward selection is not possible with the `mfp2` package, we the MFP algorithm is performed using M2 as starting model, and using all remaining predictors in the scope to obtain M3.
 
-- Because forward selection is not possible with the `mfp2` package, we performed backward selection to arrive at model M3.
+- M3 selected 6 variables which had to be reduced to 5 for M4. In M3 there were only linear effects involved. Since `mfp2` does not allow to select a fixed number of predictors out of a larger set of candidate predictors, we tuned the  significance level for selection in `mfp2` in order to yield exactly 5 predictors. We accepted that it might not always be possible to find a significance level that yields 5 predictors. 
 
-- M3 selected 6 variables which had to be reduced to 5 for M4. In M3 there were only linear effects involved. When performing backward elimination to remove 1 variable, we assumed these linear effects, but backed up with assuming FP1s for all variables.
+- At external validation, in addition to calculating all performance measures, the prediction error, calibration slope and R-squared was also computed after correcting for miscalibration-in-the-large.
 
 
-# Model validation
 
-## Apparent validity
+### Model diagnostics
 
-### Check local bias
+#### Check local bias
 
 
 ```{r}
@@ -431,14 +442,14 @@ ggplot(data.frame(fitted.values=M4.fp1$fitted.values, y=M4.fp1$y), aes(x=fitted.
 ```
 Observation: There seems to be only little local bias at the very lower end of the distribution of fitted values.
 
-### Check heteroskedasticity
+#### Check heteroskedasticity
 
 ```{r}
 ggplot(data.frame(fitted.values=M4.fp1$fitted.values, y=sqrt(abs(M4.fp1$residuals))), aes(x=fitted.values, y=y)) + geom_point() + geom_smooth() 
 ```
 Observation: there is a little bit of higher variability of residuals when predictions are around 15%.
 
-### Check association with excluded predictors
+#### Check association with excluded predictors
 
 The MFP algorithm iteratively checks for possible inclusion of previously excluded predictors. Hence, we do not expect that any predictor might show an relevant association with the model residuals. Still, we will check this for Weight, which was excluded when moving from M3 to M4.
 
@@ -447,7 +458,7 @@ ggplot(data.frame(Weight=women_AS_M3$Weight, Residuals=M4.fp1$residuals), aes(x=
 ```
 Observation: No residual association with Weight can be noted.
 
-### Check normality of residuals
+#### Check normality of residuals
 
 ```{r}
 ggplot(data.frame(residuals=M4.fp1$residuals), aes(sample=residuals)) +
@@ -458,4 +469,412 @@ ggplot(data=data.frame(residuals=M4.fp1$residuals), aes(x=residuals)) + geom_his
 ```
 
 Conclusion: there are only little deviations from the normality assumption for residuals, probably more on the left tail.
+
+### Apparent performance of the model
+
+#### Root mean squared prediction error
+
+```{r}
+rmspe_app <- sqrt(mean(M4.fp1$residuals^2))
+rmspe_app
+
+```
+
+#### Adjusted R-square
+
+```{r}
+model_df = length(coef(M4.fp1))
+n = dim(women_AS_M3)[1]
+
+R2_adj_app <- 1-(sum(M4.fp1$residuals^2)/(n-model_df)) / var(women_AS_M3$Fat)
+R2_adj_app
+```
+
+### Model description
+
+#### Term plots
+
+```{r}
+fracplot(M4.fp1)
+```
+#### Standardized regression coefficients
+
+```{r}
+sd.beta <- coef(M4.fp1) * apply(M4.fp1$x, 2, sd)
+sd.beta
+```
+
+# Internal validation
+
+## Performing bootstrap replications of model building
+
+```{r, message=FALSE}
+# define a function that automates the complex model building process. The function returns the model M4.
+model_build <- function(data, verbose=FALSE){
+  x <- as.matrix(data[, c("Waist", "Height", "Weight")])
+  y <- as.numeric(data$Fat)
+  M1 <- mfp2(x=x, y=y, select=1, df=4, criterion="aic", verbose=verbose)
+  x <- as.matrix(data[, c("Waist", "Height", "Weight", "BMI")])
+  y <- as.numeric(data$Fat)
+
+  M2 <- mfp2(x=x, y=y, df=c(4,4,4,2), criterion="pvalue", select=0.157, alpha=0.157, keep=c("Waist", "Height", "Weight"), verbose=verbose)
+
+  data_nona <- data[complete.cases(data),]
+
+  # instead of forward, use backward but keep Waist, Height and Weight from exclusion
+
+  yM3 <- data_nona[,2]
+  
+  if(M2$fp_terms["BMI","selected"]){
+    xM3 <- as.matrix(data_nona[,-c(1,2)])
+    keep <- c("Height","Weight","BMI","Waist")
+    df <-  c(4, 4, 2, 2, 2, 2, 2, 2, 2, 4, 2, 2, 2, 2, 2, 2, 2, 2)
+  } else {
+    xM3 <- as.matrix(data_nona[,-c(1,2,5)])
+    keep <- c("Height","Weight","Waist")
+    df <-  c(4, 4, 2, 2, 2, 2, 2, 2, 4, 2, 2, 2, 2, 2, 2, 2, 2)
+  }
+
+  M3 <- mfp2(y=yM3, x=xM3, 
+             keep=keep,
+             df=df,
+             order="descending", criterion="pvalue", select=0.5, alpha=0.157, verbose=verbose)
+  sel_predictors <- rownames(M3$fp_terms[M3$fp_terms[,"selected"],])
+  if(length(sel_predictors)<=5){
+    M4 <- M3
+  } else {
+    data_M4 <- data[,c("Fat", sel_predictors)]
+    data_M4 <- data_M4[complete.cases(data_M4),]
+    xM4 <- as.matrix(data_M4[,sel_predictors])
+    yM4 <- data_M4[,"Fat"]
+    
+    # perform as many iterations as needed to have only 5 terms in the model. set the alpha to 0.157 to approximate aic for functional form selection. one has to play with the select argument to get exactly 5 predictors. This is done using uniroot() with (N_selected - 5) as target function of parameter select to be minimized.
+
+    f <- function(sel){
+      fit <-mfp2(x=xM4, y=yM4, df = ifelse(sel_predictors %in% c("Waist", "Weight", "Height"), 4, 2), select=sel, alpha=0.157, verbose=FALSE, order="descending")
+      ret <- sum(fit$fp_terms[,"selected"]) - 5
+      return(ret)
+    }
+    opt_res <- uniroot(f, interval=c(0.0000001, 1),tol=0.001)
+    M4 <- mfp2(x=xM4, y=yM4, select=opt_res$root, alpha=0.157, df= ifelse(sel_predictors %in% c("Waist", "Weight", "Height"), 4, 2), order="descending", verbose=verbose)
+  }
+  return(M4)
+}
+
+# ranges for selected predictors (100 equidistant steps)
+
+pred_range <- data.frame(
+  Waist = seq(min(women_AS$Waist), max(women_AS$Waist), diff(range(women_AS$Waist))/99),
+  Height = seq(min(women_AS$Height), max(women_AS$Height), diff(range(women_AS$Height))/99),
+  Hips = seq(min(women_AS$Hips), max(women_AS$Hips), diff(range(women_AS$Hips))/99),
+  Wrist = seq(min(women_AS$Wrist), max(women_AS$Wrist), diff(range(women_AS$Wrist))/99),
+  Knee = seq(min(women_AS$Knee, na.rm=T), max(women_AS$Knee, na.rm=T), diff(range(women_AS$Knee, na.rm=T))/99))
+# could be automated with sel.predictors.M4.fp1
+
+p.M4.fp1 <- predict(M4.fp1, newdata=pred_range, type="terms", terms=c("Waist", "Height", "Hips", "Wrist", "Knee"))
+
+  candidate_predictors <- colnames(women_AS)[-c(1,2)]
+  ncp <- length(candidate_predictors)
+  N <- nrow(women_AS)
+
+
+do_bootstrap <- FALSE
+
+B <- 1000
+
+if(do_bootstrap){
+  # run the bootstrap. We need to save the sigma_b_test and sigma_b_app, and rsqu_b_test and rsqu_b_app; as well as the selection pattern and the predicted terms per variable.
+  
+  sigma_b_test <- sigma_b_app <- rsqu_b_test <- rsqu_b_app <- calib_slope <- (1:1000)*0
+  sel_frequency <- matrix(0, B, ncp)
+  power1_sel <- power2_sel <- matrix(NA, B, ncp)
+  colnames(sel_frequency) <- colnames(power1_sel) <- colnames(power2_sel) <- candidate_predictors
+  
+  
+  spagh.mat <- matrix(mean(M4.fp1$y), 100, B)
+  
+  spagh <- lapply(sel.predictors.M4.fp1, function(X) spagh.mat)
+  names(spagh) <- sel.predictors.M4.fp1
+  
+  set.seed(7123981)
+  
+  
+  for(b in 1:B){
+    idB <- sample(1:N, repl=TRUE)
+    id_oob <- is.na(match(1:N, idB))
+    data_train <- women_AS[idB,]
+    data_test <- women_AS[id_oob,]
+    BM4 <- model_build(data_train)
+    
+    # remove missing values with respect to predictors from data_train and data_test
+    sel_predictors <- rownames(BM4$fp_terms)[BM4$fp_terms[,"selected"]]
+    data_train <- data_train[complete.cases(data_train[,sel_predictors]),c(sel_predictors,"Fat")]
+    data_test <- data_test[complete.cases(data_test[,sel_predictors]),c(sel_predictors,"Fat")]
+    
+    pred_train <- predict(BM4, data_train)
+    res_train <- data_train$Fat - pred_train
+    df_BM4 <- sum(BM4$fp_terms[,"df_final"])
+    n_BM4 <- nrow(data_train)
+    
+    pred_test <- predict(BM4, data_test)
+    res_test <- data_test$Fat - pred_test
+    
+    sigma_b_app[b] <- sqrt(sum(res_train^2)/(n_BM4-df_BM4-1))
+    sigma_b_test[b] <- sqrt(mean(res_test^2))
+    
+    rsqu_b_app[b] <- 1 - sigma_b_app[b]^2 / var(data_train$Fat)
+    rsqu_b_test[b] <- 1 - sigma_b_test[b]^2 / var(data_test$Fat)  ### alternative formulation: MSE relative to mean of training set)
+    
+    # calibration slope
+    
+    calib_slope[b] <- coef(lm(data_test$Fat ~ pred_test))[2]
+    
+    # predictor selection frequency
+    
+    sel_frequency[b, sel_predictors] <- 1
+    
+    # functional form selection frequency
+  
+      power1_sel[b, sel_predictors] <- BM4$fp_terms[sel_predictors, "power1"]
+    if(any(BM4$fp_terms[,"df_final"]>2)) power2_sel[b, sel_predictors] <- BM4$fp_terms[sel_predictors, "power2"]
+  
+      
+    # contributions to spaghetti plots (for selected predictors)
+    b.BM4 <- predict(BM4, newdata=pred_range, type="terms", terms=c("Waist", "Height", "Hips", "Wrist", "Knee"))
+    for(p in sel.predictors.M4.fp1) {
+      if(!is.null(b.BM4[[p]])) spagh[[p]][,b] <- b.BM4[[p]][,"value"]
+      else spagh[[p]][,b] <- mean(BM4$y)    # mean Fat in bootstrap sample (which would be predicted for all)
+    }
+      
+  }
+  
+  #save(list=c("spagh", "sel_frequency", "power1_sel", "power2_sel", "calib_slope", "sigma_b_app", "sigma_b_test", "rsqu_b_app", "rsqu_b_test"), file="spagh.Rdata")
+
+} else {
+  load("spagh.Rdata")  
+}
+
+
+rmspe_optcorr <- rmspe_app - mean(sigma_b_app - sigma_b_test)
+rsqu_optcorr <- R2_adj_app - mean(rsqu_b_app - rsqu_b_test)
+rmspe_optcorr_ci <- rmspe_app - quantile(sigma_b_app - sigma_b_test, c(0.975, 0.025))
+rsqu_optcorr_ci <- R2_adj_app - quantile(rsqu_b_app - rsqu_b_test, c(0.975, 0.025))
+
+mean_calib_slope <- mean(calib_slope)
+calib_slope_ci <- quantile(calib_slope, c(0.025, 0.975))
+
+predictor_sf <- apply(sel_frequency, 2, mean)
+powers_sel <- matrix(paste(power1_sel, power2_sel), B, ncp, byrow=FALSE)
+colnames(powers_sel) <- candidate_predictors
+powers_sf <- lapply(candidate_predictors, function(X) {
+  res<-t(t(-sort(-table(powers_sel[,X]))))/B
+  colnames(res) <- "prop_selected"
+  res
+})
+names(powers_sf) <- candidate_predictors
+```
+
+## Optimism-corrected measures of performance
+
+### Optimism-corrected root mean squared preidction error
+
+```{r, message=FALSE}
+rmspe_optcorr
+rmspe_optcorr_ci
+```
+
+### Optimism-corrected R-squared
+
+```{r, message=FALSE}
+rsqu_optcorr
+rsqu_optcorr_ci
+```
+
+### Calibration slope
+
+```{r, message=FALSE}
+mean_calib_slope
+calib_slope_ci
+```
+
+## Model instability
+
+### Predictor selection frequencies
+
+```{r, message=FALSE}
+-sort(-predictor_sf)
+```
+
+### FP power selection frequencies per predictor
+
+
+```{r, message=FALSE}
+powers_sf
+```
+
+### Spaghetti plots of bootstrapped and original predictor-outcome relations
+
+```{r, message=FALSE}
+for(predictor in sel.predictors.M4.fp1){
+  plot(pred_range[,predictor], p.M4.fp1[[predictor]][,"value"], type="l", lwd=2, ylim=range(spagh[[predictor]]),
+       ylab="Predicted Fat", xlab="Value of predictor")
+  for(b in 1:100) lines(pred_range[,predictor], spagh[[predictor]][,b], lwd=0.01, col="grey")
+  lines(pred_range[,predictor], apply(spagh[[predictor]],1, mean), lwd=2, col="red")
+  lines(pred_range[,predictor], p.M4.fp1[[predictor]][,"value"], lwd=2, col="black")
+  lines(pred_range[,predictor], apply(spagh[[predictor]],1, function(X) quantile(X, 0.025)), lwd=2, lty=2, col="blue")
+  lines(pred_range[,predictor], apply(spagh[[predictor]],1, function(X) quantile(X, 0.975)), lwd=2, lty=2, col="blue")
+  title(main=predictor, sub="100 bootstrap replications")
+  legend("bottomright", lwd=c(2,2), col=c("black","red"), legend=c("Original","Boot mean"))
+}
+
+```
+
+
+
+## Recalibration
+
+### Recalibrated coefficients
+
+Recalibrate the model with the estimated calibration slope.
+
+```{r}
+# since the model only has linear effects, first refit the model with lm for simplicity
+M4.refit <- lm(data=women_AS, as.formula(paste("Fat~",paste(sel.predictors.M4.fp1,collapse="+"))), x=T, y=T)
+M4.recalib <- M4.refit
+
+# first multiply slopes with calibration slope (=shrinkage factor)
+
+M4.recalib$coefficients[-1] <- M4.refit$coefficients[-1] * mean_calib_slope
+
+# second, adjust intercept such that the mean prediction is equal to the mean y of the training set
+
+M4.recalib$coefficients[1] <- M4.refit$coefficients[1] - mean(predict(M4.recalib, newdata=women_AS[,sel.predictors.M4.fp1]), na.rm=T) + mean(M4.refit$y, na.rm=T)
+```
+
+
+### Check the coefficients
+
+```{r}
+cbind(M4.recalib$coefficients, M4.refit$coefficients)
+
+
+```
+
+### Check the mean prediction against the mean Fat value of training set
+
+```{r}
+cat("Mean prediction:\n")
+mean(predict(M4.recalib, women_AS[,sel.predictors.M4.fp1]), na.rm=T)
+
+cat("Mean of Fat in training set:\n")
+mean(M4.refit$y)
+```
+
+
+
+# External validation
+
+## Apply the fitted, recalibrated model to men data set
+
+```{r}
+men2 <- men |>
+  mutate(Wrist = wrist)
+
+pred_ext <- predict(M4.recalib, newdata=men2)
+
+eval_men <- data.frame(men2, Prediction=pred_ext)
+```
+
+## Performance measures at external validation
+
+### Root mean squared prediction error
+
+```{r}
+rmspe_ext <- sqrt(mean((men2$Fat - pred_ext)^2))
+rmspe_ext
+```
+
+### R-squared
+
+```{r}
+Rsqu_ext <- 1 - mean((men2$Fat - pred_ext)^2)/var(men2$Fat)
+Rsqu_ext
+
+```
+### Calibration
+
+```{r}
+library(ggplot2)
+ggplot(eval_men, aes(Prediction, Fat)) + geom_point() + geom_smooth() + geom_smooth(method="lm", col="red") + geom_abline(intercept=0, slope=1) 
+```
+
+#### Calibration slope
+
+```{r}
+calib_slope_ext <- coef(lm(data=eval_men, Fat~Prediction))[2]
+calib_slope_ext
+```
+
+
+#### Calibration intercept
+
+```{r}
+calib_inter_ext <- coef(lm(data=eval_men, Fat~offset(Prediction)))[1]
+calib_inter_ext
+```
+
+### Residual plots
+
+#### Local bias
+
+Plot the residuals vs. the predictions.
+
+```{r}
+ggplot(eval_men, aes(x=Prediction, y=Fat-Prediction)) + geom_point() + geom_smooth()
+
+
+```
+
+#### Heteroskedasticity
+
+Plot the square root of absolute residuals vs. predictions.
+
+```{r}
+ggplot(eval_men, aes(x=Prediction, y=sqrt(abs(Fat-Prediction)))) + geom_point() + geom_smooth()
+
+```
+#### Residual nonlinear association with predictors
+
+Plot residuals vs. predictors.
+
+```{r}
+ggplot(eval_men, aes(x=Height, y=Fat-Prediction)) + geom_point() + geom_smooth() 
+ggplot(eval_men, aes(x=Waist, y=Fat-Prediction)) + geom_point() + geom_smooth() 
+ggplot(eval_men, aes(x=Hips, y=Fat-Prediction)) + geom_point() + geom_smooth() 
+ggplot(eval_men, aes(x=Wrist, y=Fat-Prediction)) + geom_point() + geom_smooth() 
+ggplot(eval_men, aes(x=Knee, y=Fat-Prediction)) + geom_point() + geom_smooth() 
+
+```
+
+#### Residual association with non-predictors
+
+Plot residuals vs. variables not used for predictions.
+
+```{r}
+nonpredictors <- colnames(eval_men)[is.na(match(candidate_predictors, sel.predictors.M4.fp1))]
+nonpredictors <- nonpredictors[is.na(match(nonpredictors, c("case", "Fat", "density", "wrist", "Prediction")))]
+
+for(p in nonpredictors){
+  pl <- ggplot(eval_men, aes(eval_men[,p], Fat-Prediction)) + geom_smooth() + geom_point() + xlab(p)
+  print(pl)
+}
+
+```
+
+
+## Conclusion from external validation
+
+When applying the model that was trained on women to men, we find that it underpredicts the bodyfat percentage by about 10% (9.33% precisely). This is not caused by the restricted age range in women, as the model seems to predict slightly better for old men compared to young men. It is also not caused by overfit, because the calibration slope in the external data is very close to 1. There is also no seemingly unaccounted linear or nonlinear association with any predictor or any variable not used in the model except of age. Refitting the model with age, however, does not seem to be sensible as the age range is very restricted in the training set, and age may play a different role in predicting percentage body fat in men than in women. 
+
+When discounting the effect of miscalibration-in-the-large, the root mean squared prediction error (root MSPE) at external validation is `r sqrt(rmspe_ext^2 - calib_inter_ext^2)`. The $R^2$ (calculated as $1 - MSPE/Var(Y))$), where $Var(Fat)$ = `r var(men$Fat)` with the recalibrated predictions would be estimated at $R^2$ = `r 1 - (rmspe_ext^2 - calib_inter_ext^2)/var(men$Fat)`. This number is also very well approximated by the squared correlation of predictions and observed outcomes given as `r cor(pred_ext, men$Fat)^2`, which does not account for miscalibration-in-the-large.
 
