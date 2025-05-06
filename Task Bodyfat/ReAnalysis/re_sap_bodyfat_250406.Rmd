@@ -1,0 +1,354 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+  html_notebook: default
+---
+---
+title: "Statistical re-analysis plan: Predicting body fat proportion using anthropometric measures"
+author: "Mariana Nold" 
+---
+
+
+##### Load R packages
+```{r load package, message = FALSE, warning = FALSE}
+
+library(mfp2)
+library(rstanarm)
+library(projpred)
+library(ggplot2)
+library(loo)
+library(bayesplot)
+library(bayesrules)
+library(FBMS)
+```
+
+
+```{r read path and load data}
+women <- read.delim("C:/Users/zo95yup/Documents/GitHub/Bayes_for_STRATOS/Task Bodyfat/Datafiles/BodyFat.txt", header = TRUE)
+names(women)
+PPath2 <- "C:/Users/zo95yup/Nextcloud/Statistik_SoSe24/Forschung/STRATOS/P6/Code_A/Results"
+
+```
+
+##### Prepare data
+```{r prepare data, message = FALSE, warning = FALSE}
+fat_density <- density(women$Fat, na.rm = TRUE)
+ggplot(women, aes(x = Fat)) + geom_density() + 
+  labs(title = "Kernel-density plot for outcome fat", x = "Fat", y = "Density")
+summary(women$Fat)
+summary(women$Age)
+women<- women[women$Age != 1, ]
+women[,3:20] <- scale(women[,3:20])
+head(women)
+```
+
+##### Derive reference model
+
+```{r derive reference model based on original SAP}
+model1_f <- formula(Fat ~ fp(Waist, df = 2) + fp(Height, df = 2) + fp(Weight, df = 2))
+model1 <- mfp2(model1_f, data = women, verbose=TRUE)
+
+# Summarize the model
+summary(model1)
+print(model1)
+# Estimate the model
+model2 <- mfp2(Fat ~ fp(Waist, df = 2) + fp(Height, df = 2) + fp(Weight, df = 2) 
+               + fp(BMI, df = 1), data = women, verbose=TRUE)
+
+# Summarize the model
+summary(model2)
+print(model2)
+#library(rstanarm)
+
+```
+
+
+```{r refit model with rstanarm, results='hide' }
+# Use the full model after stept 3 in Georgs task, thus model 1 and all predictors but not BMI
+# Only use predictors that are available in the man dataset
+# Fat = siri, Age = age, Height = height, Weight = weight, Neck = neck, Chest = chest, Waist = abdomen, Hips = hip, Knee = knee, Ankle = ankle, Forearm = forearm, Biceps = biceps
+rmf <- as.formula(Fat ~ Waist + Height + Weight + Age + Neck + Chest +  
+                          Biceps + Hips + Forearm +
+                        Knee +  Ankle)
+
+# Fit a Bayesian Gaussian regression model using stan_glm 
+ref_fitf <- stan_glm(rmf, data = women, family = gaussian())
+# Check reference model, MCMC check
+summary(ref_fitf)
+#shinystan::launch_shinystan(ref_fitf)
+
+mcmc_areas(as.matrix(ref_fitf)[,2:12])
+```
+
+
+```{r LOOPIT and bayesrules summary}
+
+pp_check(ref_fitf)
+y_rep_rmf <- posterior_predict(ref_fitf)
+loo_rmf <- loo(ref_fitf , save_psis = TRUE, cores = 4)
+psis1_rmf <- loo_rmf$psis_object
+lw_rmf <- weights(psis1_rmf)
+color_scheme_set("red")
+#pdf(file.path(PPath2, "/LOOPITrmf.pdf"))
+ppc_loo_pit_overlay(y= women$Fat,yrep=y_rep_rmf,lw=lw_rmf)
+#dev.off()
+
+# Summarize the posterior distributions simple model
+summary_rmf_cv <- prediction_summary_cv(model = ref_fitf , data = women, k = 3)
+
+# Print the summary simple model
+print(summary_rmf_cv)
+
+```
+
+##### Compute the probabilty for each estimator that it is close to zero 
+```{r close to zero}
+
+pred <- c("Waist" ,"Height" ,"Weight" ,"Age", "Neck" ,"Chest" , 
+                          "Biceps" ,"Hips" , "Forearm",
+                        "Knee", "Ankle")
+
+# Extract the posterior samples for the estimator
+posterior_samples <- as.matrix(ref_fitf, pars = pred)
+
+# Define the range
+lower_bound <- -0.05
+upper_bound <- 0.05
+
+# Apply the condition to each element of the matrix
+prob_between <- apply(posterior_samples, 2, function(par) mean(par >= lower_bound & par <= upper_bound))
+
+# Print the result
+print(prob_between)
+print(prob_between[prob_between > 0.25])
+
+```
+
+##### Use projpred to downsize model even more
+```{r predictive projection, results='hide'}
+set.seed(2341)
+vs_cvf <- cv_varsel(ref_fitf)
+
+save(vs_cvf,file = file.path(PPath2,"vs_cvf"))
+#load(file = file.path(PPath2,"vs_cv"))
+nsel <- suggest_size(vs_cvf)
+nsel
+
+rank_vs_cvf <- ranking(vs_cvf)
+rank_vs_cvf
+solterms_final_vs_cvf <- head(rank_vs_cvf$fulldata ,suggest_size(vs_cvf))
+
+solterms_final_vs_cvf
+
+# Print the summary of the variable selection 
+summary(vs_cvf) 
+
+# Plot the variable selection 
+#pdf(file.path(PPath2, "cv_valsel_plotf.pdf"))
+plot(vs_cvf, deltas = TRUE)
+#dev.off()
+# 
+
+
+```
+
+```{r best five predictors}
+solterms_final_fivef <- head(rank_vs_cvf$fulldata, 5)
+solterms_final_fivef 
+```
+
+
+
+##### Projected posterior for the selected model
+```{r post-selection inference, results='hide'}
+# https://cran.r-project.org/web/packages/projpred/vignettes/projpred.html#post-selection-inference
+proj_ref_fitf <- project(vs_cvf, predictor_terms = solterms_final_fivef, ns = 4000)
+
+```
+##### Show results
+```{r Show results}
+color_scheme_set(scheme = "green")
+mcmc_areas(as.matrix(proj_ref_fitf), pars = solterms_final_fivef)# 
+```
+
+###### Derive second reference model based on FBMS: Using BMA, marginal likelihoods inherently account for model complexity, and PIPs derived from them reflect this balance.
+```{r second reference model based on FBMS, results='hide', message=FALSE}
+#Marginal likelihoods inherently account for model complexity by integrating over all possible parameter values of #a model, rather than focusing on specific parameter estimates. This process naturally penalizes more complex #models, as they tend to spread their likelihood across a larger parameter space. Simpler models, with fewer #parameters, often concentrate their likelihood more narrowly, giving them an advantage in terms of marginal #likelihood.
+
+transforms <- c("p2","p3")#  transforms planed in my re-sap
+
+probs <- gen.probs.gmjmcmc(transforms)
+probs$gen <- c(0,1,0,1) # Only modifications!
+params <- gen.params.gmjmcmc(women[,c("Waist","Height","Weight","Age","Neck","Chest","Biceps","Hips","Forearm","Knee","Ankle","BMI")])
+params$feat$pop.max <- 20 #set the population size to be 20
+params$feat$D <- 1   # Set depth of features to 1
+#@ Aliaksandr(1): please decide about this options
+params$loglik$r <- exp(-2) # to correspond to AIC complexity that Georg uses in mfp
+params$loglik$var <- "unknown"
+modelFBMS <- as.formula(Fat ~ Waist + Height + Weight + Age + Neck + Chest +  
+                          Biceps + Hips + Forearm 
+                        +  Knee +  Ankle + BMI)
+
+set.seed(1234)
+
+result <- fbms(modelFBMS, data = women, method = "gmjmcmc.parallel", 
+                family = "gaussian",
+               transforms = transforms, probs = probs, params = params, P = 50,
+              runs = 40, cores = 10)
+
+```
+##### The final model, which includes five predictors, is  identical
+```{r formula_male}
+
+summary(result, labels = c("Waist","Height","Weight","Age","Neck","Chest","Biceps","Hips","Forearm","Knee","Ankle","BMI"),tol = 0.01)
+
+formula_male <- as.formula(Fat ~ Waist  + Hips + Height + Knee + Ankle)
+```
+
+##### Fit model to male data set and compare the posterior predictive distributions
+##### See Task Bodyfat.qmd
+```{r read and prepare male data}
+library(mfp)
+
+data(bodyfat)
+
+bodyfat_corr <- bodyfat 
+
+bodyfat_corr[42,"height"] <- 69.5       # one-digit correction of height
+bodyfat_corr[48,"density"] <- 1.0865    # one-digit correction of density
+bodyfat_corr[76,"density"] <- 1.0566    # one-digit correction of density
+bodyfat_corr[96,"density"] <- 1.0591    # one-digit correction of density
+
+# recompute siri formula based on corrected density
+
+bodyfat_corr[,"siri"]   <- pmax(round(495 / bodyfat_corr$density - 450, 1) , 0)
+bodyfat_corr[,"brozek"] <- pmax(round(457/ bodyfat_corr$density - 414.2, 1) , 0)
+```
+###### Aligning the two data sets
+```{r Aligning the two data sets}
+bodyfat_corr$height <- bodyfat_corr$height * 2.54/100
+bodyfat_corr$weight <- bodyfat_corr$weight * 0.454592
+
+library(tidyverse)
+
+men <- bodyfat_corr %>%
+  rename(Fat = siri, Age = age, Height = height, Weight = weight, 
+         Neck = neck, Chest = chest, Waist = abdomen, Hips = hip, 
+         Knee = knee, Ankle = ankle, Forearm = forearm, 
+         Biceps = biceps, Thigh = thigh)
+names(men)
+# Add BMI
+men$BMI <- men$Weight / (men$Height^2)
+men[,4:18] <- scale(men[,4:18])
+
+```
+
+##### Prepare data for males
+```{r prepare data for males, message = FALSE, warning = FALSE}
+fat_density_male <- density(men$Fat, na.rm = TRUE)
+ggplot(men, aes(x = Fat)) + geom_density() + 
+  labs(title = "Kernel-density plot for outcome fat for males", x = "Fat", y = "Density")
+summary(men$Fat)
+
+```
+
+
+```{r LOOPIT and bayesrules summary for male data,results='hide'}
+# LOOPIT and bayesrules summary for male data based on female model
+# Prediction for male data based on female model
+fit_female <- stan_glm(formula_male, data = women, family = gaussian())
+#proj_ref_fitf <- project(vs_cvf, predictor_terms = solterms_final_fivef, ns = 4000)
+# https://www.rdocumentation.org/packages/projpred/versions/2.0.2/topics/proj-pred
+#y_rep_male <- proj_linpred(vs_cvf, solution_terms= solterms_final_fivef, newdata = men)#
+y_rep_male <- posterior_predict(fit_female, newdata = men)
+color_scheme_set("blue")
+bayesplot::pp_check(object = men$Fat, yrep = y_rep_male[1:50,],fun = ppc_dens_overlay)
+
+binary_waist_male <- ifelse(men$Waist <= 0, 0, 1)
+binary_height_male <- ifelse(men$Height <= 0, 0, 1)
+binary_hips_male <- ifelse(men$Hips <= 0, 0, 1)
+binary_knee_male <- ifelse(men$Knee <= 0, 0, 1)
+binary_ankle_male <- ifelse(men$Ankle <= 0, 0, 1)
+color_scheme_set("pink")
+bayesplot::pp_check(object = men$Fat, yrep = y_rep_male,
+                    fun = "stat_grouped", group = binary_waist_male, stat = "median")
+
+bayesplot::pp_check(object = men$Fat, yrep = y_rep_male,
+                    fun = "stat_grouped", group = binary_height_male, stat = "median")
+
+bayesplot::pp_check(object = men$Fat, yrep = y_rep_male,
+                    fun = "stat_grouped", group = binary_hips_male, stat = "median")
+
+bayesplot::pp_check(object = men$Fat, yrep = y_rep_male,fun = "stat_grouped", 
+                    group = binary_knee_male, stat = "median")
+
+bayesplot::pp_check(object = men$Fat, yrep = y_rep_male,fun = "stat_grouped", 
+                    group = binary_ankle_male, stat = "median")
+color_scheme_set("gray")
+bayesplot::pp_check(object = men$Fat, yrep = y_rep_male,
+                    fun = "stat_grouped", group = binary_waist_male, stat = "mean")
+
+bayesplot::pp_check(object = men$Fat, yrep = y_rep_male,
+                    fun = "stat_grouped", group = binary_height_male, stat = "mean")
+
+bayesplot::pp_check(object = men$Fat, yrep = y_rep_male,
+                    fun = "stat_grouped", group = binary_hips_male, stat = "mean")
+
+bayesplot::pp_check(object = men$Fat, yrep = y_rep_male,fun = "stat_grouped", 
+                    group = binary_knee_male, stat = "mean")
+
+bayesplot::pp_check(object = men$Fat, yrep = y_rep_male,fun = "stat_grouped", 
+                    group = binary_ankle_male, stat = "mean")
+
+
+```
+
+##### Summarize the posterior distributions
+```{r Summarize the posterior distributions}
+# Summarize the posterior distributions 
+summary_male_cv <- prediction_summary_cv(model = fit_female, data = men, k = 3)
+
+# Print the summary 
+print(summary_male_cv)
+
+summary_male <- prediction_summary(model = fit_female, data = men)
+
+# Print the summary 
+print(summary_male)
+```
+
+
+
+##### Identify the groups where the prediction performs effectively
+
+```{r define different groups}
+age_group <- cut(men$Age, breaks = quantile(men$Age, probs = seq(0, 1, by = 0.25)), include.lowest = TRUE)
+table(age_group)
+fat_group <- cut(men$Fat, breaks = quantile(men$Fat, probs = seq(0, 1, by = 0.25)), include.lowest = TRUE)
+table(fat_group)
+waist_group <- cut(men$Waist, breaks = quantile(men$Waist, probs = seq(0, 1, by = 0.25)), include.lowest = TRUE) # table(waist_group)
+
+color_scheme_set(scheme = "purple")
+bayesplot::pp_check(object = men$Fat, yrep = y_rep_male,
+                    fun = "stat_grouped", group = age_group, stat = "median")
+color_scheme_set(scheme = "yellow")
+bayesplot::pp_check(object = men$Fat, yrep = y_rep_male,
+                    fun = "stat_grouped", group = fat_group, stat = "median")
+color_scheme_set(scheme = "teal")
+bayesplot::pp_check(object = men$Fat, yrep = y_rep_male,
+                    fun = "stat_grouped", group = waist_group, stat = "median")
+
+
+color_scheme_set(scheme = "purple")
+bayesplot::pp_check(object = men$Fat, yrep = y_rep_male,
+                    fun = "stat_grouped", group = age_group, stat = "mean")
+color_scheme_set(scheme = "yellow")
+bayesplot::pp_check(object = men$Fat, yrep = y_rep_male,
+                    fun = "stat_grouped", group = fat_group, stat = "mean")
+color_scheme_set(scheme = "teal")
+bayesplot::pp_check(object = men$Fat, yrep = y_rep_male,
+                    fun = "stat_grouped", group = waist_group, stat = "mean")
+```
+

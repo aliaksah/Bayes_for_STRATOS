@@ -1,0 +1,1145 @@
+---
+title: "Bacteremia data analysis"
+author: 
+  - Michael Kammer
+date: now
+date-format: iso
+title-block-banner: "#828282"
+format:
+  html:
+    code-fold: true
+    code-tools: true
+    theme: default
+    toc: true
+    number-sections: true
+    toc-location: right
+    embed-resources: true
+    self-contained: true
+    df-print: kable
+params: 
+  folder_analysis: Data/Processed
+  set: 4K
+---
+
+# Background 
+
+This frequentist analysis follows the statistical analysis plan by Michael Kammer 
+dated 27.5.2024 (see version history). IDA and descriptives are presented in an 
+[overview notebook](./analysis_overview-bacteremia.html).
+
+As of 29.8.2024 it was decided to conduct this analysis also for only one third 
+of the dataset for this example, to make the tradeoff between model complexity 
+and prediction performance more apparent. This notebook contains results for 
+the `params$set` dataset. 
+
+# Setup and data
+
+Data were downloaded from [Zenodo](https://zenodo.org/records/7554815) and
+stored locally for ease of use. 
+
+Processing steps: 
+
+- Convert BloodCulture to numeric
+- Reduce the dataset by using only the first 4000 observations
+
+```{r message=FALSE, warning=FALSE}
+#| code-fold: true
+
+T_START = Sys.time()
+
+# data handling and printing
+library(tidyverse)
+library(glue)
+library(magrittr)
+library(patchwork)
+library(doFuture)
+# imputation
+library(mice)
+# also requires furrr to be installed for parallel computations
+# modeling
+library(glmnet)
+# used but not loaded
+# rms
+
+df = read.csv("Data/Raw/Bacteremia_public_S2.csv",
+              header = TRUE, sep = ",", dec = ".") %>%
+    mutate(
+        BloodCulture = if_else(BloodCulture == "yes", 1, 0)
+    )
+
+SUFFIX = "_full"
+if (params$set == "4K") {
+    df = df[1:4000, ]
+    SUFFIX = "_4K"
+}
+```
+
+## Helper functions
+
+Code for helper functions that conduct CV, bootstrap etc...
+
+```{r}
+#| code-fold: true
+
+# custom functions
+pseudo_log <- function(x, sigma = 1, base = 10) {
+    asinh(x / (2 * sigma)) / log(base)
+}
+
+optimise_pseudo_log <- function(x, base = 10, sigmas = 2^seq(-10, 10, 1)) {
+    qnormx = qnorm((1:length(x) - 0.5) / length(x))
+    correlations = map_dbl(sigmas, ~ cor(qnormx, sort(pseudo_log(x, .x))))
+    sigmas[correlations == max(correlations)]
+}
+
+plot_density_and_box <- function(plotdf, v) {
+    list(
+        ggplot(plotdf, aes(x = .data[[v]])) + 
+            geom_density() + 
+            theme_bw() +
+            theme(axis.title.x = element_blank(), 
+                  axis.text.x = element_blank(), 
+                  axis.ticks.x = element_blank(),
+                  plot.margin = margin()), 
+        ggplot(plotdf, aes(x = .data[[v]], y = 0)) + 
+            geom_boxplot(outlier.shape = NA) +
+            geom_jitter(height = 0.25, alpha = 0.1) +
+            theme_bw() + 
+            theme(axis.text.y = element_blank(), 
+                  axis.title.y = element_blank(),
+                  axis.ticks.y = element_blank(),
+                  panel.grid.minor.y = element_blank(), 
+                  panel.grid.major.y = element_blank(), 
+                  plot.margin = margin(0))
+    ) %>% 
+        wrap_plots(nrow = 2, heights = c(0.8, 0.2))
+}
+
+#' Extracts information for scaling input data
+#' 
+#' @details 
+#' Scaling refers to centering at zero and unit variance. Binary or factor 
+#' variables are NOT scaled. 
+#' 
+#' @return 
+#' Returns a list that can be used to scale data, fitted on the input data.
+get_scale <- function(d) {
+    d %>% 
+        map(
+            ~ {
+                # sadly case_when doesnt work here, as it cannot mix strings 
+                # and numeric values, and does not allow mixed length output
+                out = list()
+                if (is.logical(.x))
+                    out = list(NA, NA, "Logical, not scaled")
+                
+                if (is_empty(out)) {
+                    if (is.factor(.x)) 
+                        out = list(NA, NA, "Factor, not scaled")    
+                }
+                
+                if (is_empty(out)) {
+                    if (n_distinct(.x) < 10) 
+                        out = list(NA, NA, "Fewer than 10 distinct values, not scaled")    
+                }
+                
+                if (is_empty(out)) {
+                    out = list(mean(.x, na.rm = TRUE), sd(.x, na.rm = TRUE), 
+                         "scaled")
+                }
+                
+                out
+            }
+        )
+}
+
+#' Applies extracted scale to data.frame
+#' 
+#' @param d
+#' Data.frame
+#' @param scaler
+#' List of scalers
+#' 
+#' @details 
+#' All columns not found in scaler are left as they are.
+#' 
+#' @return 
+#' Scaled data.frame
+apply_scale <- function(d, scaler) {
+    d_scaled = d
+    
+    for (i in seq_along(scaler)) {
+        s = scaler[[i]]
+        if (is.na(s[[1]])) next
+        v = names(scaler)[i]
+        d_scaled[[v]] = apply_scale_variable(d[[v]], s)
+    }
+    
+    d_scaled
+}
+
+#' Apply scale to individual vector
+#' 
+#' @param v
+#' Vector of data.
+#' @param scaler
+#' Scaler.
+#' 
+#' @return 
+#' Scaled vector if vector is numeric, otherwise left unchanged.
+apply_scale_variable <- function(v, scaler) {
+    v_scaled = v
+    if (scaler[[3]] == "scaled") {
+        v_scaled = (v - scaler[[1]]) / scaler[[2]]
+    }
+    
+    v_scaled
+}
+
+#' Extracts information for using pseudolog
+#' 
+#' @details 
+#' Binary or factor variables are NOT transformed. 
+#' 
+#' @return 
+#' Returns a list that can be used to transform data, fitted on the input data.
+get_pseudolog <- function(d, base = 10) {
+    d %>% 
+        map(
+            ~ {
+                # sadly case_when doesnt work here, as it cannot mix strings 
+                # and numeric values, and does not allow mixed length output
+                out = list()
+                if (is.logical(.x))
+                    out = list(NA, NA, "Logical, not transformed")
+                
+                if (is_empty(out)) {
+                    if (is.factor(.x)) 
+                        out = list(NA, NA, "Factor, not transformed")    
+                }
+                
+                if (is_empty(out)) {
+                    if (n_distinct(.x) < 10) 
+                        out = list(NA, NA, "Fewer than 10 distinct values, not transformed")    
+                }
+                
+                if (is_empty(out)) {
+                    out = list(optimise_pseudo_log(.x, base = base), 
+                         "transformed")
+                }
+                
+                out
+            }
+        )
+}
+
+#' Applies extracted pseudolog parameter to data.frame
+#' 
+#' @param d
+#' Data.frame
+#' @param transformer
+#' List of transformers
+#' 
+#' @details 
+#' All columns not found in transformer are left as they are.
+#' 
+#' @return 
+#' Scaled data.frame
+apply_pseudolog <- function(d, transformer, base = 10) {
+    d_trafo = d
+    
+    for (i in seq_along(transformer)) {
+        s = transformer[[i]]
+        if (is.na(s[[1]])) next
+        v = names(transformer)[i]
+        d_trafo[[v]] = apply_pseudolog_variable(d[[v]], s, base = base)
+    }
+    
+    d_trafo
+}
+
+#' Apply transform to individual vector
+#' 
+#' @param v
+#' Vector of data.
+#' @param transformer
+#' Transformer
+#' 
+#' @return 
+#' Transformed vector if vector is numeric, otherwise left unchanged.
+apply_pseudolog_variable <- function(v, transformer, base = 10) {
+    v_trafo = v
+    if (transformer[[2]] == "transformed") {
+        v_trafo = pseudo_log(v, transformer[[1]], base = base)
+    }
+    
+    v_trafo
+}
+
+#' Helper to create cross-validation fold indices
+#' 
+#' @details
+#' To ensure reproducibility, call `set.seed` or manage seed otherwise outside
+#' this function call. 
+#' 
+#' @return
+#' List of indices for cross-validation.
+make_cv_stratified_folds <- function(d, outcome, n_folds) {
+    # draw samples stratified by outcome
+    folds = by(1:nrow(d), d[[outcome]], function(f) {
+        by(sample(f), cut(1:length(f), n_folds, include.lowest = TRUE), identity)
+    }) 
+    # now merge stratified resamples
+    map2(folds[[1]], folds[[2]], ~ c(.x, .y)) %>% unname()
+}
+
+#' Helper to compute performance metrics for logistic lasso model
+#'
+#' @details
+#' Uses `rms::val.prob` to compute most prediction metrics.
+compute_performance_lasso <- function(m, x, y) {
+    predict(m, newx = x, type = "response") %>% 
+        apply(2, 
+              function(p) tryCatch(
+                  rms::val.prob(p, y, pl = FALSE)[
+                  c("C (ROC)", "Brier", "Intercept", "Slope")
+              ], 
+              error = function(e) rep(NA, 4)
+              )) %>%  
+        t() %>% 
+        as.data.frame() %>% 
+        set_names(c("AUC", "Brier", "Intercept", "Slope")) %>% 
+        mutate(
+            lambda = m$lambda, 
+            n_nonzero = colSums(as.matrix(m$beta) != 0)
+        )
+}
+
+#' Helper function to extract maximal lambda for given number of coefficients
+#' 
+#' @details
+#' Extracts the maximal lamba in the lambda sequence such that the number of 
+#' nonzero coefficients is less or equal than n. 
+get_lambda_ncoef <- function(m, n) {
+    n_nonzero = colSums(as.matrix(m$beta) != 0)
+    ind = which.min(abs(n_nonzero - n))
+    if (length(ind) > 1) ind = ind[1]
+    m$lambda[ind]
+}
+
+
+#' Helper to fit adaptive logistic lasso model
+#' 
+#' @return 
+#' List with entries: 
+#' 
+#' - `m_glm`: the weight model object
+#' - `pf`: penalty factors derived from `m_glm`
+#' - `m_adalasso`: adaptive lasso glmnet object
+#' - `perf`: apparent performance
+#' - `scaler`: scaler object
+fit_adaptive_lasso <- function(d, f, lambda = NULL, gamma = 0.5) {
+    # standardize, in addition to SAP
+    scaler = get_scale(d)
+    d %<>% apply_scale(scaler) %>% 
+        mutate(SEX = SEX - 1)
+    
+    # computation of penalty factors according to SAP
+    m_glm = glm(f, data = d, family = "binomial")
+    pf = 1 / abs(coef(m_glm)[-1])^gamma
+    
+    x = model.matrix(f, d)[, -1]
+    y = factor(d$BloodCulture)
+    m_adalasso = glmnet(
+        x, y, 
+        # settings according to SAP
+        family = "binomial", 
+        penalty.factor = pf, 
+        alpha = 1,
+        # note standardization is false, as data was standardized before
+        standardize = FALSE, 
+        # user specified lambda (sequence)
+        lambda = lambda, 
+        # speed up by lowering number of lambdas to evaluate
+        nlambda = 50, 
+        lambda.min.ratio = 1e-8
+    )
+    
+    perf = compute_performance_lasso(m_adalasso, x, d$BloodCulture)
+    
+    list(
+        m_glm = m_glm, 
+        pf = pf,
+        m_adalasso = m_adalasso, 
+        perf = perf, 
+        scaler = scaler
+    )
+}
+
+
+#' Helper to run cross-validation
+#'
+#' @details
+#' Handle set up of futures outside of this function.
+do_cv <- function(d, folds, f_m, lambda, gamma = 0.5, seed = 678) {
+    foreach(
+        i = seq_along(folds), 
+        .errorhandling = "pass", 
+        .options.future = list(seed = seed)
+    ) %dofuture% {
+        ind_v = folds[[i]]
+        ind_t = unlist(folds[-i])
+        d_t = d[ind_t, ]
+        d_v = d[ind_v, ] 
+        
+        # use same lambda sequence for all folds, see default
+        # alignment = "lambda" option in cv.glmnet
+        res_t = fit_adaptive_lasso(d_t, f_m, lambda = lambda, gamma = gamma)
+        
+        d_v %<>% 
+            apply_scale(res_t$scaler) %>% 
+            mutate(SEX = SEX - 1)
+        x_v = model.matrix(f_m, d_v)[, -1]
+        perf_v = compute_performance_lasso(res_t$m_adalasso, x_v, 
+                                           d_v[[all.vars(f_m)[1]]])
+        
+        perf_v
+    } 
+}
+
+#' Run single bootstrap sample
+#' 
+#' @details
+#' Handle seed and parallelisation outside this function.
+do_bootstrap <- function(df, b_ind, variables,  
+                         imp_seed, 
+                         imp_m = 5, imp_maxit = 20) {
+    res_out = list()
+    
+    d_b = df[b_ind, ]
+    d_oob = df[setdiff(1:nrow(df), b_ind), ]
+    
+    # impute for training part
+    m_imp_b = d_b %>% 
+        select(one_of(variables), BloodCulture) |>
+        futuremice(
+            m = imp_m, method = "pmm", 
+            maxit = imp_maxit, 
+            parallelseed = imp_seed, n.core = 1, future.plan = "sequential"
+        )
+    
+    # impute out of bag samples
+    m_imp_oob = d_oob %>% 
+        select(one_of(variables), BloodCulture) |>
+        futuremice(
+            m = imp_m, method = "pmm", 
+            maxit = imp_maxit, 
+            parallelseed = imp_seed, n.core = 1, future.plan = "sequential"
+        )
+    
+    # fit and evaluate model for all imputations
+    f_m = glue("BloodCulture ~ {paste0(variables, collapse = '+')}") %>%
+        as.formula()
+    res_imp = list()
+    for (i in 1:imp_m) {
+        # fit model
+        d_b_imp = complete(m_imp_b, i) 
+        transformer = get_pseudolog(d_b_imp)
+        d_b_imp %<>% apply_pseudolog(transformer)
+        res_out = fit_adaptive_lasso(d_b_imp, f_m)
+        res_out$folds = make_cv_stratified_folds(d_b_imp, "BloodCulture", 5)
+        res_out$seed_inner = sample.int(10e8, 1)
+        res_out$res_cv = do_cv(d_b_imp, res_out$folds, f_m,
+                               res_out$m_adalasso$lambda, seed = res_out$seed_inner)
+        
+        # obtain optimal lambda from cv
+        res_out$opt_lambda = bind_rows(res_out$res_cv) %>% 
+            group_by(lambda) %>% 
+            # average across folds
+            summarise(across(everything(), mean)) %>% 
+            filter(AUC == max(AUC, na.rm = TRUE)) %>% 
+            pull(lambda)
+        
+        # store apparent performance at optimal lambda
+        res_out$perf_opt = res_out$perf[res_out$perf$lambda == res_out$opt_lambda, ]
+        
+        # evaluate models on respective oob samples
+        d_oob_imp = complete(m_imp_oob, i) %>% 
+            apply_pseudolog(transformer) %>% 
+            apply_scale(res_out$scaler) %>% 
+            mutate(SEX = SEX - 1)
+        x_oob = model.matrix(f_m, d_oob_imp)[, -1]
+        perf_oob = compute_performance_lasso(res_out$m_adalasso, x_oob, 
+                                           d_oob_imp[[all.vars(f_m)[1]]])
+        res_out$perf_oob_opt = perf_oob[perf_oob$lambda == res_out$opt_lambda, ]
+        
+        res_imp[[i]] = res_out
+    }
+    
+    # obtain p_Mi_Di_Dic by averaging over imputations
+    # also store p_Mi_Di_Di for confidence intervals
+    list(
+        p_Mi_Di_Dic = map(res_imp, "perf_oob_opt") %>%
+            bind_rows(.id = "imputation"),
+        p_Mi_Di_Di = map(res_imp, "perf_opt") %>% 
+            bind_rows(.id = "imputation")
+    )
+}
+```
+
+# Variables
+
+As outlined in the SAP, the set of variables for modeling is reduced according 
+to collinearities and high variance inflation factors. 
+
+```{r}
+VARIABLES = names(df) %>%
+    setdiff(c(
+        # exclude identifier and outcome
+        "ID", "BloodCulture",
+        # exclude ratio variables
+        "MONOR", "LYMR", "NEUR", "EOSR", "BASOR", 
+        # exclude high vif
+        "MCV", "HCT"
+    ))
+
+glue("{length(VARIABLES)} Variables used for modeling according to SAP: 
+     {VARIABLES |> paste0(collapse = ', ')}")
+
+# further changes according to diagnostics from imputation, see below
+VARIABLES %<>% 
+    setdiff(c(
+        # exclude due to extreme correlation
+        "NEU", "PDW"
+    ))
+
+glue("Final {length(VARIABLES)} Variables used for modeling: 
+     {VARIABLES |> paste0(collapse = ', ')}")
+```
+
+# Imputation
+
+Imputation model is only re-fitted if no model file in `r params$folder_imputation`
+is found. Note that we used a parallel version of mice to speed up computations.
+
+## Clarifications / deviations from SAP
+
+Based on initial runs and checking trace plots for diagnostics it was clear
+that the initial set of variables as outlined in the SAP did not work well with
+imputation due to difficult sampling from the Markov chains. The reason for this
+were extremely high correlation between certain pairs of variables. In theory, 
+one could just increase the number of iterations to obtain mixing chains. 
+To keep the analysis feasible however, further variables were excluded from 
+analysis to reduce autocorrelation of the chains:
+
+- NEU (neutrophiles) were extremely strongly correlated (0.97) with WBC (white 
+    blood cells), even though they represent only a subset of white blood cells. 
+    Both variables were affected by badly mixing chains, so NEU was removed.
+- PDW (platelet distribution width) and MPV (mean platelet volume) showed
+    extremely high correlation (0.94), so PDW was removed.
+    
+Note that these choices were not made based on any association with the outcome, 
+but purely for reasons of imputation and correlation. Increasing the number of 
+iterations beyond 100 would have removed these issues as well, but that leads
+to very long runtimes for bootstrapping.
+
+Further, the number of iterations in the mice algorithm was not mentioned in 
+the SAP. Based on MCMC traceplots diagnostics it was increased to 20 from the 
+default value to accomodate high autocorrelation in the chains (which is 
+itself due to high correlations between groups of variables as seen in the 
+correlation matrix). The value of 20 was conservative, even 15 might have been 
+enough.
+
+## Fit / load
+
+```{r}
+file_model_imputation = file.path(params$folder_analysis, 
+                                  sprintf("model_imputation%s.rds", SUFFIX))
+if (!file.exists(file_model_imputation)) {
+    glue("Fitting model and saving to {file_model_imputation}") %>% print()
+    t = now()
+    m_imp = df %>% 
+        select(one_of(VARIABLES), BloodCulture) |>
+        futuremice(
+            # specified according to SAP
+            m = 20, method = "pmm", 
+            # based on diagnostics
+            maxit = 20, 
+            # implementation specific, for parallelisation 
+            parallelseed = 35, n.core = 10, future.plan = "multisession"
+        )
+    dt = difftime(now(), t, units = "s") %>% as.numeric()
+    
+    list(model = m_imp, 
+         runtime = dt) %>%
+        saveRDS(file_model_imputation)    
+} else {
+    glue("Reading fitted model from {file_model_imputation}") %>% print()
+    m_imp = readRDS(file_model_imputation)
+    dt = m_imp$runtime
+    m_imp = m_imp$model
+}
+```
+
+## Check
+
+Mixing of the chains looks well after increasing iterations. 
+
+```{r}
+glue("Fitting time: {dt} seconds")
+
+print("Method used for imputation (empty means no missing data):")
+m_imp$method
+
+plot(m_imp)
+```
+
+# Example model fit in one imputation
+
+Predictor distributions before and after optimized pseudolog transformation.
+
+```{r fig.height=10, fig.width=10}
+d_imp = complete(m_imp, 1)
+
+# visualise original distributions
+d_imp %>% 
+    select(one_of(VARIABLES), -SEX) %>% 
+    pivot_longer(everything()) %>% 
+    ggplot(aes(x = value)) + 
+    geom_density() +
+    facet_wrap(~ name, ncol = 5, scales = "free") + 
+    theme_bw()
+
+d_imp %<>%
+    # symmetrize according to SAP
+    mutate(across(-c(SEX, AGE, BloodCulture), 
+                  ~ pseudo_log(.x, optimise_pseudo_log(.x))))
+
+# visualise all transformed marker distributions
+# they all should be somewhat symmetric after the pseudo-log transformation
+d_imp %>% 
+    select(one_of(VARIABLES), -SEX) %>% 
+    pivot_longer(everything()) %>% 
+    ggplot(aes(x = value)) + 
+    geom_density() +
+    facet_wrap(~ name, ncol = 5, scales = "free") + 
+    theme_bw()
+```
+
+Fitting adaptive Lasso.
+
+```{r}
+f_m = glue("BloodCulture ~ {paste0(VARIABLES, collapse = '+')}") %>% 
+    as.formula()
+
+res = fit_adaptive_lasso(d_imp, f_m)
+```
+
+Check calibration and performance of weight model.
+
+```{r} 
+rms::val.prob(predict(res$m_glm, type = "response"), d_imp$BloodCulture)
+```
+
+Weight distribution (i.e. penalty factors).
+
+```{r} 
+plot_density_and_box(data.frame(penalty_factor = res$pf), "penalty_factor")
+```
+
+Adaptive lasso coefficient paths (shows difficulty to obtain simple set of 
+covariates).
+
+```{r} 
+plot(res$m_adalasso, xvar = "lambda")
+```
+
+## CV
+
+Doing 5-fold CV. 
+
+```{r}
+set.seed(15)
+folds = make_cv_stratified_folds(d_imp, "BloodCulture", 5)
+glue("Outcome prevalence in CV folds:")
+map_dbl(folds, ~ d_imp$BloodCulture[.x] %>% mean())
+
+plan(multisession, workers = 5)
+res_cv = do_cv(d_imp, folds, f_m, res$m_adalasso$lambda, seed = 1868)
+plan(sequential)
+```
+
+## Results
+
+Performance metrics per cross-validation fold (out of fold data).
+
+```{r fig.width = 5, rows.print=20, warning=FALSE}
+plot_cv = bind_rows(res_cv, .id = "fold")
+
+ggplot(plot_cv, aes(x = log(lambda), y = AUC, color = fold)) + 
+    geom_point() + 
+    stat_summary(fun.y = mean, color = "black", geom = "line") +
+    theme_bw() + 
+    theme(legend.position = "top")
+
+ggplot(plot_cv, aes(x = n_nonzero, y = AUC, color = fold)) + 
+    geom_point() + 
+    geom_smooth(aes(x = n_nonzero, y = AUC), inherit.aes = FALSE, color = "black", 
+                se = FALSE) +
+    theme_bw() + 
+    theme(legend.position = "top")
+
+ggplot(plot_cv, aes(x = log(lambda), y = Brier, color = fold)) + 
+    geom_point() + 
+    stat_summary(fun.y = mean, color = "black", geom = "line") +
+    theme_bw() + 
+    theme(legend.position = "top")
+
+ggplot(plot_cv, aes(x = log(lambda), y = Slope, color = fold)) + 
+    geom_point() + 
+    stat_summary(fun.y = mean, color = "black", geom = "line") +
+    coord_cartesian(ylim = c(0, 10)) +
+    theme_bw() + 
+    theme(legend.position = "top")
+
+ggplot(plot_cv, aes(x = n_nonzero, y = Slope, color = fold)) + 
+    geom_point() + 
+    geom_smooth(aes(x = n_nonzero, y = Slope), inherit.aes = FALSE, color = "black", 
+                se = FALSE) +
+    theme_bw() + 
+    theme(legend.position = "top")
+
+perf_cv = plot_cv %>% group_by(lambda) %>% 
+    summarise(
+        across(c(AUC, Brier, Slope, Intercept), 
+               ~ mean(.x, na.rm = TRUE))
+    )
+ind_opt_lambda = which.max(perf_cv$AUC)
+opt_lambda = perf_cv$lambda[ind_opt_lambda]
+glue("Best performance at lambda {opt_lambda} using {sum(coef(res$m_adalasso, s = opt_lambda) != 0) - 1} variables:")
+glue("Apparent AUC {res$perf$AUC[ind_opt_lambda]} / CV AUC {perf_cv$AUC[ind_opt_lambda]}
+    Apparent Brier score {res$perf$Brier[ind_opt_lambda]} / CV Brier score {perf_cv$Brier[ind_opt_lambda]}
+    Apparent calibration intercept {res$perf$Intercept[ind_opt_lambda]} / CV calibration intercept {perf_cv$Intercept[ind_opt_lambda]}
+    Apparent calibration slope {res$perf$Slope[ind_opt_lambda]} / CV calibration slope {perf_cv$Slope[ind_opt_lambda]}")
+coef_m = coef(res$m_adalasso, s = opt_lambda)
+data.frame(dimnames(coef_m)[1], as.numeric(coef_m)) %>% 
+    set_names(c("Variable", "Coefficient")) %>%
+    arrange(desc(abs(Coefficient)))
+```
+
+# Main model fit on all imputations
+
+According to SAP the main model is fitted on the 20 imputed datasets and 
+the apparent performance is computed. For this we simply repeat the steps 
+done for a single imputation. 
+
+```{r}
+f_m = glue("BloodCulture ~ {paste0(VARIABLES, collapse = '+')}") %>% 
+    as.formula()
+plan(multisession, workers = 10)
+
+res_imp = foreach(
+        i = 1:m_imp$m, 
+        .errorhandling = "pass", 
+        .options.future = list(seed = 156, 
+                               packages = c("mice", "glmnet"))
+) %dofuture% {
+    t_start = Sys.time()
+    
+    # res_out = list()
+    # res_out$packages = loadedNamespaces()
+    d_imp = complete(m_imp, i) %>%
+        mutate(across(-c(SEX, AGE, BloodCulture),
+                      ~ pseudo_log(.x, optimise_pseudo_log(.x))))
+    res_out = fit_adaptive_lasso(d_imp, f_m)
+    res_out$folds = make_cv_stratified_folds(d_imp, "BloodCulture", 5)
+    res_out$seed_inner = sample.int(10e8, 1)
+    res_out$res_cv = do_cv(d_imp, res_out$folds, f_m,
+                           res_out$m_adalasso$lambda, seed = res_out$seed_inner)
+    res_out$time = difftime(Sys.time(), t_start, units = "s") %>% 
+        as.numeric()
+
+    res_out
+}
+
+plan(sequential)
+```
+
+## Results
+
+Performance metrics over all imputations. 
+
+```{r, fig.height=10, fig.width=10}
+glue("Mean runtime per imputation {map_dbl(res_imp, 'time') %>% mean()} seconds.")
+
+perf_cv_imp = map(res_imp, ~ .x$res_cv %>% bind_rows(.id = "fold")) %>% 
+    bind_rows(.id = "imputation") %>% 
+    mutate(imputation = fct_inseq(imputation), 
+           fold = fct_inseq(fold))
+
+perf_cv_imp %>% 
+    select(-n_nonzero) %>% 
+    group_by(imputation, lambda) %>% 
+    select(-fold) %>% 
+    summarise(across(everything(), mean)) %>% 
+    pivot_longer(-c(imputation, lambda)) %>% 
+    filter(value < 10) %>% 
+    ggplot(aes(x = log(lambda), y = value, color = imputation)) + 
+    geom_line(alpha = 0.5) + 
+    facet_wrap(~ name, ncol = 2, scales = "free_y") + 
+    theme_bw()
+```
+
+Performance metrics across imputations and along different number of 
+coefficients.
+
+```{r, fig.height=10, fig.width=10}
+perf_cv_imp %>% 
+    select(-lambda) %>% 
+    group_by(imputation, n_nonzero) %>% 
+    select(-fold) %>% 
+    summarise(across(everything(), mean)) %>% 
+    pivot_longer(-c(imputation, n_nonzero)) %>% 
+    filter(value < 10) %>% 
+    ggplot(aes(x = n_nonzero, y = value, color = imputation)) + 
+    geom_line(alpha = 0.5) + 
+    facet_wrap(~ name, ncol = 2, scales = "free_y") + 
+    theme_bw()
+```
+
+Obtain optimal lambda in each imputation and report metrics over imputations
+and coefficients. 
+
+```{r}
+perf_cv_imp_opt = perf_cv_imp %>% 
+    group_by(imputation, lambda) %>% 
+    select(-fold) %>% 
+    summarise(across(everything(), mean)) %>% 
+    group_by(imputation) %>% 
+    # na.rm as sometimes with extreme penalization there are NA values
+    filter(AUC == max(AUC, na.rm = TRUE)) %>% 
+    arrange(imputation)
+
+perf_cv_imp_opt %>% 
+    pivot_longer(-c(imputation, lambda)) %>% 
+    ggplot(aes(x = value)) + 
+    geom_density() + 
+    geom_rug() +
+    facet_wrap(~ name, ncol = 2, scales = "free") +
+    theme_bw()
+```
+
+Number of non-zero coefficients across imputations.
+
+```{r fig.width=10, fig.height=12}
+coef_imp = map(res_imp, "m_adalasso") %>% 
+    imap(~ coef(.x, s = perf_cv_imp_opt$lambda[.y])) %>% 
+    map(~ as.matrix(.x) %>% as.data.frame()) %>% 
+    map(~ rownames_to_column(.x, "variable")) %>% 
+    bind_rows(.id = "imputation") %>% 
+    rename(coefficient = "s1") %>% 
+    mutate(imputation = fct_inseq(imputation))
+
+coef_imp %>% 
+    group_by(imputation) %>% 
+    summarise(nnz = sum(coefficient != 0)) %>% 
+    pull(nnz) %>% 
+    summary()
+
+coef_imp %>% 
+    filter(variable != "(Intercept)") %>% 
+    ggplot(aes(x = imputation, y = coefficient, group = variable, 
+               color = variable)) + 
+    geom_hline(yintercept = 0, linetype = "dashed") +
+    geom_point() + 
+    geom_line() + 
+    facet_wrap(~ variable, ncol = 5) +
+    scale_color_viridis_d() +
+    theme_bw() + 
+    theme(legend.position = "none")
+```
+
+Number of imputations a variable was chosen in. 
+
+```{r}
+coef_imp %>% 
+    group_by(variable) %>% 
+    summarise(n_imp = sum(coefficient != 0)) %>% 
+    pull(n_imp) %>% 
+    table()
+
+coef_imp %>% 
+    group_by(imputation) %>%
+    arrange(desc(abs(coefficient)), .by_group = TRUE) %>% 
+    slice_head(n = 10) %>% 
+    pull(variable) %>% 
+    table()
+```
+
+Obtain lambda for at most 10 nonzero coefficients per imputation and report 
+metrics. 
+
+```{r}
+perf_cv_imp_10 = perf_cv_imp %>% 
+    group_by(imputation, fold) %>%
+    mutate(diff = 10 - n_nonzero) %>% 
+    # chose lambda closest to 10 variables per fold, but not more than 10
+    # if more than one choice then take larger lambda
+    filter(n_nonzero <= 10) %>% 
+    filter(diff == min(diff)) %>% 
+    filter(lambda == max(lambda)) %>% 
+    ungroup() %>% 
+    select(-fold) %>% 
+    group_by(imputation) %>% 
+    summarise(across(everything(), mean)) %>% 
+    arrange(imputation) %>% 
+    select(-diff)
+
+perf_cv_imp_10 %>% 
+    pivot_longer(-c(imputation, lambda)) %>% 
+    ggplot(aes(x = value)) + 
+    geom_density() + 
+    geom_rug() +
+    facet_wrap(~ name, ncol = 2, scales = "free") +
+    theme_bw()
+```
+
+Final coefficients by averaging over imputations. Do this for optimal lambda
+and for lambdas with at most 10 variables. 
+
+```{r rows.print=50}
+coef_imp_10 = map(res_imp, "m_adalasso") %>% 
+    imap(~ coef(.x, s = perf_cv_imp_10$lambda[.y])) %>% 
+    map(~ as.matrix(.x) %>% as.data.frame()) %>% 
+    map(~ rownames_to_column(.x, "variable")) %>% 
+    bind_rows(.id = "imputation") %>% 
+    rename(coefficient_10 = "s1") %>% 
+    mutate(imputation = fct_inseq(imputation))
+
+coef_final = coef_imp %>% 
+    bind_cols(coef_imp_10 %>% select(coefficient_10)) %>% 
+    group_by(variable) %>% 
+    summarise(coefficient_mean = mean(coefficient), 
+              coefficient_10_mean = mean(coefficient_10), 
+              coefficient_median = median(coefficient), 
+              coefficient_10_median = median(coefficient_10))
+
+coef_final %>% 
+    arrange(desc(abs(coefficient_mean))) %>% 
+    data.frame()
+```
+
+# Model evaluation using Bootstrap
+
+## Apparent performance
+
+Based on runtimes for the imputation we reduce the number of imputations
+per bootstrap to two, and reduce the number of bootstraps to 500. This is 
+according to the SAP.
+
+```{r}
+# apparent performance estimates
+# obtain tuned lambda and average imputation performance
+perf_imp = imap(res_imp, 
+                    ~ .x$perf %>% filter(lambda == perf_cv_imp_opt$lambda[.y])) %>% 
+    bind_rows(.id = "imputation") %>% 
+    select(-n_nonzero)
+
+p_M_DD = perf_imp %>% 
+    select(-c(imputation, lambda)) %>% 
+    summarise(across(everything(), mean))
+
+p_M_DD
+```
+
+## Bootstrap indices
+
+```{r}
+set.seed(13376)
+b = 500
+bootstraps = map(1:b, ~ sample(1:nrow(df), nrow(df), replace = TRUE))
+
+glue("Statistics of relative frequency of unique samples per bootstrap:")
+(map_dbl(bootstraps, n_distinct) / nrow(df)) %>% summary()
+```
+
+## Run bootstrap
+
+```{r warning=FALSE}
+file_bootstrap = file.path(params$folder_analysis, 
+                           sprintf("bootstrap%s.rds", SUFFIX))
+if (!file.exists(file_bootstrap)) {
+    glue("Running bootstraps and saving to {file_bootstrap}") %>% print()
+    
+    plan(multisession, workers = 10)
+    res_b = foreach(
+        i = seq_along(bootstraps), 
+        .errorhandling = "pass", 
+        .options.future = list(seed = 15)
+    ) %dofuture%  {
+        t_start = Sys.time()
+        res = do_bootstrap(df, b_ind = bootstraps[[i]], variables = VARIABLES, 
+                           imp_seed = sample.int(10e8, 1), imp_m = 2, imp_maxit = 20)
+        res$runtime = difftime(now(), t_start, units = "s") %>% as.numeric()
+        res
+    }
+    plan(sequential)
+    saveRDS(res_b, file_bootstrap)    
+} else {
+    glue("Reading bootstrap results from {file_bootstrap}") %>% print()
+    res_b = readRDS(file_bootstrap)
+}
+
+glue("Runtime per bootstrap in hours:")
+summary(map_dbl(res_b, 'runtime')) / 3600
+```
+
+$p_M^{0.632+}$ estimate of performance.
+
+```{r}
+# first compute p_Mi_Di_Dic in each bootstrap
+p_Mi_Di_Dic = res_b %>% map_df("p_Mi_Di_Dic", .id = "bootstrap") %>% 
+    group_by(bootstrap) %>% 
+    select(-imputation, -lambda) %>% 
+    summarise(across(everything(), mean))
+
+# then average
+p_M_BS = p_Mi_Di_Dic %>%
+    select(-bootstrap) %>% 
+    colMeans()
+
+p_M_BS
+
+# define weights - but exclude brier score in this step
+# define no-effect weights for intercept and slope by computing
+# m0 = glm(BloodCulture ~ 1, data = d_imp, family = "binomial")
+# rms::val.prob(predict(m0, type = "response"), d_imp$BloodCulture)
+p_M_0 = c(0.5, -2.382719, 0)
+R = (p_M_BS[-2] - p_M_DD[-2]) / (p_M_0 - p_M_DD[-2])
+w = 0.632 / (1 - 0.368 * R)
+p_M_0.632 = (1 - w) * p_M_DD[-2] + w * p_M_BS[-2]
+
+p_M_0.632
+```
+
+Compute quantiles for confidence intervals and show distribution of 
+statistics from which they are derived.
+
+```{r}
+p_Mi_Di_Di = res_b %>% map_df("p_Mi_Di_Di", .id = "bootstrap") %>% 
+    group_by(bootstrap) %>% 
+    select(-imputation, -lambda) %>% 
+    summarise(across(everything(), mean)) %>% 
+    select(-bootstrap)
+
+wi = p_Mi_Di_Di %>% apply(1, function(row) row - p_M_DD) %>% 
+    bind_rows() %>% 
+    select(-Brier)
+
+wi %>% 
+    pivot_longer(everything()) %>% 
+    ggplot(aes(x = value)) + 
+    geom_histogram(bins = 20) + 
+    facet_wrap(~ name, ncol = 3, scales = "free") + 
+    theme_bw()
+```
+
+Confidence intervals.
+
+```{r}
+# compute quantiles from distribution
+xi = apply(wi, 2, quantile, probs = c(0.025, 0.975))
+
+glue("Bootstrap evaluation including confidence intervals: ")
+glue("AUC: {p_M_0.632$AUC} ({p_M_0.632$AUC - abs(xi[1, 'AUC'])}, {p_M_0.632$AUC + xi[2, 'AUC']})")
+glue("Calibration intercept: {p_M_0.632$Intercept} ({p_M_0.632$Intercept - abs(xi[2, 'Intercept'])}, {p_M_0.632$Intercept + xi[2, 'Intercept']})")
+glue("Calibration slope: {p_M_0.632$Slope} ({p_M_0.632$Slope - abs(xi[1, 'Slope'])}, {p_M_0.632$Slope + xi[2, 'Slope']})")
+```
+
+# Clarifications / deviations from SAP
+
+- Two more variables remove due to problems with imputation model (not 
+    anticipated in SAP, see above for details).
+- Iterations in imputation model increased based on diagnostics (not mentioned 
+    in SAP).
+- Data were standardised for all model fitting procedures (after imputation, 
+    not mentioned in SAP, but common for penalized models).
+- CV was stratified to keep similar outcome prevalence (not specified in SAP, 
+    done due to larger differences between folds).
+- Alignment of lambda sequences in the CV was based on model trained on full 
+    data (this was not explicitly specified in the protocol, but is the default
+    in cv.glmnet so can be considered a "default" way to handle this).
+- Creating folds indices for CV in different imputations was now done 
+    independently (but you might choose the same indices for all imputations, 
+    this was not specified in the SAP).
+- There is a typo in Section 6, in the definition of $\hat{p}_M^{D, D}$ (an 
+    index $j$ is missing in the summation).
+- The construction of the 95% CIs is actually unclear, but also in the paper.
+    Due to negative values I introduced an absolute value, but I'm not sure if
+    that is correct.
+- The definition of the 0.632+ estimate requires non-effect weights for 
+    calibration slope and intercept. These were now estimated by an 
+    empty logistic model mimicking no association of the variables with the
+    outcome. 
+- The model with at most 10 variables is quite bad in terms of calibration
+    performance (i.e. it overshrinks leading to high calibration slope in the
+    validation set). Also discrimination is lower than for the optimal model. 
+    At the moment we do not evaluate this model in the bootstrap.
+    
+# Further notes
+
+- A "fix" / bug in the optimisation of the pseudo-log optimisation was found
+    when looking at the coefficient paths of the lasso model.
+- Even after reduction of dataset to 4000 observations (epv < 10) the 
+    number of imputations actually leads to a model that is not sparse. 
+    Choosing the median instead of the mean would lead to selection. 
+- (Superseded by 29.8.2024) Using the full dataset, the model is not 
+    sparse, the lasso cannot remove a relevant number of variables as the CV 
+    performance is very flat. Arguably, the 
+    dataset is too large and allows to fit an essentially saturated model 
+    with all variables. Restricting the number of observations leads to more 
+    typical results, i.e. overfitting with all variables and a relevant
+    selection by the lasso. 
+    
+# Conclusions
+
+Overall the results from the analysis as outlined in the SAP are not that great. 
+While discrimination is close to the published model (both full and 4K data), 
+the calibration is not excellent during bootstrap validation. That is likely
+because the separate imputation of out-of-bootstrap data leads to slight 
+differences in the distribution and miscalibrated predictions. This effect is
+smaller for the full dataset, indicating that the 4K dataset is "at the limit"
+for this kind of approach to work well. 
+
+Furthermore, the final model using all imputed datasets, despite using adaptive 
+Lasso, is not sparse anymore due to many variables being taken up with small
+coefficients as they occur a handful of times in the imputed datasets. This is 
+a big weakness of the approach to use the mean coefficient from imputations
+(although it is close to a "Bayesian" way to handle things, were sparsity also
+has to be enforced and is not a direct product of shrinkage posteriors). 
+However, alternatives are not so clear and would require to "break" the 
+principles of multiple imputation a bit by sharing information across 
+imputations (e.g. by requiring a variable to be selected in at least 50% of
+imputations). Such an approach could be added here, however, to enforce more
+sparsity. Alternatively, one could drop in each imputation the variables with
+small coefficients and only then combine the imputations (this would be 
+feasible for each imputation independently and thus fits to multiple 
+imputation).
+
+# Sessioninfo
+
+To build this notebook:
+
+- install `quarto`
+- make sure the data is in the correct folder (either in global Data folder, 
+    or as subfolder of the folder containing this notebook).
+- build using the `make.R` script (global Data), or using the Render button in 
+    RStudio (subfolder Data).
+
+```{r}
+params
+
+glue("Runtime {difftime(Sys.time(), T_START, units = 'm') / 60} hours.")
+
+sessioninfo::session_info()
+```

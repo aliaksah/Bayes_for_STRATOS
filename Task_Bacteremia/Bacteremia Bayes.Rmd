@@ -1,0 +1,243 @@
+---
+title: "Bacteremia Bayes"
+author: "Aliaksandr"
+date: "2025-04-19"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## **Overview**
+
+This analysis evaluates a binary classification model for predicting BloodCulture (bacteremia presence) using the FBMS package. We use a bootstrap approach to estimate model performance, including **C-index,** and **calibration slope**. The bootstrap loop is parallelized using mclapply to improve efficiency. We compute the .632+ bootstrap estimates and 95% confidence intervals for each metric as well as the relative over-fitting rate.
+
+The dataset is sourced from [Zenodo](https://zenodo.org/records/7554815/files/Bacteremia_public_S2.csv). The analysis includes data preprocessing, model fitting, performance evaluation, and bootstrap resampling.
+
+**Step 1: Load Libraries and Set Seed**
+
+We load required packages: Metrics for C-index, FBMS for model fitting, and parallel for parallelized bootstrapping. The random seed is set for reproducibility.
+
+```{r cars}
+# Install FBMS if needed
+# devtools::install_github("https://github.com/jonlachmann/GMJMCMC/tree/stratos")
+
+library(Metrics)  # For C-index
+library(FBMS)     # For model fitting
+library(parallel) # For mclapply
+set.seed(123)     # For reproducibility
+```
+
+## **Step 2: Define Performance Metric Functions**
+
+We define two functions to compute performance metrics:
+
+-   **C-index**: Measures the proportion of concordant pairs (equivalent to AUC-ROC for binary classification).
+
+-   **Calibration Slope**: Assesses the calibration of predicted probabilities by fitting a logistic regression model to the log-odds of predictions versus actual outcomes.
+
+```{r pressure, echo=FALSE}
+# Function to calculate C-index (equivalent to AUC-ROC)
+cindex_manual <- function(predictions, labels) {
+  n <- length(labels)
+  concordant <- 0
+  discordant <- 0
+  ties <- 0
+  for (i in 1:(n-1)) {
+    for (j in (i+1):n) {
+      if (labels[i] != labels[j]) {
+        if (predictions[i] == predictions[j]) {
+          ties <- ties + 1
+        } else if ((predictions[i] > predictions[j] && labels[i] > labels[j]) ||
+                   (predictions[i] < predictions[j] && labels[i] < labels[j])) {
+          concordant <- concordant + 1
+        } else {
+          discordant <- discordant + 1
+        }
+      }
+    }
+  }
+  total_pairs <- concordant + discordant + ties
+  c_index <- (concordant + 0.5 * ties) / total_pairs
+  return(c_index)
+}
+
+# Function to calculate calibration slope
+calibration_slope <- function(predictions, labels) {
+  # Ensure predictions are in (0,1) to avoid log-odds issues
+  predictions <- pmin(pmax(predictions, 1e-5), 1 - 1e-5)
+  # Calculate log-odds of predictions
+  logit_pred <- log(predictions / (1 - predictions))
+  # Fit logistic regression: actual outcome ~ log-odds of predictions
+  df <- data.frame(logit_pred = logit_pred, y = labels)
+  model <- glm(y ~ logit_pred, family = binomial, data = df)
+  # Return the slope (coefficient of logit_pred)
+  slope <- coef(model)["logit_pred"]
+  return(as.numeric(slope))
+}
+```
+
+**Step 3: Load and Preprocess Data**
+
+We load the bacteremia dataset, remove unnecessary columns, and convert the BloodCulture variable to a binary (0/1) format.
+
+```{r}
+# Load dataset
+df.train <- read.csv("https://zenodo.org/records/7554815/files/Bacteremia_public_S2.csv", 
+               header = TRUE, sep = ",", dec = ".")
+
+# Remove unnecessary columns
+df.train <- df.train[, !(names(df.train) %in% c("MONOR", "LYMR", "NEUR", "EOSR", "BASOR", "WBC", "MCV", "HCT"))]
+
+# Convert BloodCulture to binary
+df.train$BloodCulture <- ifelse(df.train$BloodCulture == "yes", 1, 0)
+```
+
+**Step 4: Fit Full Models**
+
+We fit two models using the FBMS package:
+
+-   A **nonlinear model** using gmjmcmc.parallel with transformations (sigmoid, sin, cos, exp_dbl).
+
+Predictions are made on the training set (optimistic) using the nonlinear model, and we compute C-index, and calibration slope.
+
+```{r}
+# Fit nonlinear model
+result.nonlinear <- fbms(formula = BloodCulture ~ 1 + ., family = "binomial", beta_prior =   list(type = "Jeffreys-BIC"), 
+data = df.train, impute = TRUE, method = "gmjmcmc.parallel", 
+P = 10, cores = 6, runs = 6, 
+transforms = c("sigmoid", "sin", "cos", "exp_dbl"))
+summary(result.nonlinear)
+
+
+# Predictions on test data (using nonlinear model)
+prob_full <- predict(result.nonlinear, df.train[, -45], link = sigmoid)$aggr$mean
+
+# Metrics on full model
+cindex_full <- cindex_manual(prob_full, df.train$BloodCulture)
+calib_slope_full <- calibration_slope(prob_full, df.train$BloodCulture)
+
+cat("train cindex_full: ", cindex_full," train calib_slope_full: ",calib_slope_full)
+```
+
+Only linear terms are present, hence we continue with linear models as discussed in the analysis plan.
+
+**Step 5: Define Theoretical Performance**
+
+We define baseline performance for a model with no predictive power (absence of effect):
+
+-   **C-index (AUC)**: 0.5 (no discrimination).
+
+-   **Calibration Slope**: 0.
+
+```{r}
+# Theoretical performance (no effect)
+p_M0_cindex <- 0.5  # For C-index (equivalent to AUC)
+p_M0_calib_slope <- 0.0  # For calibration slope (perfect calibration)
+```
+
+**Step 6: Bootstrap Procedure with Parallelization**
+
+We perform n_bootstrap = 999 bootstrap iterations to estimate model performance. Each iteration:
+
+-   Resamples the training data with replacement.
+
+-   Fits a model using mjmcmc.
+
+-   Computes C-index, and calibration slope for in-sample (bootstrap) and out-of-bag (test) predictions.
+
+The loop is parallelized using mclapply with 9 cores to improve computational efficiency.
+
+```{r}
+# Number of bootstrap iterations
+n_bootstrap <- 1000
+# Define bootstrap iteration function
+bootstrap_iter <- function(i) {
+  # Bootstrap resample from training data
+  boot_indices <- sample(1:nrow(df.train), replace = TRUE)
+  df_boot <- df.train[boot_indices, ]
+  df.test <- df.train[-boot_indices, ]
+  # Fit model on bootstrap sample
+  result_boot <- fbms(formula = BloodCulture ~ 1 + ., family = "binomial", beta_prior =      list(type = "Jeffreys-BIC"), 
+  data = df_boot, impute = TRUE, method = "mjmcmc")
+  
+  # Predictions on bootstrap sample (in-sample performance)
+  preds_boot <- predict(result_boot, df_boot[, -45])
+  prob_boot <- sigmoid(preds_boot$mean)
+  
+  # Predictions on test data (out-of-bag performance)
+  preds_oob <- predict(result_boot, df.test[, -45])
+  prob_oob <- sigmoid(preds_oob$mean)
+  
+  # Calculate metrics
+  cindex_boot <- cindex_manual(prob_boot, df_boot$BloodCulture)
+  cindex_oob <- cindex_manual(prob_oob, df.test$BloodCulture)
+  calib_slope_boot <- calibration_slope(prob_boot, df_boot$BloodCulture)
+  calib_slope_oob <- calibration_slope(prob_oob, df.test$BloodCulture)
+  
+  return(c(cindex_boot = cindex_boot, cindex_oob = cindex_oob,
+           calib_slope_boot = calib_slope_boot, calib_slope_oob = calib_slope_oob))
+}
+
+# Run bootstrap iterations in parallel with 9 cores
+results <- mclapply(1:n_bootstrap, bootstrap_iter, mc.cores = 5)
+
+# Convert results to a matrix
+results_matrix <- do.call(rbind, results)
+
+# Extract metrics
+cindex_boot <- results_matrix[, "cindex_boot"]
+cindex_oob <- results_matrix[, "cindex_oob"]
+calib_slope_boot <- results_matrix[, "calib_slope_boot"]
+calib_slope_oob <- results_matrix[, "calib_slope_oob"]
+```
+
+**Step 7: Calculate Overfitting Rates and .632+ Estimates**
+
+We compute the **relative overfitting rate (R)** for each metric to quantify the degree of overfitting. Using these, we calculate the **.632+ bootstrap estimates**, which combine full model performance with bootstrap performance to correct for bias.
+
+```{r}
+# Calculate overfitting rate R
+R_cindex <- mean(cindex_oob - mean(cindex_boot)) / (p_M0_cindex - mean(cindex_boot))
+R_calib_slope <- mean(calib_slope_oob - mean(calib_slope_boot)) / (p_M0_calib_slope - mean(calib_slope_boot))
+
+# .632+ weights
+w_cindex <- 0.632 / (1 - 0.368 * R_cindex)
+w_calib_slope <- 0.632 / (1 - 0.368 * R_calib_slope)
+
+# .632+ estimates
+cindex_632plus <- (1 - w_cindex) * mean(cindex_boot) + w_cindex * mean(cindex_oob)
+calib_slope_632plus <- (1 - w_calib_slope) * calib_slope_full + w_calib_slope * mean(calib_slope_oob)
+
+
+```
+
+**Step 8: Compute Confidence Intervals**
+
+We calculate 95% confidence intervals for each metric using the 2.5th and 97.5th percentiles of the bootstrap distributions.
+
+```{r}
+# Confidence intervals (95% CI using bootstrap percentiles)
+cindex_ci <- quantile(cindex_boot, probs = c(0.025, 0.975))
+calib_slope_ci <- quantile(calib_slope_boot, probs = c(0.025, 0.975))
+```
+
+**Step 9: Display Results**
+
+Finally, we print the full model performance, .632+ estimates, and 95% confidence intervals for accuracy, C-index (AUC), and calibration slope.
+
+```{r}
+# Print results
+cat("Full model C-index (AUC):", cindex_full, "\n")
+cat(".632+ C-index (AUC) estimate:", cindex_632plus, "\n")
+cat("C-index (AUC) 95% CI from bootstrap:", cindex_ci, "\n\n")
+
+cat("Full model Calibration Slope:", calib_slope_full, "\n")
+cat(".632+ Calibration Slope estimate:", calib_slope_632plus, "\n")
+cat("Calibration Slope 95% CI from bootstrap:", calib_slope_ci, "\n")
+```
+
+**Conclusion**
+
+This analysis provides a robust evaluation of the classification model using bootstrap resampling. The .632+ estimates account for overfitting, and the calibration slope ensures the reliability of predicted probabilities. Parallelization with 9 cores improves computational efficiency. Future work could include visualizing the calibration curve or comparing linear and nonlinear models.
