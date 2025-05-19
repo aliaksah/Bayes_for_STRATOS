@@ -54,6 +54,7 @@ drawPosteriorInequalityGroup <- function(sgr = sgr,fit = fit, p = 0.5){
   return(int)
 }
 
+
 compute_quantiles <- function(data, prob = 0.5) {
   # Check which variables are numeric
   numeric_vars <- sapply(data, is.numeric)
