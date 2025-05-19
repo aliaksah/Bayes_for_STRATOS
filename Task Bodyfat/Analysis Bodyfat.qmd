@@ -151,15 +151,9 @@ for (plts in 1:length(rem_plts)) {
 
 ```
 
-
-
-
-
 ### IDA domain V: multivariate descriptions
 
 #### Key predictors vs. structural variable
-
-
 
 ```{r}
 library(tidyr)
@@ -216,14 +210,13 @@ for (plts in 1:length(key_plts)) {
 
 There seem to be some mismeasured data points in the following variables:
 
-| Subject | Variable | Problem | Solution |
-|---------|----------|---------|----------|
-| 120     | Age      | Age == 1| set to NA|
-| 42, 145 | Chest    | Chest < 60| set to NA |
-| 31      | Calf     |  Calf == 66 | set to NA |
-| 124     | Knee     | Knee ==24.7 | set to NA |
+| Subject | Variable | Problem       | Solution  |
+|---------|----------|---------------|-----------|
+| 120     | Age      | Age == 1      | set to NA |
+| 42, 145 | Chest    | Chest \< 60   | set to NA |
+| 31      | Calf     | Calf == 66    | set to NA |
+| 124     | Knee     | Knee ==24.7   | set to NA |
 | 136     | Elbow    | Elbow == 15.5 | set to NA |
- 
 
 ```{r}
 # we first copy the data into an analysis set women_AS
@@ -236,9 +229,8 @@ women_AS$Calf[women_AS$Calf == 66] <- NA
 women_AS$Knee[women_AS$Knee ==24.7] <-  NA
 women_AS$Elbow[women_AS$Elbow == 15.5] <- NA
 ```
- 
-After this data cleaning, we repeat the IDA with the clean data. 
-Since the missing values are not overlapping, we don't have to pay special attention to their description.
+
+After this data cleaning, we repeat the IDA with the clean data. Since the missing values are not overlapping, we don't have to pay special attention to their description.
 
 ```{r}
 ## transform
@@ -293,9 +285,9 @@ for (plts in 1:length(rem_plts)) {
 
 ```
 
- #### IDA domain V: Correlation between predictors
- 
- Calculate correlation matrix using Spearman correlation coefficient. 
+\#### IDA domain V: Correlation between predictors
+
+Calculate correlation matrix using Spearman correlation coefficient.
 
 ```{r mcorrs, message=FALSE, warning=FALSE, echo=FALSE, fig.height=3}
 
@@ -342,16 +334,15 @@ ggplot(data=women_AS, aes(x=PThigh, y=DThigh)) + geom_point()
 ggplot(data=women_AS, aes(x=DThigh, y=MThigh)) + geom_point()
 ```
 
-
 ### Summary from IDA
 
 We see very high correlations between all variables except of Age (which has a small range anyway). Moreover, BMI does not seem to have any correlation with Height.
 
 The key predictors Waist, Weight and Height have correlations of:
 
-- Waist and Weight: 0.87
-- Waist and Height: 0.18
-- Weight and Height: 0.44
+-   Waist and Weight: 0.87
+-   Waist and Height: 0.18
+-   Weight and Height: 0.44
 
 ## Main analysis
 
@@ -366,6 +357,7 @@ y <- as.numeric(women_AS$Fat)
 M1 <- mfp2(x=x, y=y, select=1, df=4, criterion="aic")
 summary(M1)
 ```
+
 ```{r}
 x <- as.matrix(women_AS[, c("Waist", "Height", "Weight", "BMI")])
 y <- as.numeric(women_AS$Fat)
@@ -374,6 +366,7 @@ M2 <- mfp2(x=x, y=y, df=c(4,4,4,2), criterion="aic", keep=c(T, T, T, F))
 summary(M2)
 
 ```
+
 ```{r}
 # refit M2
 women_AS_nona <- women_AS[complete.cases(women_AS),]
@@ -386,6 +379,7 @@ yM3 <- women_AS_nona[,2]
 M3 <- mfp2(y=yM3, x=xM3, keep=c("Height","Weight","Waist"), df=c(4, 4, 2, 2, 2, 2, 2, 2, 4, 2, 2, 2, 2, 2, 2, 2, 2))
 summary(M3)
 ```
+
 ```{r}
 # refit M3 with complete cases
 
@@ -409,15 +403,13 @@ summary(M4.lin)
 
 ### Problems encountered
 
-- forward selection not possible with mfp2
- 
+-   forward selection not possible with mfp2
 
 ### Solutions
 
-- Because forward selection is not possible with the `mfp2` package, we performed backward selection to arrive at model M3.
+-   Because forward selection is not possible with the `mfp2` package, we performed backward selection to arrive at model M3.
 
-- M3 selected 6 variables which had to be reduced to 5 for M4. In M3 there were only linear effects involved. When performing backward elimination to remove 1 variable, we assumed these linear effects, but backed up with assuming FP1s for all variables.
-
+-   M3 selected 6 variables which had to be reduced to 5 for M4. In M3 there were only linear effects involved. When performing backward elimination to remove 1 variable, we assumed these linear effects, but backed up with assuming FP1s for all variables.
 
 # Model validation
 
@@ -425,10 +417,10 @@ summary(M4.lin)
 
 ### Check local bias
 
-
 ```{r}
 ggplot(data.frame(fitted.values=M4.fp1$fitted.values, y=M4.fp1$y), aes(x=fitted.values, y=y)) + geom_point() + geom_smooth() + geom_abline(slope=1, intercept=0)
 ```
+
 Observation: There seems to be only little local bias at the very lower end of the distribution of fitted values.
 
 ### Check heteroskedasticity
@@ -436,6 +428,7 @@ Observation: There seems to be only little local bias at the very lower end of t
 ```{r}
 ggplot(data.frame(fitted.values=M4.fp1$fitted.values, y=sqrt(abs(M4.fp1$residuals))), aes(x=fitted.values, y=y)) + geom_point() + geom_smooth() 
 ```
+
 Observation: there is a little bit of higher variability of residuals when predictions are around 15%.
 
 ### Check association with excluded predictors
@@ -445,6 +438,7 @@ The MFP algorithm iteratively checks for possible inclusion of previously exclud
 ```{r}
 ggplot(data.frame(Weight=women_AS_M3$Weight, Residuals=M4.fp1$residuals), aes(x=Weight, y=Residuals)) + geom_point() + geom_smooth() 
 ```
+
 Observation: No residual association with Weight can be noted.
 
 ### Check normality of residuals
@@ -458,4 +452,3 @@ ggplot(data=data.frame(residuals=M4.fp1$residuals), aes(x=residuals)) + geom_his
 ```
 
 Conclusion: there are only little deviations from the normality assumption for residuals, probably more on the left tail.
-

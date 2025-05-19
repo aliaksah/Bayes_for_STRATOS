@@ -247,3 +247,15 @@ school.type <- unclass(IMPDAT$PROGN)  # Schulform, Study programme indices
 pisa18$GYM <- rep(0,length(school.type))
 pisa18$GYM[school.type == "00400002" ] <- 1
 pisa18$GYM[school.type == "00400005" ] <- 1
+
+###--------------
+
+pisa18$DISH  <- IMPDAT$SC048Q03NA/100 # Students from socioeconomically disadvantaged homes
+pisa18$NDISH <- 1- pisa18$DISH 
+
+
+pisa18$failed <- IMPDAT$SC164Q01HA/100 #  the last full academic year, what proportion of students left without certification
+pisa18$WITHGRAD <- 1 - pisa18$failed 
+ 
+
+pisa18$N_SC <- 1 - IMPDAT$SC048Q01NA/100 # Students whose <heritage language> is  NOT different from <test language>

@@ -37,7 +37,7 @@ library("bayestestR")
 library("rlist")
 #library("plyr")
 
-#library(tidyverse)        # ggplot, dplyr, %>%, and friends
+library(tidyverse)        # ggplot, dplyr, %>%, and friends
 library(brms)             # Bayesian modeling through Stan
 library(tidybayes)        # Manipulate Stan objects in a tidy way
 library(broom)            # Convert model objects to data frames
@@ -51,5 +51,5 @@ library(ggdist)           # Special geoms for posterior distributions
 #library(ggrepel)          # Automatically position labels
 #library(patchwork)        # Combine ggplot objects
 #library(scales)           # Format numbers in nice ways
-library(marginaleffects)  # Calculate marginal effects for regression models
+#library(marginaleffects)  # Calculate marginal effects for regression models
 #library(modelsummary)     # Create side-by-side regression tables
