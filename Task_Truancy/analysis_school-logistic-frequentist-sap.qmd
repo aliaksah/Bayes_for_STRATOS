@@ -1,0 +1,525 @@
+---
+title: "School belonging data analysis, logistic model"
+author: 
+  - Michael Kammer
+date: now
+date-format: iso
+title-block-banner: "#828282"
+format:
+  html:
+    code-fold: true
+    code-tools: true
+    theme: default
+    toc: true
+    number-sections: true
+    toc-location: right
+    embed-resources: true
+    self-contained: true
+    df-print: kable
+params: 
+  folder_analysis: Data/Processed/School_FSAP
+---
+
+# Background 
+
+This frequentist analysis for the school belonging analysis task follows the 
+statistical analysis plan by Michael Kammer dated 20.5.2025 (and referring
+to the task description for the simplified school belonging task with the same 
+date that addresses a binary outcome variable).
+
+# Setup and data
+
+Data were provided by Mariana Nold by mail on 3.1.2025 (`pisa2018.RData`). This
+dataset is already pre-processed with one small exception.
+
+- ATT4 is computed by the `ggplot2::cut_number()` function, as outlined by 
+    Mariana in her SAP. 
+- bel01 is computed as the lowest 25% of students in terms of sense of belonging
+    in `belong`.
+
+```{r message=FALSE, warning=FALSE}
+#| code-fold: true
+
+T_START = Sys.time()
+SUFFIX = ""
+
+# data handling and printing
+library(tidyverse)
+library(glue)
+library(magrittr)
+library(patchwork)
+library(gtsummary)
+library(gt)
+
+# modelling
+library(lme4)
+library(MuMIn)
+library(DHARMa)
+
+# plotting
+library(GGally)
+
+# parallel
+library(doFuture)
+
+# required bot not loaded
+# ranger
+# pracma
+
+rm(list = c("pisa2018"))
+load("Data/Raw/pisa2018.Rdata")
+
+pisa2018 %<>% mutate(
+        ATT4 = cut_number(ATT01, 4), 
+        bel01 = belong <= quantile(belong, probs = 0.25, na.rm = TRUE)
+    )
+```
+
+## Helper functions
+
+Code for helper functions.
+
+```{r}
+#| code-fold: true
+
+logit = binomial()$linkfun
+expit = binomial()$linkinv
+
+plot_density_and_box <- function(plotdf, v) {
+    list(
+        ggplot(plotdf, aes(x = .data[[v]])) + 
+            geom_density() + 
+            theme_bw() +
+            theme(axis.title.x = element_blank(), 
+                  axis.text.x = element_blank(), 
+                  axis.ticks.x = element_blank(),
+                  plot.margin = margin()), 
+        ggplot(plotdf, aes(x = .data[[v]], y = 0)) + 
+            geom_boxplot(outlier.shape = NA) +
+            geom_jitter(height = 0.25, width = 0, alpha = 0.1) +
+            theme_bw() + 
+            theme(axis.text.y = element_blank(), 
+                  axis.title.y = element_blank(),
+                  axis.ticks.y = element_blank(),
+                  panel.grid.minor.y = element_blank(), 
+                  panel.grid.major.y = element_blank(), 
+                  plot.margin = margin(0))
+    ) %>% 
+        wrap_plots(nrow = 2, heights = c(0.8, 0.2))
+}
+```
+
+# Variables
+
+As outlined in Table 1 in the task description. 
+
+```{r}
+VARIABLES = list(
+    outcome = "bel01", 
+    focal = c("bull", "ATT4"), 
+    nonfocal = c("female", "nld", "scie_std", "aca", "val", "comp", "ndiff", 
+                 "nfof", "native", "nfewbooks", "joyread", "goal", "mot", 
+                 "res", "swbp", "mean", "parent_sup", "ndis_clim", "GYM", "UNI")
+)
+
+glue("{length(VARIABLES$nonfocal)} non-focal variables used for modeling according to SAP: 
+     {VARIABLES$nonfocal |> paste0(collapse = ', ')}")
+```
+
+## Overview
+
+Elementary overview of distributions and correlations. 
+
+```{r}
+pisa2018 %>% 
+    select(bel01, one_of(unlist(VARIABLES))) %>% 
+    tbl_summary(
+        type = all_continuous() ~ "continuous2",
+        statistic = list(all_continuous() ~ c("{median} ({p25}, {p75})",
+                                              "{mean} ({sd})",
+                                             "{min}, {max}"))
+    )
+```
+
+```{r fig.width=8, fig.height=8}
+cormat = pisa2018 %>% 
+    select(one_of(unlist(VARIABLES))) %>% 
+    mutate(across(where(is.factor), as.numeric)) %>% 
+    cor(use = "pairwise.complete.obs", method = "spearman")
+
+ggcorrplot::ggcorrplot(cormat)
+```
+
+Focal predictors - important for target estimands.
+
+```{r}
+tbl_cross(pisa2018, bull, ATT4)
+```
+
+# Analysis
+
+## Primary model 
+
+```{r}
+f_m = sprintf("bel01 ~ bull * ATT4 + %s + (1 | school.id)", 
+              paste0(VARIABLES$nonfocal, collapse = " + ")) %>% 
+    as.formula()
+
+m = glmer(f_m, data = pisa2018, family = binomial)
+summary(m)
+```
+
+### Diagnostics
+
+Calibration including and excluding random effects, respectively. 
+
+```{r}
+rms::val.prob(logit = predict(m, re.form = NA), y = pisa2018$bel01)
+rms::val.prob(logit = predict(m, re.form = NULL), y = pisa2018$bel01)
+```
+
+Randomized quantile residuals. Note that outlier tests may have inflated
+error rates and are likely not relevant here. 
+
+```{r}
+s = simulateResiduals(m, seed = 26, plot = TRUE)
+plotResiduals(s, pisa2018$ATT4)
+plotResiduals(s, pisa2018$bull)
+```
+
+Random effect distribution (qq-plot for normality).
+
+```{r}
+ggplot(ranef(m)$school.id, aes(sample = `(Intercept)`)) + 
+        stat_qq() + 
+        stat_qq_line() + 
+        theme_bw()
+```
+
+### Target estimands
+
+Follow SAP to create representative students. We compute this for the 
+full model only.
+
+```{r}
+preddf = pisa2018 %>% 
+    select(bull, ATT4, one_of(VARIABLES$nonfocal)) %>% 
+    # 1) create subsets of data by focal predictors
+    group_by(bull, ATT4) %>% 
+    # 2) compute 1st, 2nd, 3rd quartiles in subsets
+    reframe(
+        across(everything(), ~ quantile(.x, probs = c(0.25, 0.5, 0.75))),
+        quantile = 1:3
+    )
+
+# 3) apply models
+preddf$pred_m = predict(m, newdata = preddf, re.form = NA)
+preddf$pred_m_prob = expit(preddf$pred_m)
+
+# 4) marginalize over random effect distribution
+rf = ranef(m)$school.id[, 1]
+preddf %<>% 
+    rowwise() %>% 
+    mutate(
+        pred_m_marg = mean(pred_m + rf), 
+        pred_m_marg_prob = mean(expit(pred_m + rf))
+    ) %>% 
+    ungroup()
+```
+
+Example: estimated probability and whole distribution due to random effect 
+variation for a single representative student. All the estimated distributions 
+have a common shape around their point estimate. 
+
+```{r}
+#| message: false
+#| warning: false
+i = 1
+preddf_1 = data.frame(
+    id = 1, pred_m = preddf$pred_m[i], 
+    pred_m_rf = preddf$pred_m[i] + rf, 
+    pred_m_prob_rf = expit(preddf$pred_m[i] + rf)
+)
+
+ggplot(preddf_1, aes(x = pred_m_prob_rf)) +
+    geom_vline(xintercept = expit(preddf_1$pred_m[1]), linetype = "dashed") + 
+    geom_density() + 
+    theme_bw()
+```
+
+## Secondary model 
+
+```{r}
+f_m2 = sprintf("bel01 ~ %s + (1 | school.id)", 
+              paste0(VARIABLES$nonfocal, collapse = " + ")) %>% 
+    as.formula()
+
+m2 = glmer(f_m2, data = pisa2018, family = binomial)
+summary(m2)
+```
+
+### Diagnostics
+
+Calibration including and excluding random effects, respectively. 
+
+```{r}
+rms::val.prob(logit = predict(m2, re.form = NA), y = pisa2018$bel01)
+rms::val.prob(logit = predict(m2, re.form = NULL), y = pisa2018$bel01)
+```
+
+Randomized quantile residuals. Note that outlier tests may have inflated
+error rates and are likely not relevant here. 
+
+```{r}
+s = simulateResiduals(m2, seed = 26, plot = TRUE)
+```
+
+Random effect distribution (qq-plot for normality).
+
+```{r}
+ggplot(ranef(m2)$school.id, aes(sample = `(Intercept)`)) + 
+        stat_qq() + 
+        stat_qq_line() + 
+        theme_bw()
+```
+
+## Model comparison
+
+Compare models in terms of a likelihood ratio test to assess if the secondary
+model would describe the data as well as the primary model.
+
+The test is significant, indicating the the larger model "better" describes the
+data based on frequentist likelihood theory. Also the AIC and BIC criteria are
+smaller for the larger model, indicating it is to be preferred despite the 
+larger number of fixed effects. 
+
+```{r}
+anova(m, m2)
+```
+
+## Bootstrap
+
+Simulate 1000 bootstraps for full model. The bootstrap is done at cluster
+level (i.e. schools).
+
+### Bootstrap indices
+
+```{r}
+set.seed(13376)
+b = 1000
+sids = unique(pisa2018$school.id)
+bootstraps = map(1:b, ~ sample(sids, length(sids), replace = TRUE))
+
+glue("Statistics of relative frequency of unique schools per bootstrap:")
+(map_dbl(bootstraps, n_distinct) / length(sids)) %>% summary()
+```
+
+### Run bootstrap
+
+```{r}
+f_b = sprintf("bel01 ~ bull * ATT4 + %s + (1 | school.id)", 
+              paste0(VARIABLES$nonfocal, collapse = " + ")) %>% 
+    as.formula()
+
+do_bootstrap <- function(df, ind, f_b, VARIABLES) {
+    # construct bootstrap sample
+    # first take schools in bootstrap, then give them unique ids
+    newids = set_names(ind, 1:length(ind))
+    df_bi = map_df(1:length(newids), 
+                   ~ df %>% 
+                       filter(school.id == newids[.x]) %>% 
+                       mutate(school.id = names(newids)[.x]))
+    
+    # fit model
+    m_bi = glmer(f_b, data = df_bi, family = "binomial")
+    
+    preddf_bi = df_bi %>% 
+        select(bull, ATT4, one_of(VARIABLES$nonfocal)) %>% 
+        # 1) create subsets of data by focal predictors
+        group_by(bull, ATT4) %>% 
+        # 2) compute 1st, 2nd, 3rd quartiles in subsets
+        reframe(
+            across(everything(), ~ quantile(.x, probs = c(0.25, 0.5, 0.75))),
+            quantile = 1:3
+        )
+
+    preddf_bi$pred_bi = predict(m_bi, newdata = preddf_bi, re.form = NA)
+    preddf_bi$pred_bi_prob = expit(preddf_bi$pred_bi)
+
+    rf = ranef(m_bi)$school.id[, 1]
+    preddf_bi %<>% 
+        rowwise() %>% 
+        mutate(pred_bi_marg = mean(pred_bi + rf), 
+               pred_bi_marg_prob = mean(expit(pred_bi + rf))) %>% 
+        ungroup() 
+
+    list(
+        preddf_bi = preddf_bi %>% select(bull, ATT4, quantile, 
+                                         pred_bi, pred_bi_prob, 
+                                         pred_bi_marg, pred_bi_marg_prob), 
+        optinfo = m_bi@optinfo, 
+        nrow = nrow(df_bi), 
+        rf = rf
+    )
+}
+```
+
+```{r warning=FALSE}
+#| message: false
+file_bootstrap = file.path(params$folder_analysis, 
+                           sprintf("bootstrap-logistic%s.rds", SUFFIX))
+if (!file.exists(file_bootstrap)) {
+    glue("Running bootstraps and saving to {file_bootstrap}") %>% print()
+    
+    plan(multisession, workers = 12)
+    res_b = foreach(
+        i = seq_along(bootstraps), 
+        .errorhandling = "pass", 
+        .options.future = list(seed = 15)
+    ) %dofuture%  {
+        t_start = Sys.time()
+        res = do_bootstrap(pisa2018, bootstraps[[i]], f_b, VARIABLES)
+        res$runtime = difftime(now(), t_start, units = "s") %>% as.numeric()
+        res
+    }
+    plan(sequential)
+    saveRDS(res_b, file_bootstrap)    
+} else {
+    glue("Reading bootstrap results from {file_bootstrap}") %>% print()
+    res_b = readRDS(file_bootstrap)
+}
+
+glue("Runtime per bootstrap in hours:")
+summary(map_dbl(res_b, 'runtime')) / 3600
+```
+
+### Convergence
+
+```{r}
+#| message: false
+#| warning: false
+res_b %>% map_chr(~ .x$optinfo$message) %>% table()
+```
+
+### Insights
+
+Random effect variances. 
+
+```{r}
+res_b %>% 
+    map_dfr( ~ data.frame(rf = .x$rf), .id = "bootstrap") %>% 
+    group_by(bootstrap) %>% 
+    summarise(
+        var_rf = var(rf)
+    ) %>% 
+    ggplot(aes(x = var_rf)) + 
+    geom_boxplot() + 
+    theme_bw()
+```
+
+# Final result
+
+Display target estimands and variability as table. We sort by bullying, 
+to ease comparison across levels of ATT and quantiles. 
+
+These confidence intervals reflect the variability of the marginalized
+probability estimates.
+
+```{r rows.print=50}
+#| message: false
+#| warning: false
+
+res_b_summary = bind_rows(map(res_b, "preddf_bi")) %>% 
+    group_by(bull, ATT4, quantile) %>% 
+    reframe(
+        pred_marg_prob = quantile(pred_bi_marg_prob, probs = c(0.025, 0.25, 0.75, 0.975)), 
+        pred_quantile = c("q2.5", "q25", "q75", "q97.5")
+    ) %>% 
+    pivot_wider(id_cols = c(bull, ATT4, quantile), 
+                names_from = pred_quantile, 
+                values_from = pred_marg_prob)
+
+res = preddf %>% 
+    select(bull, ATT4, quantile, pred_marg_prob = pred_m_marg_prob) %>% 
+    left_join(res_b_summary, by = c("bull", "ATT4", "quantile"))
+
+res$result = sprintf("%s<br>50%% [%s, %s]<br>95%% [%s, %s]", 
+                   round(res$pred_marg_prob, 2), 
+                   round(res$q25, 2), round(res$q75, 2), 
+                   round(res$q2.5, 2), round(res$q97.5, 2))
+
+res %>% 
+    select(bull, ATT4, quantile, result) %>% 
+    pivot_wider(id_cols = c(ATT4, quantile), 
+                names_from = bull, values_from = result) %>% 
+    arrange(ATT4, quantile) %>%
+    gt() %>% 
+    tab_style(
+        style = list(cell_fill("#EEEEEE")), 
+        locations = cells_body(rows = ATT4 %in% c(2, 4))
+    ) %>% 
+    fmt_markdown(columns = everything()) %>%
+    cols_align("center", c("0", "1")) %>% 
+    tab_spanner(label = "bull", columns = c("0", "1")) %>% 
+    tab_options(quarto.disable_processing = TRUE)
+
+ggplot(res, aes(group = ATT4, y = pred_marg_prob, color = fct_rev(factor(bull)), 
+                x = factor(quantile))) + 
+    geom_linerange(aes(ymin = q2.5, ymax = q97.5), position = position_dodge(0.5), 
+                   linewidth = 1.5) +
+    geom_linerange(aes(ymin = q25, ymax = q75), position = position_dodge(0.5), 
+                   linewidth = 3) +
+    geom_point(position = position_dodge(0.5), size = 5, shape = 3) + 
+    scale_color_brewer(palette = "Set1", name = "bull") +
+    coord_cartesian(ylim = c(0, 1)) +
+    ylab("Probability of low sense of belonging") +
+    xlab("Covariate quantile (dodged by increasing categories of ATT4)") + 
+    theme_bw() + 
+    theme(legend.position = "bottom")
+```
+
+# Further notes
+
+- Convergence: the models had some trouble with convergence as the random 
+    intercepts lead to models that are (close to being) singular. In particular
+    within the bootstrap this leads to the situation that the optimiser says
+    it converged, while lme4 specific diagnostics say it didn't. Likely 
+    that does not matter, as we also did some case studies with `allFit` which
+    indicated that all optimisers say they converged. In any case we switched
+    back to the default "Nelder Mead" optimiser after some testing for 
+    the analysis, as it seemed the most robust. 
+- RF variance: because it is so low overall we do not provide further CIs 
+    that reflect RF variance. 
+
+# Conclusions
+
+Overall model convergence seemed satisfactory across the bootstrap samples given
+the insights above. Random intercepts for schools reflect the sampling 
+strategy but do not capture much of the residual variance. In general the
+presented modeling strategy should provide an adequate estimate for the 
+desired target estimands. 
+
+Bullying consistently leads to a drop in sense of belonging across all levels
+of school truancy and all representative student values (i.e. subset quartiles).
+This is expressed by a higher probability of being in group of students with 
+sense of belonging lower than the 25% quantile.
+These differences are are also demonstrated by non-overlapping confidence
+intervals in all scenarios.
+
+# Sessioninfo
+
+To build this notebook:
+
+- install `quarto`
+- make sure the data is in the correct folder (either in global Data folder, 
+    or as subfolder of the folder containing this notebook).
+- build using the `make.R` script (global Data), or using the Render button in 
+    RStudio (subfolder Data).
+
+```{r}
+params
+
+glue("Runtime {difftime(Sys.time(), T_START, units = 'm') / 60} hours.")
+
+sessioninfo::session_info()
+```
