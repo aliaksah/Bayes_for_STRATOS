@@ -18,7 +18,7 @@ Fat: Amount of body fat expressed as a percentage of total body weight, using Si
 Weight (kg)
 Height (m)
 BMI: (Body Mass Index) Weight divided by the square of Height
-Age
+Age: ***One occurrence of Age=1 corrected to Age=20 (compared to original data set) (GH)***
 Neck: Minimal circumference perpendicular to the long axis of the neck (cm)
 Chest: Horizontal plane measurement at the sixth rib, at the end of a normal expiration (cm)
 Calf: Horizontal maximal calf measurement (cm)
