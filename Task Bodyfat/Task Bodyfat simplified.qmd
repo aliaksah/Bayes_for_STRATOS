@@ -88,7 +88,25 @@ The variable `Fat` corresponds to the Siri formula of estimating body fat propor
 women <- read.table("Datafiles/Bodyfat.txt", header=TRUE)
 ```
 
-One observation had a recorded age of 1. The age of that woman has been corrected to 20. This correction is already implemented in the data file.
+The following data corrections are applied:
+
+| Subject | Variable | Problem       | Solution  |
+|---------|----------|---------------|-----------|
+| 120     | Age      | Age == 1      | set to NA |
+| 42, 145 | Chest    | Chest \< 60   | set to NA |
+| 31      | Calf     | Calf == 66    | set to NA |
+| 124     | Knee     | Knee ==24.7   | set to NA |
+| 136     | Elbow    | Elbow == 15.5 | set to NA |
+
+These data points are set to the respective medians.
+
+```{r}
+women$Age[women$Age==1] <- median(women$Age)
+women$Chest[women$Chest<60] <- median(women$Chest)
+women$Calf[women$Calf==66] <- median(women$Calf)
+women$Knee[women$Knee==24.7] <- median(women$Knee)
+women$Elbow[women$Elbow==15.5] <- median(women$Elbow)
+```
 
 ### Data set of men
 
@@ -130,8 +148,14 @@ Several variables have different names in the two data sources. The following co
 ```{r}
 library(tidyverse)
 
+# We now compute the BMI for the men:
+
+bodyfat_corr$BMI <- bodyfat_corr$weight / bodyfat_corr$height^2
+
+# we will assign 'thigh' variable to 'MThigh' to align with the women data set.
+
 men <- bodyfat_corr %>%
-  rename(Fat = siri, Age = age, Height = height, Weight = weight, Neck = neck, Chest = chest, Waist = abdomen, Hips = hip, Knee = knee, Ankle = ankle, Forearm = forearm, Biceps = biceps, Thigh = thigh)
+  rename(Fat = siri, Age = age, Height = height, Weight = weight, Neck = neck, Chest = chest, Waist = abdomen, Hips = hip, Knee = knee, Ankle = ankle, Wrist = wrist, Forearm = forearm, Biceps = biceps, MThigh = thigh, BMI = BMI)
 ```
 
 ## Task description
@@ -147,3 +171,196 @@ The goal is to find a 5-predictor model and to test its performance in the men d
 ```{r}
 save(list=c("men", "women"), file="Datafiles/bodyfatdata.Rdata")
 ```
+
+## Initial data analysis
+
+Here we provide insight into the distributions of all variables, and the joint distribution of the predictors in each of training (women) and test (men) sets.
+
+### Predictor distributions
+
+```{r}
+require(ggplot2)
+  
+#helper function to compare distributions between women and men
+
+compare_histograms <- function(men, women, varname, bins = 30, xlab = NULL, title = NULL) {
+  # Determine availability of the variable in each dataset
+  has_men_var <- varname %in% names(men)
+  has_women_var <- varname %in% names(women)
+  
+  # Handle case: variable missing from both datasets
+  if (!has_men_var && !has_women_var) {
+    stop(paste("Variable", varname, "not found in either 'men' or 'women' data frame."))
+  }
+  
+  # Extract data from available datasets
+  data_list <- list()
+  if (has_men_var) {
+    data_list[[length(data_list) + 1]] <- data.frame(
+      value = men[[varname]],
+      group = "Men"
+    )
+  }
+  if (has_women_var) {
+    data_list[[length(data_list) + 1]] <- data.frame(
+      value = women[[varname]],
+      group = "Women"
+    )
+  }
+  
+  combined_df <- do.call(rbind, data_list)
+  
+  # Set default axis label and title if not provided
+  if (is.null(xlab)) xlab <- varname
+  if (is.null(title)) {
+    title <- paste("Histogram of", varname,
+                   if (has_men_var && has_women_var) "by Sex"
+                   else if (has_men_var) "for Men"
+                   else "for Women")
+  }
+  
+  # Plot using ggplot2
+   ggplot(combined_df, aes(x = value, fill = group)) +
+    geom_histogram(position = "identity", alpha = 0.5, bins = bins) +
+    labs(title = title, x = xlab, y = "Count") +
+    scale_fill_manual(values = c("Men" = "steelblue", "Women" = "tomato")) +
+    theme_minimal()
+}
+
+
+```
+
+```{r}
+compare_histograms(men, women, "Fat")
+compare_histograms(men, women, "Weight")
+compare_histograms(men, women, "Height")
+compare_histograms(men, women, "BMI")
+compare_histograms(men, women, "Age")
+compare_histograms(men, women, "Neck")
+compare_histograms(men, women, "Chest")
+compare_histograms(men, women, "Calf") # only available for women!
+compare_histograms(men, women, "Biceps")
+compare_histograms(men, women, "Hips")
+compare_histograms(men, women, "Waist")
+compare_histograms(men, women, "Forearm")
+compare_histograms(men, women, "MThigh")
+compare_histograms(men, women, "Wrist")
+compare_histograms(men, women, "Knee")
+compare_histograms(men, women, "Elbow") # only available for women!
+compare_histograms(men, women, "Ankle")
+```
+
+The age distributions are strikingly different between the two data sets. The age range for women is between 18 and 25, while that for men is between 20 and 80.
+
+We further note that all variables are clearly separated and tending to be higher in men than in women.
+
+The variable Calf and Elbow only exist for women; hence, to be able to validate the model in men, these variables should not be used for model building.
+
+## Correlation analysis
+
+Next we compute Spearman correlations between the pairs of predictors. We depict the correlation using a network graph.
+
+### A helper function for network graphs
+
+*   You can adjust the `threshold` to filter weak correlations.
+*    Only numeric variables are used.
+*    You can adapt the layout using `layout_with_kk()` or `layout_nicely()` if desired.
+*    If you don’t want to use `ggraph`, I can provide a base `plot.igraph()` version.
+
+```{r}
+# helper function for correlation network graph
+# Load necessary libraries
+correlation_network <- function(data, threshold = 0.3, title = "Spearman Correlation Network") {
+  # Load required packages
+  if (!requireNamespace("igraph", quietly = TRUE)) install.packages("igraph")
+  if (!requireNamespace("Hmisc", quietly = TRUE)) install.packages("Hmisc")
+  if (!requireNamespace("ggraph", quietly = TRUE)) install.packages("ggraph")
+  if (!requireNamespace("tidygraph", quietly = TRUE)) install.packages("tidygraph")
+  
+  library(igraph)
+  library(Hmisc)
+  library(ggraph)
+  library(tidygraph)
+  
+  # Use only numeric variables
+  numeric_data <- data[sapply(data, is.numeric)]
+  var_names <- colnames(numeric_data)
+  
+  # Compute Spearman correlations
+  cor_res <- rcorr(as.matrix(numeric_data), type = "spearman")
+  corr_mat <- cor_res$r
+  
+  # Remove diagonal and lower triangle (symmetric matrix)
+  corr_mat[lower.tri(corr_mat, diag = TRUE)] <- NA
+  
+  # Convert to edge list and apply threshold
+  edge_list <- as.data.frame(as.table(corr_mat), stringsAsFactors = FALSE)
+  edge_list <- na.omit(edge_list)
+  edge_list <- edge_list[abs(edge_list$Freq) >= threshold, ]
+  names(edge_list) <- c("from", "to", "weight")
+  
+  # Create node data frame (all variables)
+  node_df <- data.frame(name = var_names, stringsAsFactors = FALSE)
+  
+  # Create graph with full node list
+  # Create graph with full node list
+  g <- graph_from_data_frame(d = edge_list, vertices = node_df, directed = FALSE)
+
+  # Edge attributes
+  E(g)$weight_abs <- abs(E(g)$weight)
+  E(g)$color <- ifelse(E(g)$weight > 0, "steelblue", "tomato")
+  E(g)$distance <- 1 - E(g)$weight_abs  # correlation to distance
+
+  # Compute average path length
+  if (is.connected(g)) {
+  avg_path_len <- average.path.length(g, weights = E(g)$distance)
+  } else {
+    comps <- components(g)
+    largest_comp <- induced_subgraph(g, which(comps$membership == which.max(comps$csize)))
+    avg_path_len <- average.path.length(largest_comp, weights = E(largest_comp)$distance)
+  }
+  cat("Average weighted path length (1 - |Spearman|):", round(avg_path_len, 3), "\n")  
+  # Layout with force-directed algorithm
+  layout <- layout_with_fr(g, weights = E(g)$weight_abs)
+  
+  # Convert to tidygraph object
+  g_tbl <- as_tbl_graph(g)
+  
+  # Plot with ggraph
+  ggraph(g_tbl, layout = "manual", x = layout[,1], y = layout[,2]) +
+    geom_edge_link(aes(width = weight_abs, color = weight), alpha = 0.8) +
+    geom_node_point(size = 5, color = "grey30") +
+    geom_node_text(aes(label = name), repel = TRUE) +
+    scale_edge_color_gradient2(low = "tomato", mid = "grey80", high = "steelblue", midpoint = 0) +
+    scale_edge_width(range = c(0.5, 2.5)) +
+    labs(title = title, edge_color = "Spearman r") +
+    theme_minimal()
+}
+
+```
+
+In the following, we depict the network for varying thresholds (edges with correlation coefficients below the threshold are omitted):
+
+
+```{r}
+correlation_network(women[,c("Weight", "Height", "BMI", "Age", "Neck", "Chest", "Biceps", "Hips", "Waist", "Forearm", "MThigh", "Wrist", "Knee", "Ankle")], threshold = 0.25, title = "Women: correlation network. Threshold=0.25")
+
+correlation_network(women[,c("Weight", "Height", "BMI", "Age", "Neck", "Chest", "Biceps", "Hips", "Waist", "Forearm", "MThigh", "Wrist", "Knee", "Ankle")], threshold = 0.5, title = "Women: correlation network. Threshold=0.5")
+
+correlation_network(women[,c("Weight", "Height", "BMI", "Age", "Neck", "Chest", "Biceps", "Hips", "Waist", "Forearm", "MThigh", "Wrist", "Knee", "Ankle")], threshold = 0.75, title = "Women: correlation network. Threshold=0.75")
+```
+
+We learn that the correlations in this data set are very strong. Only Age and Height are only weakly connected to the other nodes.
+
+Now we repeat the same exercise for the men's data set:
+
+```{r}
+correlation_network(men[,c("Weight", "Height", "BMI", "Age", "Neck", "Chest", "Biceps", "Hips", "Waist", "Forearm", "MThigh", "Wrist", "Knee", "Ankle")], threshold = 0.25, title = "Men: correlation network. Threshold=0.25")
+
+correlation_network(men[,c("Weight", "Height", "BMI", "Age", "Neck", "Chest", "Biceps", "Hips", "Waist", "Forearm", "MThigh", "Wrist", "Knee", "Ankle")], threshold = 0.5, title = "Men: correlation network. Threshold=0.5")
+
+correlation_network(men[,c("Weight", "Height", "BMI", "Age", "Neck", "Chest", "Biceps", "Hips", "Waist", "Forearm", "MThigh", "Wrist", "Knee", "Ankle")], threshold = 0.75, title = "Men: correlation network. Threshold=0.75")
+
+```
+
+The correlation networks for men are similarly dense compared to those for the women. For example, at the threshold of 0.75, Wrist and Ankle are already disconnected from the main cluster, and Forearm only weakly connected (only to Biceps). For women, Neck and Ankle are disconnected at the highest threshold. The average characteristic path lengths are similar between the networks.
