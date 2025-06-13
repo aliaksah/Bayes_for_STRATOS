@@ -1,0 +1,892 @@
+---
+title: "Replication of Task Kepler"
+author: "GH"
+format: 
+  html:
+    toc: true
+    embed-resources: true
+editor: visual
+---
+
+## Helpers and preparations
+
+### Set switch to do bootstrap
+
+```{r}
+do_bootstrap <- FALSE
+do_symbolic <- FALSE
+```
+
+### Helper function to plot residuals
+
+```{r}
+library(ggplot2)
+library(patchwork)  # for combining plots
+
+plot_lm_diagnostics <- function(model, point=TRUE, hist=TRUE) {
+  # Compute observed values
+  pred <- model$fitted.values
+  resid <- residuals(model)
+  sresid <- rstandard(model)
+  observed <- pred + resid
+  sqrt_abs_sresid <- sqrt(abs(sresid))
+  hatvalues <- hatvalues(model)
+
+  # Data frame for plotting
+  df <- data.frame(
+    Predicted = pred,
+    Observed = observed,
+    Residuals = resid,
+    SqrtAbsRstandard = sqrt_abs_sresid,
+    hat = hatvalues
+  )
+
+  # Plot 1: Observed vs Predicted
+  p1 <- ggplot(df, aes(x = Predicted, y = Observed)) +
+    geom_smooth(method = "loess", formula = y ~ x, se = TRUE, color = "blue") +
+    labs(title = "Observed vs. Predicted", x = "Predicted", y = "Observed") +
+    theme_minimal()
+
+  # Plot 2: Residuals vs Predicted
+  p2 <- ggplot(df, aes(x = Predicted, y = Residuals)) +
+    geom_smooth(method = "loess", formula = y ~ x, se = TRUE, color = "darkred") +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+    labs(title = "Residuals vs. Predicted", x = "Predicted", y = "Residuals") +
+    theme_minimal()
+
+  # Plot 3: Absolute Residuals vs Predicted
+  p3 <- ggplot(df, aes(x = Predicted, y = SqrtAbsRstandard)) +
+    geom_smooth(method = "loess", formula = y ~ x, se = TRUE, color = "darkgreen") +
+    labs(title = "Absolute Residuals vs. Predicted", x = "Predicted", y = "sqrt(Absolute Stand. Residuals)") +
+    theme_minimal()
+  
+  # Plot 5: hat values, highest 1%
+  p5 <- ggplot(data=df, aes(x = hat, y = sresid)) + geom_point() + xlab("Hat values") + ylab("Standardized residuals")
+  
+  if(hist) {
+    p4a <- ggplot(df, aes(x = Residuals)) + geom_histogram() + theme_minimal()
+    qqn <- as.data.frame(qqnorm(df$Residuals, plot=FALSE))
+    p4b <- ggplot(qqn, aes(x=x, y=y)) + geom_point() + geom_smooth() + labs(title ="Normal Q-Q Plot") + xlab("Theoretical normal quantiles") + ylab("Residuals")
+    print(p4a)
+    print(p4b)
+    
+  }
+
+ if(point == T) print(p1 + geom_point())
+  else print(p1)
+  if(point == T) print(p2 + geom_point())
+  else print(p2)
+  if(point == T) print(p3 + geom_point())
+  else print(p3)
+ print(p5)
+}
+
+```
+
+### Helper function for spaghetti plot
+
+```{r}
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+
+spaghetti_plot <- function(x, y_mat, y_main) {
+  # Check dimensions
+  if (length(x) != nrow(y_mat)) stop("Length of x must match number of rows in y_mat.")
+  if (length(x) != length(y_main)) stop("Length of y_main must match length of x.")
+
+
+  # Create data frame for y_mat
+  df <- as.data.frame(y_mat)
+  df$x <- x
+  
+  # Long format for y_mat
+  df_long <- df %>%
+    pivot_longer(
+      cols = -x,
+      names_to = "curve",
+      values_to = "y"
+    ) %>%
+    mutate(type = "other")  # Label for color/type
+  
+  # Data frame for y_main
+  df_main <- data.frame(
+    x = x,
+    y = y_main,
+    curve = "main",
+    type = "main"
+  )
+  
+  # Combine data
+  df_all <- bind_rows(df_long, df_main) %>%
+    arrange(type, curve, x)  # Ensure proper line drawing order
+  
+  # Plot
+  ggplot(df_all, aes(x = x, y = y, group = curve)) +
+    geom_line(aes(color = type, size = type)) +
+    scale_color_manual(values = c("main" = "black", "other" = "gray70")) +
+    scale_size_manual(values = c("main" = 1.2, "other" = 0.4)) +
+    theme_minimal() +
+    labs(x = "X", y = "Y", title = "Spaghetti Plot of functional forms") +
+    theme(legend.position = "none")  # Hide legend if not needed
+}
+
+```
+
+#### Helper function to plot estimated functional forms
+
+```{r}
+# Helper function to draw spline fit nicely
+library(ggplot2)
+
+plot_glm_term <- function(pred_terms, term_name, data,
+                          conf_level = 0.95, x_fun = identity) {
+  # pred_terms: result from predict(glm_fit, type = "terms", se.fit = TRUE)
+  # term_name: base variable name (e.g., "mass")
+  # data: data.frame used for prediction
+  # conf_level: confidence level for the bands
+  # x_fun: transformation function for x-axis (default: identity)
+
+  # Find the corresponding term in pred_terms$fit
+  match_col <- grep(paste0("\\b", term_name, "\\b"), colnames(pred_terms$fit), value = TRUE)
+
+  if (length(match_col) == 0) {
+    stop("No matching term found in prediction output for: ", term_name)
+  } else if (length(match_col) > 1) {
+    warning("Multiple matching terms found. Using the first match: ", match_col[1])
+  }
+
+  matched_name <- match_col[1]
+
+  # Get x values
+  x_raw <- data[[term_name]]   
+
+  # Extract fit and standard error
+  fit <- pred_terms$fit[, matched_name]
+  se <- pred_terms$se.fit[, matched_name]
+
+  # Compute confidence intervals
+  z <- qnorm(1 - (1 - conf_level) / 2)
+  lower <- fit - z * se
+  upper <- fit + z * se
+
+  # Prepare plot data
+  plot_data <- data.frame(
+    x = x_fun(x_raw),
+    fit = fit,
+    lower = lower,
+    upper = upper
+  )
+
+  # Sort for clean plotting
+  plot_data <- plot_data[order(plot_data$x), ]
+
+  # Plot
+  ggplot(plot_data, aes(x = x, y = fit)) +
+    geom_line(color = "blue", linewidth = 1) +
+    geom_ribbon(aes(ymin = lower, ymax = upper), fill = "blue", alpha = 0.2) +
+    labs(
+      title = paste("Partial Effect of", term_name),
+      y = "Partial Fit (on link scale)",
+      x = term_name
+    ) +
+    theme_minimal()
+}
+
+
+
+```
+
+## Data set
+
+```{r}
+Kepler_url <- url("https://raw.githubusercontent.com/OpenExoplanetCatalogue/oec_tables/master/comma_separated/open_exoplanet_catalogue.txt")
+Kepler_data <- read.csv(Kepler_url)
+
+```
+
+## Define Initial Data Analysis plan
+
+### Main analysis of interest
+
+#### Outcome variable
+
+-   semimajoraxis
+
+#### Main predictors
+
+-   hoststar_mass
+-   period
+
+#### Further candidate predictors
+
+-   mass
+-   binaryflag
+-   radius
+-   eccentricity
+-   periastron
+-   longitude
+-   ascendingnode
+-   inclination
+-   temperature
+-   system_rightascension
+-   system_declination
+-   hoststar_radius
+-   hoststar_metallicity
+-   hoststar_temperature
+
+#### Structural or irrelevant variables
+
+-   discoverymethod
+-   discoveryyear
+-   lastupdate
+-   system_distance
+-   age
+-   hoststar_age
+-   list
+
+```{r}
+# define variable groups
+
+main_predictors <- c("hoststar_mass", "period")
+candidate_predictors <- c("mass","binaryflag","radius","eccentricity","periastron","longitude",
+"ascendingnode","inclination","temperature","system_rightascension","system_declination","hoststar_radius",
+"hoststar_metallicity","hoststar_temperature")
+structural <- c("discoverymethod","discoveryyear","lastupdate","system_distance","age","hoststar_age","list")
+system_var <- c("system_rightascension", "system_declination", "system_distance", "hoststar_mass", "hoststar_radius", "hoststar_metallicity", "hoststar_temperature", "hoststar_age")
+```
+
+## IDA
+
+### Missing values
+
+#### Per variable
+
+```{r}
+mean(is.na(Kepler_data$semimajoraxis))
+
+miss_var <- function(var) {
+  ret <- sapply(1:length(var), function(X) mean(is.na(Kepler_data[,X])))
+  names(ret) <- var
+  ret <- ret[order(ret)]
+  return(ret)
+}
+
+miss_main <- miss_var(main_predictors)
+miss_candidate <- miss_var(candidate_predictors)
+miss_structural <- miss_var(structural)
+miss_main
+miss_candidate
+miss_structural
+```
+
+#### Complete cases if considering different groups of predictors
+
+```{r}
+cat("Main predictors:", sum(complete.cases(Kepler_data[,c("semimajoraxis", main_predictors)])))
+cat("\nCandidate predictors:", sum(complete.cases(Kepler_data[,c("semimajoraxis", main_predictors, candidate_predictors)])))
+# probably work through candidate predictor list starting with variable with smallest proportion missingness
+
+varlist <- c("semimajoraxis", names(miss_main), names(miss_candidate), names(miss_structural))
+
+comp_cases <- sapply(1:length(varlist), function(X) sum(complete.cases(Kepler_data[,varlist[1:X]])))
+names(comp_cases) <- paste("+", varlist)
+comp_cases
+
+
+
+```
+
+### Univariate distributions
+
+```{r}
+library(ggplot2)
+
+ggplot(data=Kepler_data, aes(x=semimajoraxis)) + geom_histogram()
+ggplot(data=Kepler_data, aes(x=hoststar_mass)) + geom_histogram()
+ggplot(data=Kepler_data, aes(x=period)) + geom_histogram()
+ggplot(data=Kepler_data, aes(x=mass)) + geom_histogram()
+ggplot(data=Kepler_data, aes(x=hoststar_temperature)) + geom_histogram()
+
+ggplot(data=Kepler_data, aes(x=semimajoraxis)) + geom_histogram() +
+  scale_x_continuous(transform="log")
+
+ggplot(data=Kepler_data, aes(x=hoststar_mass)) + geom_histogram() + scale_x_continuous(transform="log")
+ggplot(data=Kepler_data, aes(x=period)) + geom_histogram() + scale_x_continuous(transform="log")
+ggplot(data=Kepler_data, aes(x=mass)) + geom_histogram()+ scale_x_continuous(transform="log")
+ggplot(data=Kepler_data, aes(x=hoststar_temperature)) + geom_histogram()+ scale_x_continuous(transform="log")
+
+
+```
+
+### Correlations
+
+```{r}
+
+varlist <- c("semimajoraxis","mass", "radius", "period", "eccentricity", "hoststar_mass", "hoststar_radius", "hoststar_metallicity","hoststar_temperature","binaryflag")
+
+Kepler_data_focus <- Kepler_data %>% select(semimajoraxis,mass, radius, period, eccentricity, hoststar_mass, hoststar_radius, hoststar_metallicity,hoststar_temperature,binaryflag) %>% na.omit()
+summary(Kepler_data_focus)
+
+
+cor(Kepler_data_focus[,varlist[-1]], method="spearman", use="pairwise.complete")
+
+```
+
+## Analyses according to SAP
+
+### Analysis sets
+
+We create an analysis set with original data and one with log-transformed data. For the log-transformation, we add constants to eccentricity and to hoststar_metallicity, because their smalles values are less than 0. binaryflag is not tansformed.
+
+```{r}
+
+analysis_set <- Kepler_data_focus
+analysis_set <- analysis_set[complete.cases(analysis_set),]
+
+analysis_set_tmp <- analysis_set
+analysis_set_tmp$eccentricity <- analysis_set_tmp$eccentricity + 0.13
+analysis_set_tmp$hoststar_metallicity <- analysis_set_tmp$hoststar_metallicity + 1
+analysis_set_tmp$binaryflag <- exp(analysis_set_tmp$binaryflag) # to ensure that after log transforamtion, we still have original values.
+analysis_log <- log(analysis_set_tmp)
+
+```
+
+### Model 1: linear with backward elimination (BIC)
+
+```{r}
+
+formula <- as.formula(paste0("semimajoraxis ~", paste(varlist[-1], collapse="+")))
+
+fit_M1_global <- lm(data=analysis_set, formula=formula)
+fit_M1 <- step(fit_M1_global, direction="both", k=log(nrow(analysis_set)))
+summary(fit_M1)
+
+plot_lm_diagnostics(fit_M1)
+
+
+# the leverage plot suggests to remove observations 666 and 2168 for their extreme leverages.
+```
+
+The leverage plot suggests that there are probably two observations with extreme leverages. Leverages (a/k/a hat values) should sum up to 4 and two observations have values greater than 0.4, which seems disproportionally high. This would suggest to remove these observations for their extreme leverages.
+
+```{r}
+rbind(analysis_set[hatvalues(fit_M1)>0.4,],
+apply(analysis_set, 2, quantile, c(0.9, 0.99, 1)))
+# it seems 666 has an extreme mass und 2168 an extreme semimajoraxis
+```
+
+The comparison of these two observations with the 90th and 99th percentiles and maximum for each variable reveals that for observation 666, mass is more than 10fold the 99th percentile, and for observation 2168, period and semimajoraxis are at the maximum, exceeding the 99th percentiles by the 400fold and 14fold, respectively.
+
+The analysis is now repeated with these two influential observations removed, to yield the 'robust' model Model 1rob.
+
+### Model 1 rob: two influential observations removed
+
+```{r}
+analysis_rob <- analysis_set[hatvalues(fit_M1)<0.4,]
+
+fit_M1_rob_global <- lm(data=analysis_rob, formula)
+fit_M1_rob <- step(fit_M1_rob_global, direction="both", k=log(nrow(analysis_rob)))
+summary(fit_M1_rob)
+```
+
+```{r}
+plot_lm_diagnostics(fit_M1_rob)
+
+```
+
+The residual plots, in particular the scale-location plot indicate that the model might still need some modification.
+
+### Model 2: backward elimination with BIC and log-transformed data
+
+```{r}
+fit_M2_global <- lm(data=analysis_log, formula)
+fit_M2 <- step(fit_M2_global, direction="both", k=log(nrow(analysis_set)))
+summary(fit_M2)
+
+plot_lm_diagnostics(fit_M2)
+plot_lm_diagnostics(fit_M2, point=F, hist=F)
+```
+
+Remark: this is exactly the result predicted by Kepler's law! The regression coefficients are essentially 0.332 and 0.667 on the log scale. The regression approximately yields
+
+$$ log(semimajoraxis) \propto 1/3\cdot \log(hoststarmass) + 2/3 \cdot log(period)$$
+
+which could be written as
+
+$$ semimajoraxis \propto (hoststarmass \times period^2)^{1/3} $$.
+
+### Interlude
+
+Comparing Model 2 and Model 1rob, we see that Model 2 has much higher $R^2$ (0.9989 compared to 0.9564) and less problems with residual diagnostics. Hence the decision was made to change the analysis plan such that we work with log-transformed data for most analyses.
+
+### Model 3: MFP
+
+Using the analysis set with log-transformed data (`analysis_log`).
+
+```{r}
+
+library(mfp2)
+fit_M3 <- mfp2(data=analysis_log, semimajoraxis ~ fp(hoststar_mass) + fp(period) + fp(mass) + fp(hoststar_temperature) + fp(radius) + fp(eccentricity) + fp(hoststar_radius) + fp(hoststar_metallicity) + binaryflag, df=4, criterion="bic")
+
+fit_M3
+
+```
+
+```{r}
+summary(fit_M3)
+```
+
+The MFP model confirms the Kepler law model - it identifies hoststar_mass and period with no transformation (except the log) as the only influential variables. The regression coefficients are in line with the Kepler law.
+
+```{r}
+plot_lm_diagnostics(fit_M3)
+plot_lm_diagnostics(fit_M3, point=F, hist=F)
+```
+
+The residual plots do not give rise to any major concerns.
+
+### Model 4: Symbolic regression
+
+In the SAP it was not clarified which 'grammar' to use for the symbolic regression. Here we used a couple of possible transformations of the input variables: log, identity, square, cubic, square root, cubic root. We also allowed for sum, difference, product and ratio operators and the numbers 1, 2, and 3 to be included in the formula.
+
+```{r}
+library(gramEvol)
+
+if(do_symbolic) {
+
+  pow2 <- function(X) X^2
+  pow3 <- function(X) X^3
+  pow1_2 <- function(X) X^(1/2)
+  pow1_3 <- function(X) X^(1/3)
+  
+  ruleDef <- list(expr = grule(op(expr, expr), func(expr), var),
+                  func = grule(log, identity, pow2, pow3, pow1_2, pow1_3),
+                  op = grule('+', '-', '*', '/'),
+                  var = grule(analysis_log$period,  
+                              analysis_log$mass, 
+                              analysis_log$hoststar_mass, 
+                              analysis_log$hoststar_temperature,
+                              analysis_log$radius,
+                              analysis_log$eccentricity,
+                              analysis_log$hoststar_radius,
+                              analysis_log$hoststar_metallicity,
+                              analysis_log$binaryflag), 
+                  n = gvrule(1:4))
+  
+  grammarDef <- CreateGrammar(ruleDef)
+  #GrammarRandomExpression(grammarDef, 6)
+  
+  null_var <- var(analysis_log$semimajoraxis)
+  
+  SymRegFitFunc <- function(expr) {
+    result <- eval(expr)
+    if (any(is.nan(result)))
+      return(Inf)
+  #  calib <- lm(analysis_log$semimajoraxis ~ result)
+    resid_var = mean((analysis_log$semimajoraxis - result)^2)
+    Unexpl_var = resid_var/null_var
+    return(Unexpl_var)
+  }
+  
+  set.seed(7123981)
+  ge <- GrammaticalEvolution(grammarDef=grammarDef, evalFunc=SymRegFitFunc, 
+                             terminationCost = 0.01, 
+                             iterations = 500, 
+                             disable.warnings=TRUE, 
+                             optimizer = "ga",
+                             max.depth =3)
+  print(ge, sequence=TRUE)
+  
+  ges <- GrammaticalExhaustiveSearch(grammar = grammarDef, evalFunc = SymRegFitFunc, max.depth=3, terminationCost = 1)
+} else {
+  load("symbolic_results.Rdata")
+}
+print(ges)
+```
+
+The model ended up in the expression `hoststar_mass + eccentricity` (recall, both variables were on the log scale) which yields a variance of residuals that is about 1.06 fold the original variance of log(semimajoraxis). This means the model did not converge to the Kepler law, it did not even yield a residual variance that was smaller than the variance of the dependent variable. An exhaustive enumeration of all possible expressions did not yield a better model. This may be due to insufficient implementation of the symbolic regression model. Finally, it was decided to skip symbolic regression for this example.
+
+### Model 4 alternative: using FPs as grammar, linear combination, and an FP1 for outcome transformation
+
+In this model building strategy, we use FP as the grammar, offering the set of powers $\{-2, -1, -1/2, 0, 1/2, 1, 2, 3\}$, where 0 refers to $\log$. We also apply FP to the outcome, which means we wrap a loop over the transformations around the ´mfp´ call and evaluate the models by inverting the outcome transformation and applying it to the linear predictor. However, for the outcome we use a symmetric power set, which seems more reasonable for the right-skewed data: $\{-1, -0.5, -1/3, 0, 1/3, 0.5, 1\}$.
+
+For this analysis, we chose to use the non-transformed data set, first including the two influential points. The Kepler Law would be within the search space in the model.
+
+```{r}
+require(mfp2)
+out_trans <- c(-1, -0.5, -1/3, 0, 1/3, 0.5, 1)
+
+# define functions for outcome transformation and inverse transformation
+FPY <- function(y, p){
+  if(p !=0) return(y^p)
+  else return(log(y))
+}
+IFPY <- function(mu, p){
+  if(p !=0) return(mu^(1/p))
+  else return(exp(mu))
+}
+
+
+ss_ymfp <- matrix(0,length(out_trans), 3)  # 3 columns: SS, df of model, BIC
+colnames(ss_ymfp) <- c("SumSq", "DF", "BIC")
+
+
+fits <- vector(mode="list", length = length(out_trans))
+pred_ymfp <- matrix(0, nrow(analysis_set), length(out_trans))
+mape <- vector(mode="numeric", length(length(out_trans)))
+
+
+# loop over outcome transformations
+for(j in 1:length(out_trans)){
+  # transform outcome
+  y_tmp <- FPY(analysis_set$semimajoraxis, out_trans[j])
+  # fit MFP model with transformed outcome
+  fit_tmp <-    mfp2(data=analysis_set, y_tmp ~ fp(hoststar_mass) + fp(period) + fp(mass) + fp(hoststar_temperature) + fp(radius) + fp(eccentricity) + fp(hoststar_radius) + fp(hoststar_metallicity) + binaryflag, df=4, criterion="bic", verbose=FALSE)
+  fits[[j]] <- fit_tmp
+  # evaluate sum of squares with inversely transformed linear predictor
+  pred_ymfp[,j] <- IFPY(predict(fit_tmp, newdata=analysis_set), out_trans[j])
+  ss_ymfp[j,1] <- sum((pred_ymfp[,j] - analysis_set$semimajoraxis)^2)
+  ss_ymfp[j,2] <- sum(fit_tmp$fp_terms[,"df_final"])
+  ss_ymfp[j,3] <- ss_ymfp[j,1] + log(fit_tmp$df.null+1) * ss_ymfp[j,2]   # bic
+  mape[j] <- median(abs(analysis_set$semimajoraxis - pred_ymfp[,j]))
+}
+
+
+# evaluate results
+round(cbind(out_trans, ss_ymfp),1)
+cbind(out_trans, mape)
+
+
+# summary of best fit:
+best_index <- which.min(ss_ymfp[,3])
+fits[[best_index]]
+```
+
+With this approach, model 4 applies a log transformation to the outcome and two log transformations to hoststar_mass and period, and such finds the Kepler model. The second-best model is model 7, with untransformed outcome variable. That model has considerably more complex transformations for the variables:
+
+-   FP(0.5,1) for period
+-   FP(-2) for mass
+-   FP(-0.5) for hoststar_radius
+-   linear hoststar_mass
+-   linear eccentricity
+
+This could be a result from the sum of squares being highly influenced by the two high-leverage observations.
+
+The importance of the variables, as expressed by standardized regression coefficients, is as follows:
+
+```{r}
+
+# Helper function to obtain partial fit for a variable
+
+#Helper function to compute standardised coefficients (sd(beta*FP(X)))
+
+partial <- function(model, data, adj_stat = mean){
+  variables <- rownames(model$transformations)
+  adj_to <- apply(data[,variables], 2, adj_stat)
+  partial <- matrix(NA, nrow(data), length(variables))
+  colnames(partial) <- variables
+  nv <- length(variables)
+  betas <- 0*(1:nv)
+  names(betas) <- variables
+  for(j in 1:nv){
+    variable <- variables[j]
+    scale <- model$transformations[variable,2]
+    shift <- model$transformations[variable, 1]
+    pow <- model$fp_powers[[variable]]
+    var_pre <- (c(adj_to[variable],data[[variable]]) +shift)/ scale
+    value <- rep(0, length(var_pre))
+    if(!is.na(pow[1])) {
+      beta <- coef(model)[grepl(variable, names(coef(model)))]
+      var1 <- var_pre**pow[1] 
+      if(pow[1]==0) var1 <- log(var_pre) 
+      value <- var1 * beta[1]
+      if(length(pow)==2) {
+        if(pow[2] == pow[1]) var2 <- var1 * log(var_pre)
+        else var2 <- var_pre**pow[2]
+        value <- value + var2 * beta[2]
+      }
+    }
+    value <- value - value[1]
+    partial[,j] <- value[-1]
+  }
+  return(partial)
+}
+
+
+
+#Helper function to compute standardised coefficients (sd(beta*FP(X)))
+
+beta_std <- function(model, data){
+  variables <- rownames(model$transformations)
+  nv <- length(variables)
+  betas <- 0*(1:nv)
+  names(betas) <- variables
+  for(j in 1:nv){
+    variable <- variables[j]
+    scale <- model$transformations[variable,2]
+    shift <- model$transformations[variable, 1]
+    pow <- model$fp_powers[[variable]]
+    if(is.na(pow[1])) beta[j] <- 0
+    else {
+      beta <- coef(model)[grepl(variable, names(coef(model)))]
+      var_pre <- (data[[variable]] +shift)/ scale
+      var1 <- var_pre**pow[1] 
+      if(pow[1]==0) var1 <- log(var_pre) 
+      value <- var1 * beta[1]
+      if(length(pow)==2) {
+        if(pow[2] == pow[1]) var2 <- var1 * log(var_pre)
+        else var2 <- var_pre**pow[2]
+        value <- value + var2 * beta[2]
+      }
+      betas[j] <- sd(value)
+    }
+  }
+  return(-sort(-betas))
+}
+
+cat("Standardized betas for Linear outcome\n")
+beta_std(fits[[7]], analysis_set)
+
+cat("\nStandardized betas for Log outcome\n")
+beta_std(fits[[4]], analysis_set)
+```
+
+This confirms period and hoststar_mass as the by far most influential variables. Nevertheless, hoststar_temperature and to a small degree mass still play a role in the equation.
+
+In the following, we investigate the residuals of model 6:
+
+```{r}
+plot_lm_diagnostics(fits[[7]])
+plot_lm_diagnostics(fits[[7]], point=FALSE, hist=FALSE)
+```
+
+The residual plots indicate that the model is probably not correctly specified, and that there are some highly influential data foints.
+
+We repeat the analysis without the two data points that were identified already earlier.
+
+```{r}
+ss_ymfp_rob <- matrix(0,length(out_trans), 3)  # 3 columns: SS, df of model, BIC
+colnames(ss_ymfp_rob) <- c("SumSq", "DF", "BIC")
+
+fits_rob <- vector(mode="list", length = length(out_trans))
+pred_ymfp_rob <- matrix(0, nrow(analysis_rob), length(out_trans))
+mape_rob <- vector(mode="numeric", length(length(out_trans)))
+
+
+# loop over outcome transformations
+for(j in 1:length(out_trans)){
+  # transform outcome
+  y_tmp <- FPY(analysis_rob$semimajoraxis, out_trans[j])
+  # fit MFP model with transformed outcome
+  fit_tmp <-    mfp2(data=analysis_rob, y_tmp ~ fp(hoststar_mass) + fp(period) + fp(mass) + fp(hoststar_temperature) + fp(radius) + fp(eccentricity) + fp(hoststar_radius) + fp(hoststar_metallicity) + binaryflag, df=4, criterion="bic", verbose=FALSE)
+  fits_rob[[j]] <- fit_tmp
+  # evaluate sum of squares with inversely transformed linear predictor
+  pred_ymfp_rob[,j] <- IFPY(predict(fit_tmp, newdata=analysis_rob), out_trans[j])
+  ss_ymfp_rob[j,1] <- sum((pred_ymfp_rob[,j] - analysis_rob$semimajoraxis)^2)
+  ss_ymfp_rob[j,2] <- sum(fit_tmp$fp_terms[,"df_final"])
+  ss_ymfp_rob[j,3] <- ss_ymfp_rob[j,1] + log(fit_tmp$df.null+1) * ss_ymfp_rob[j,2]   # bic
+  mape_rob[j] <- median(abs(analysis_rob$semimajoraxis - pred_ymfp_rob[,j]))
+}
+
+
+# evaluate results
+round(cbind(out_trans, ss_ymfp_rob),1)
+cbind(out_trans, mape_rob)
+```
+
+Using the reduced data set, the optimal model is again exactly the Kepler model.
+
+```{r}
+fits_rob[[4]]
+
+```
+
+This model identifies period and hoststar_mass as the two influential variables:
+
+```{r}
+beta_std(fits_rob[[4]], analysis_rob)
+```
+
+The following plots the log(BIC) vs. the outcome transformation:
+
+```{r}
+plot(out_trans, log(ss_ymfp_rob[,3]), ylab="log(BIC)", xlab="Power transformation of Y")
+```
+
+The residual diagnostics for the optimal model:
+
+```{r}
+plot_lm_diagnostics(fits_rob[[4]])
+plot_lm_diagnostics(fits_rob[[4]], point=FALSE, hist=FALSE)
+```
+
+The residual plots do not indicate any major concerns.
+
+The following two plots depict the estimated functional forms (recall that the outcome was log-transformed):
+
+```{r}
+fracplot(fits_rob[[4]], terms ="period")
+fracplot(fits_rob[[4]], terms ="hoststar_mass")
+```
+
+Because of the high $R^2$, we skip the internal validation by cross-validation.
+
+In the following, we conduct a bootstrap analysis with 50 iterations to investigate if the identified model is stable. This analysis is based on the data set with the two influential observations removed.
+
+```{r, eval=TRUE}
+# bootstrap analysis to investigate model stability
+if(do_bootstrap) {  
+  B <- 50
+  best_out_trans <- 0*(1:B)
+  best_fp_terms1 <- matrix(NA, B, 9)
+  colnames(best_fp_terms1) <- varlist[-1]
+  best_fp_terms2 <- matrix(NA, B, 9)
+  colnames(best_fp_terms2) <- varlist[-1]
+  partial_b <- vector(mode = "list", length=B)
+  
+  set.seed(7123981)
+  for(b in 1:B){
+    analysis_brob <- analysis_rob[sample(1:nrow(analysis_rob), repl=TRUE),]
+  
+    fits_brob <- vector(mode="list", length = length(out_trans))
+    bic_tmp <- vector(mode="numeric", length = length(out_trans))
+    
+    # loop over outcome transformations
+    for(j in 1:length(out_trans)){
+      # transform outcome
+      y_tmp <- FPY(analysis_brob$semimajoraxis, out_trans[j])
+      # fit MFP model with transformed outcome
+      fit_tmp <-    mfp2(data=analysis_brob, y_tmp ~ fp(hoststar_mass) + fp(period) + fp(mass) + fp(hoststar_temperature) + fp(radius) + fp(eccentricity) + fp(hoststar_radius) + fp(hoststar_metallicity) + binaryflag, df=4, criterion="bic", verbose=FALSE, cycles=10)
+      fits_brob[[j]] <- fit_tmp
+      # evaluate sum of squares with inversely transformed linear predictor
+      pred_tmp <- IFPY(predict(fit_tmp, newdata=analysis_brob), out_trans[j])
+      ss_tmp <- sum((pred_tmp - analysis_brob$semimajoraxis)^2)
+      df_tmp <- sum(fit_tmp$fp_terms[,"df_final"])
+      bic_tmp[j] <- ss_tmp + log(fit_tmp$df.null+1) * df_tmp   # bic
+  
+    }
+    
+    best_out_trans[b] <- out_trans[which.min(bic_tmp)]
+    #cat("Resample ", b, " Best outcome transformation: ", best_out_trans[b], "\n")
+    best_fp_terms1[b,] <- fits_brob[[which.min(bic_tmp)]]$fp_terms[colnames(best_fp_terms1),"power1"]
+    if(any(fits_brob[[which.min(bic_tmp)]]$fp_terms[, "df_final"] == 4)) best_fp_terms2[b, ] <- fits_brob[[which.min(bic_tmp)]]$fp_terms[colnames(best_fp_terms1),"power2"]
+    # save partial fits for best fit for spaghetti plot
+    partial_b[[b]] <- partial(fits_brob[[which.min(bic_tmp)]], analysis_rob, median)
+  
+  }
+  
+  table(best_out_trans)
+} else {
+  load("bootstrap_results.Rdata")
+}
+```
+
+In all resamples, the optimal outcome transformation according to BIC on the original scale was the log transformation.
+
+```{r, eval=TRUE}
+period_fp <- sapply(1:B, function(X) paste(best_fp_terms1[X,"period"], best_fp_terms2[X,"period"]))
+table(period_fp)  
+
+hoststar_mass_fp <- sapply(1:B, function(X) paste(best_fp_terms1[X,"hoststar_mass"], best_fp_terms2[X,"hoststar_mass"]))
+table(hoststar_mass_fp)  
+
+mass_fp <- sapply(1:B, function(X) paste(best_fp_terms1[X,"mass"], best_fp_terms2[X,"mass"]))
+table(mass_fp)  
+
+hoststar_temperature_fp <- sapply(1:B, function(X) paste(best_fp_terms1[X,"hoststar_temperature"], best_fp_terms2[X,"hoststar_temperature"]))
+table(hoststar_temperature_fp)  
+
+```
+
+We finally list the frequencies of the selected outcome transformations and the frequencies of the selected FPs.
+
+-   Period was always selected; always as log (=FP(0))
+-   Hoststar_mass was also always selected: 37 times as FP(0), 6 times as square root (FP(0.5)), 5 times as linear (FP(1)), and once each as FP(-2, -0.5) and as FP(0,3).
+-   Hoststar_temperature was selected 9 times as linear and twice as FP(-2).
+-   Hoststar_radius was selected 10 times as FP(-0.5), 9 times as FP(-2) and twice as FP(-1) For period and hoststar_mass, the log was always involved in the model. For mass, linear functional form was always involved.
+-   further variables were selected in less than 10 resamples.
+
+### Variability of estimated functional forms
+
+Based on the bootstrap, we can plot the estimated functional forms for each variable.
+
+```{r, eval=T}
+# arrange results into a matrix
+
+partial_fits <- partial(fits_rob[[4]], analysis_rob, median)
+
+period_ff <- matrix(sapply(1:B, function(X) partial_b[[X]][,"period"]), nrow(analysis_rob), B, byrow=FALSE)
+
+hoststar_mass_ff <- matrix(sapply(1:B, function(X) partial_b[[X]][,"hoststar_mass"]), nrow(analysis_rob), B, byrow=FALSE)
+
+mass_ff <- matrix(sapply(1:B, function(X) partial_b[[X]][,"mass"]), nrow(analysis_rob), B, byrow=FALSE)
+
+
+spaghetti_plot(x = log(analysis_rob[,"period"]), y_main=partial_fits[,"period"], y_mat = period_ff) + ggtitle("Spaghetti plot of functional forms for period")
+
+spaghetti_plot(x = log(analysis_rob[,"hoststar_mass"]), y_main=partial_fits[,"hoststar_mass"], y_mat = hoststar_mass_ff) + ggtitle("Spaghetti plot of functional forms for hoststar_mass")
+
+spaghetti_plot(x = log(analysis_rob[,"mass"]), y_main=partial_fits[,"mass"], y_mat = mass_ff) + ggtitle("Spaghetti plot of functional forms for mass")
+
+
+```
+
+The spaghetti plots reveal that among the 50 bootstrap resamples, in some cases (1 for period, some more for hoststar_mass) the correct functional form could not be identified. This highlights the variability in identifying the appropriate functional form using the MFP algorithm.
+
+### Model 5: Generalized additive model with restricted cubic splines with 3 df
+
+#### Analysis
+
+We apply the splines model to the log-transformed data set.
+
+```{r, eval=TRUE}
+# MVRS using RCS with 3df
+
+source("mvrs.R")
+
+analysis_log$binaryflag <- as.factor(analysis_log$binaryflag)
+fit_mvrs <- mvrs_glm(data = analysis_log, formula=formula, mode_cont = "310", crit_all="bic", family="gaussian")
+
+drop1(fit_mvrs$model)
+
+#termplot(fit_mvrs$model)
+
+p_terms <-  predict(fit_mvrs$model, type="terms", se=T, newdata=analysis_log)
+#pred_mvrs <- fit_mvrs$model$fitted.values
+#res_mvrs <- fit_mvrs$model$residuals
+
+plot_glm_term(p_terms, term_name = "period",  data = analysis_log)
+plot_glm_term(p_terms, term_name = "hoststar_mass", data = analysis_log)
+
+plot_lm_diagnostics(fit_mvrs$model)
+```
+
+Again, this analysis yields the Kepler model.
+
+The next model forces the splines into the model:
+
+```{r, eval=TRUE}
+fit_mvrsf <- mvrs_glm(data = analysis_log, formula, mode_cont = "310", crit_select="bic", crit_fsp = "significance", sl_fsp=1, family="gaussian")
+
+
+
+drop1(fit_mvrsf$model)
+
+
+p_termsf <-  predict(fit_mvrsf$model, type="terms", se=T, newdata=analysis_log)
+
+## for some reasons I get a strange error here, replaced by termplot
+plot_glm_term(p_termsf, term_name = "period",  data = analysis_log)
+plot_glm_term(p_termsf, term_name = "hoststar_mass", data = analysis_log)
+
+#termplot(fit_mvrsf$model, rug=TRUE, se=TRUE)
+
+plot_lm_diagnostics(fit_mvrsf$model)
+```
+
+The term plots still indicate a linear functional form (despite modeling with splines with 3df). As before, apart from one very large positive residual and two influential points, there seem not to be any strong patterns in the residual plots.
+
+## Summary
+
+The analysis based on the formula `r paste(as.character(formula)[c(2,1,3)], collapse=" ")`, allowing for nonlinear functional forms for the continuous predictors, converges to the Kepler model. Instead of the symbolic regression model, a outcome-transforming MFP model was estimated which also converges to the Kepler model. This was then assessed for stability, which revealed that for hoststar_mass there was some variation, but the model was stable for period. Also with the multivariable regression splines (MVRS) strategy, the model was stably detected. Even if splines were forced into the model, the estimated associations with the log outcome look linear with minimally increased variation compared to a forced-linear model.
