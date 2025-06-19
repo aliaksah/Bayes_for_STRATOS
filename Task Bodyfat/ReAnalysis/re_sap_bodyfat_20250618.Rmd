@@ -1,0 +1,392 @@
+---
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+  html_notebook: default
+---
+---
+title: "Statistical re-analysis plan: Predicting body fat proportion using anthropometric measures"
+author: "Mariana Nold" 
+---
+
+########  Run Task Bodyfat simplified first.
+
+##### Load R packages
+```{r load package, message = FALSE, warning = FALSE}
+library("rstanarm")
+library("projpred")
+library("ggplot2")
+library("loo")
+library("bayesplot")
+library("bayesrules")
+library("DHARMa")
+library("ggplot2")
+library("dplyr")
+library("tidyr")
+```
+
+
+```{r set path and load data (female and male)}
+PPath <- "C:/Users/zo95yup/Documents/GitHub/Bayes_for_STRATOS/Task Bodyfat/"
+load("~/GitHub/Bayes_for_STRATOS/Task Bodyfat/Datafiles/bodyfatdata.Rdata")
+#scale data sets
+# Create copies of the original datasets
+#woman <- women
+#man <- men
+
+# Standardize all variables except the first two in 'woman'
+#woman[, -c(1,2)] <- scale(woman[, -c(1,2)])
+
+# Standardize all variables except the first three in 'man'
+#man[, -c(1,2,3)] <- scale(man[, -c(1,2,3)])
+
+# Display summary statistics for validation
+summary(women)
+sd(women$Fat)
+summary(men)
+sd(men$Fat)
+```
+
+```{r fit full model with rstanarm, results='hide', cache=TRUE}
+
+rmf <- as.formula(Fat ~ Waist + Height + Weight + Age + Neck + Chest +  
+                          Biceps + Hips + Forearm 
+                        +  Knee +  Ankle + BMI)
+
+# Fit a Bayesian Gaussian regression model using stan_glm 
+ref_fit <- stan_glm(rmf, data = women, family = gaussian())
+# Check reference model, MCMC check
+summary(ref_fit)
+#shinystan::launch_shinystan(ref_fitf)
+
+mcmc_areas(as.matrix(ref_fit)[,2:13])
+```
+
+##### Investigate quality of the reference model
+```{r LOOPIT and bayesrules summary, cache=TRUE}
+
+pp_check(ref_fit)
+y_rep_rmf <- posterior_predict(ref_fit)
+loo_rmf <- loo(ref_fit , save_psis = TRUE, cores = 4)
+psis1_rmf <- loo_rmf$psis_object
+lw_rmf <- weights(psis1_rmf)
+color_scheme_set("red")
+#pdf(file.path(PPath, "/LOOPITrmf.pdf"))
+ppc_loo_pit_overlay(y= women$Fat,yrep=y_rep_rmf,lw=lw_rmf)
+#dev.off()
+
+# Summarize the posterior distributions simple model
+summary_rmf_cv <- prediction_summary_cv(model = ref_fit , data = women, k = 3)
+
+# Print the summary simple model
+print(summary_rmf_cv)
+
+```
+##### Use projpred to downsize model even more
+```{r predictive projection, results='hide', cache=TRUE}
+set.seed(2341)
+vs_cvf <- cv_varsel(ref_fit)
+
+save(vs_cvf,file = file.path(PPath,"vs_cvf"))
+#load(file = file.path(PPath,"vs_cvf"))
+
+# Plot the variable selection 
+#pdf(file.path(PPath, "cv_valsel_plotf.pdf"))
+plot(vs_cvf, deltas = TRUE)
+#dev.off()
+# 
+
+```
+
+```{r best five predictors}
+nsel <- suggest_size(vs_cvf)
+nsel
+
+rank_vs_cvf <- ranking(vs_cvf)
+rank_vs_cvf$fulldata
+
+solterms_final_vs_cvf <- head(rank_vs_cvf$fulldata ,suggest_size(vs_cvf))
+
+solterms_final_vs_cvf
+
+# Print the summary of the variable selection 
+summary(vs_cvf) 
+solterms_final_fivef <- head(rank_vs_cvf$fulldata, 5)
+solterms_final_fivef 
+```
+
+##### Projected posterior for the selected model
+```{r post-selection inference, results='hide'}
+# https://cran.r-project.org/web/packages/projpred/vignettes/projpred.html#post-selection-inference
+proj_ref_fit <- project(vs_cvf, predictor_terms = solterms_final_fivef, ns = 4000)
+
+```
+##### Show results
+```{r Show results}
+color_scheme_set(scheme = "green")
+mcmc_areas(as.matrix(proj_ref_fit), pars = solterms_final_fivef)# 
+```
+#### Robustness check based on Bayesian LASSO and compuation of prob. unequal zero
+```{r compute Bayesian LASSO, results='hide'}
+# Bayesian Lasso using rstanarm
+lasso <- stan_glm(Fat ~ Waist + Height + Weight + Age + Neck + Chest +  
+                    Biceps + Hips + Forearm + Knee + Ankle + BMI, 
+                  data = women, family = gaussian(),
+                  prior =  lasso(df = 1, location = 0, scale = NULL, autoscale = TRUE), prior_intercept = normal())
+```
+
+```{r robustness check based on Bayesian LASSO and compuation of prob. unequal zero}
+prior_summary(lasso)
+# show results
+summary(lasso)
+
+color_scheme_set(scheme = "pink")
+mcmc_areas(as.matrix(lasso))
+
+
+mcmc_areas(as.matrix(lasso), pars = setdiff(names(lasso$coefficients), "(Intercept)"))
+pred <- setdiff(names(lasso$coefficients), "(Intercept)")
+posterior_samples <- as.matrix(lasso, pars = pred)
+
+# Define the range
+lower_bound <- -0.05
+upper_bound <- 0.05
+
+# Apply the condition to each element of the matrix
+prob_between <- apply(posterior_samples, 2, function(par) mean(par >= lower_bound & par <= upper_bound))
+
+# Print the result
+print(prob_between)
+
+sort(prob_between)
+sort(1 - prob_between)
+```
+##### The final model, which includes five predictors, is  identical
+```{r define formula}
+formula_male <- as.formula(Fat ~ Waist  + Hips + BMI + Knee + Ankle)
+```
+
+###### Model diagnostics (1.3.3)
+```{r Model diagnostics}
+y_linpred_female <- proj_linpred(proj_ref_fit, solution_terms= solterms_final_fivef, newdata = women)
+women2 <- cbind(women, linpred = colMeans(y_linpred_female$pred))
+plotLocBias <- ggplot(data.frame(fitted.values = women2$linpred, y = women2$Fat), aes(x=fitted.values, y=y)) + geom_point() + geom_smooth() + geom_abline(slope=1, intercept=0)
+plotLocBias
+# Compute residuals
+prj_predictW <- proj_predict(proj_ref_fit)
+
+qres.m1=createDHARMa(simulatedResponse = t(prj_predictW ), 
+                          observedResponse = women2$Fat, 
+                          fittedPredictedResponse = apply(prj_predictW , 2, median), integerResponse = F, seed = 123, method = "PIT") 
+summary(residuals(qres.m1))
+# QQ-Plot 
+res <- qnorm(residuals(qres.m1))
+
+# QQ-Plot mit ggplot2
+res.plot <- ggplot(data.frame(res), aes(sample = res)) +
+  stat_qq(color = "steelblue", size = 2) +
+  stat_qq_line(color = "firebrick", linetype = "dashed") +
+  labs(
+     title = "QQ Plot of Transformed Residuals",
+    x = "Theoretical Quantiles",
+    y = "Observed Quantiles"
+  ) +
+  theme_minimal(base_size = 14)
+res.plot
+# Check heteroskedasticity (1.3.3.2)
+plotHet <- ggplot(data.frame(fitted.values = women2$linpred, y=sqrt(abs(res))), aes(x=fitted.values, y=y)) + geom_point() + geom_smooth() 
+plotHet 
+# Check association with excluded predictors
+plotExcPred <- ggplot(data.frame(Weight=women2$Weight, Residuals=res), aes(x=Weight, y=Residuals)) + geom_point() + geom_smooth() 
+plotExcPred
+
+ggplot(data=data.frame(residuals=res), aes(x=res)) + geom_histogram(bins=20)
+# Apparent performance of the model (1.3.4)
+R.square <- cor(women2$linpred, women2$Fat, method = "pearson")
+R.square
+color_scheme_set(scheme = "purple")
+mcmc_areas(as.matrix(proj_ref_fit), pars = "sigma")
+summary(as.matrix(proj_ref_fit)[, "sigma"])
+```
+##### Internal validation
+##### Calibration intercept and slope (internal validation)
+```{r compute Calibration intercept and slope (internal), results='hide'}
+observed <- women2$Fat
+predicted <- women2$linpred
+calib_dataW <- data.frame(observed = observed, predicted = predicted)
+# Compute calibration intercept and slope
+calibration_modelW <- stan_glm(observed ~ predicted, family = gaussian(), data = calib_dataW)
+```
+
+```{r Calibration intercept and slope (internal)}
+
+
+summary(calibration_modelW)
+
+posterior_samplesW <- as.matrix(calibration_modelW)
+intercepts <- posterior_samplesW[, "(Intercept)"]
+slopes <- posterior_samplesW[, "predicted"]
+
+# Dataframe  for regression lines
+regression_linesW <- data.frame(
+  intercept = intercepts,
+  slope = slopes
+)
+
+n_lines <- nrow(as.matrix(calibration_modelW))
+print(n_lines)
+sampled_lines <- regression_linesW[sample(nrow(regression_linesW), size = 100), ]
+# plot
+ggplot(calib_dataW, aes(x = predicted, y = observed)) +
+  geom_point(alpha = 0.9) +
+  geom_abline(data = sampled_lines, aes(intercept = intercept, slope = slope), alpha = 0.1, color = "darkgreen") +
+  labs(title = "Calibration Plot with regression lines (internal)",
+       x = "Predicted",
+       y = "Observed") +
+  theme_minimal()
+color_scheme_set("gray")
+summary(as.matrix(calibration_modelW))
+
+mcmc_areas(as.matrix(calibration_modelW),
+           pars = c("(Intercept)", "predicted"),
+           prob = 0.95) + 
+  ggtitle("Calibration Intercept & Calibration slope (internal)")
+
+library(bayesplot)
+
+# Intercept
+mcmc_areas(
+  as.matrix(calibration_modelW),
+  pars = "(Intercept)",
+  prob = 0.95
+) +
+  ggtitle("Calibration Intercept (internal)")
+
+# Slope
+mcmc_areas(
+  as.matrix(calibration_modelW),
+  pars = "predicted",
+  prob = 0.95
+) +
+  ggtitle("Calibration Slope (internal)")
+
+
+
+mcmc_areas(as.matrix(calibration_modelW),
+           pars = "sigma",
+           prob = 0.95) + 
+  ggtitle("Sigma of Calibration model (internal)")
+```
+##### External validation
+```{r predictions for males based on female model}
+y_linpred_male <- proj_linpred(proj_ref_fit, solution_terms= solterms_final_fivef, newdata = men)
+
+
+color_scheme_set("blue")
+prj_predictM <- proj_predict(proj_ref_fit, newdata = men)
+# Using the 'bayesplot' package:
+ppc_dens_overlay(y = men$Fat, yrep = prj_predictM)
+
+# 3.1
+eval_men <- cbind(men, linpred = colMeans(y_linpred_male$pred))
+# performance measures at external validation
+rmspe_ext <- sqrt(mean((eval_men$Fat - eval_men$linpred)^2))
+rmspe_ext
+Rsqu_ext <- 1 - (mean((eval_men$Fat - eval_men$linpred)^2))/var(eval_men$Fat)
+Rsqu_ext
+R.squareM <- cor(eval_men$linpred, eval_men$Fat, method = "pearson")
+R.squareM
+
+calPlot <- ggplot(eval_men, aes(linpred, Fat)) + geom_point() + geom_smooth() + geom_smooth(method="lm", col="red") + geom_abline(intercept=0, slope=1) 
+calPlot
+calResPlot <- ggplot(eval_men, aes(x=linpred, y=Fat-linpred)) + geom_point() + geom_smooth()
+calResPlot
+hetPlot <- ggplot(eval_men, aes(x=linpred, y=sqrt(abs(Fat-linpred)))) + geom_point() + geom_smooth()
+hetPlot
+# Predictors: "BMI"   "Hips"  "Waist" "Ankle" "Knee"
+nonpredictors <- c("Height", "Weight", "Age", "Neck", "Chest", "Biceps",  "Forearm") 
+
+eval_men_long <- eval_men %>% pivot_longer(cols = all_of(nonpredictors), names_to = "NonPredictor", values_to = "Value") 
+
+plotAll <- ggplot(eval_men_long, aes(x = Value, y = Fat - linpred)) + geom_point(alpha = 0.5) + geom_smooth(method = "lm", se = FALSE, color = "blue") + facet_wrap(~ NonPredictor, scales = "free_x") + labs(title = "Non-Predictors versue residuals (Fat - linpred)", x = "Non-Predictor", y = "Residuals (Fat - linpred)") + theme_minimal() 
+
+plotAll
+```
+
+
+
+##### Calibration intercept and slope (external validation)
+```{r compute Calibration intercept and slope (external), results='hide'}
+observed <- eval_men$Fat
+predicted <- eval_men$linpred
+calib_data <- data.frame(observed = observed, predicted = predicted)
+# Compute calibration intercept and slope
+calibration_model <- stan_glm(observed ~ predicted, family = gaussian(), data = calib_data)
+```
+
+```{r Calibration intercept and slope (external)}
+summary(calibration_model)
+
+posterior_samples <- as.matrix(calibration_model)
+intercepts <- posterior_samples[, "(Intercept)"]
+slopes <- posterior_samples[, "predicted"]
+
+# Dataframe  for regression lines
+regression_lines <- data.frame(
+  intercept = intercepts,
+  slope = slopes
+)
+
+n_lines <- nrow(as.matrix(calibration_model))
+print(n_lines)
+sampled_lines <- regression_lines[sample(nrow(regression_lines), size = 100), ]
+# plot
+ggplot(calib_data, aes(x = predicted, y = observed)) +
+  geom_point(alpha = 0.9) +
+  geom_abline(data = sampled_lines, aes(intercept = intercept, slope = slope), alpha = 0.1, color = "blue") +
+  labs(title = "Calibration Plot with regression lines",
+       x = "Predicted",
+       y = "Observed") +
+  theme_minimal()
+color_scheme_set("orange")
+summary(as.matrix(calibration_model))
+
+
+mcmc_areas(as.matrix(calibration_model),
+           pars = c("(Intercept)", "predicted"),
+           prob = 0.95) + 
+  ggtitle("Calibration Intercept & Calibration slope (external)")
+
+library(bayesplot)
+
+# Intercept
+mcmc_areas(
+  as.matrix(calibration_model),
+  pars = "(Intercept)",
+  prob = 0.95
+) +
+  ggtitle("Calibration Intercept (external)")
+
+# Slope
+mcmc_areas(
+  as.matrix(calibration_model),
+  pars = "predicted",
+  prob = 0.95
+) +
+  ggtitle("Calibration Slope (external)")
+
+
+
+mcmc_areas(as.matrix(calibration_model),
+           pars = "sigma",
+           prob = 0.95) + 
+  ggtitle("Sigma of Calibration model (external)")
+```
+
+
+
+
+
+
+
