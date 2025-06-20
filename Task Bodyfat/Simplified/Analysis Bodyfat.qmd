@@ -1,0 +1,230 @@
+---
+title: "Analysis (simplified): bodyfat prediction (unfinished!)"
+author:
+  - name: Georg Heinze
+    affiliation: Medical University of Vienna, Center for Medical Data Science
+date: last-modified                            # "`r Sys.Date()`" for system date
+categories: [2024, Contrast-Bayes-Frequentist, STRATOS, R]
+description: "Classification: confidential"
+editor: visual
+execute:
+  warning: false
+theme: cosmo                                   # cosmo bootswatch theme
+toc: true                                      # table of contents  
+number-sections: true
+colorlinks: true                               # ??
+highlight-style: pygments
+#bibliography: references.bib
+format:
+  html: 
+    code-fold: true
+    code-tools: true
+    html-math-method: katex
+    self-contained: true                      # html is self-contained
+  pdf:
+    geometry: 
+      - top=30mm
+      - left=30mm
+  docx: default                               
+---
+
+## Preliminaries
+
+This analysis report relates to SAPI V1 for the Analysis of bodyfat example (simplified).
+
+
+## Load libraries
+
+```{r}
+library(mfp2)
+
+library(here)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(tidyselect)
+library(gt)
+library(gtExtras)
+library(patchwork)
+library(Hmisc)
+library(sjlabelled)
+```
+
+# Model estimation
+
+## Load data
+
+```{r}
+load("../Datafiles/bodyfatdata.Rdata")
+```
+
+## Main analysis
+
+### Description of observational units
+
+```{r}
+library(dplyr)
+library(table1)
+
+
+# Assume these are your two existing datasets
+# data_women <- ...
+# data_men <- ...
+
+# Add Gender variable to each
+data_women <- women %>% mutate(Gender = "1-Women")
+data_men   <- men %>% mutate(Gender = "2-Men")
+
+# Combine them into one dataset
+data <- bind_rows(data_women, data_men)
+
+
+my.render.cont <- function(x) {
+        sprintf("%0.1f (%0.1f)\n[%0.1f – %0.1f]", 
+               mean(x, na.rm=TRUE), sd(x, na.rm=TRUE), min(x, na.rm=TRUE), max(x, na.rm=TRUE))
+}
+
+# Label variables
+label(data$Fat) <- "Body Fat (%)"
+label(data$Weight) <- "Weight (kg)"
+label(data$Height) <- "Height (m)"
+label(data$BMI) <- "BMI (kg/m^2)"
+label(data$Age) <- "Age (years)"
+label(data$Neck) <- "Neck (cm)"
+label(data$Chest) <- "Chest (cm)"
+label(data$Calf) <- "Calf (cm)"
+label(data$Biceps) <- "Biceps (cm)"
+label(data$Hips) <- "Hips (cm)"
+label(data$Waist) <- "Waist (cm)"
+label(data$Forearm) <- "Forearm (cm)"
+label(data$PThigh) <- "Proximal Thigh (cm)"
+label(data$MThigh) <- "Middle Thigh (cm)"
+label(data$DThigh) <- "Distal Thigh (cm)"
+label(data$Wrist) <- "Wrist (cm)"
+label(data$Knee) <- "Knee (cm)"
+label(data$Elbow) <- "Elbow (cm)"
+label(data$Ankle) <- "Ankle (cm)"
+
+# Generate Table 1
+
+
+table1(~ Fat + Weight + Height + BMI + Age + Neck + Chest  + Biceps + 
+         Hips + Waist + Forearm +  MThigh  + Wrist + Knee + 
+          Ankle | Gender, data = data, render.continuous = my.render.cont)
+```
+
+### Main data analysis
+
+#### Model estimation
+
+```{r, message=TRUE}
+library(glmnet)
+
+predictors <- c("Weight", "Height", "BMI", "Age",
+  "Neck", "Chest",  "Biceps", "Hips", "Waist",
+  "Forearm",  "MThigh",  "Wrist",
+  "Knee", "Ankle")
+p <- length(predictors)
+
+x <- as.matrix(women[, predictors])
+y <- as.numeric(women$Fat)
+n <- nrow(x)
+
+# fit the coefficient path
+fit_glmnet <- glmnet(x=x, y=y, family="gaussian", relax=T)
+
+# plot the coefficient path vs. log(lambda), y axis limited as intercept breaks out
+plot(fit_glmnet$relaxed, xvar="lambda", ylim=c(-2,2), xlim=c(-2,2), label=TRUE)
+
+
+# find lambda where p_active=5
+
+
+# Get coefficient matrix (excluding intercept)
+coef_mat <- coef(fit_glmnet)[-1, ]  # remove intercept row
+# Each column corresponds to a different lambda
+
+# Count how many non-zero coefficients for each lambda
+num_nonzero <- apply(coef_mat, 2, function(v) sum(v != 0))
+
+# Find the largest lambda where the number of nonzero coefficients equals p
+p <- 5
+target_lambda_index <- max(which(num_nonzero == p))
+target_s <- max(fit_glmnet$lambda[num_nonzero ==p])
+
+# Extract names of active predictors at that lambda
+active_coef <- coef_mat[, target_lambda_index]
+active_predictors <- rownames(coef_mat)[which(active_coef != 0)]
+
+
+## find extended set of active predictors (5+3)
+p_ext <- 8
+target_lambda_index_ext <- max(which(num_nonzero == p_ext))
+
+# Extract names of active predictors at that lambda
+active_coef_ext <- coef_mat[, target_lambda_index_ext]
+active_predictors_ext <- rownames(coef_mat)[which(active_coef_ext != 0)]
+
+
+
+
+# Result: character vector of predictor names
+cat("\n\nSelected predictors:\n")
+active_predictors
+
+
+cat("\n\nExtended set of selected predictors:\n")
+active_predictors_ext
+
+
+
+#se_residual
+se_residual <- ((1-fit_glmnet$relaxed$dev.ratio)*fit_glmnet$relaxed$nulldev)/(n-fit_glmnet$relaxed$df-1)
+# at selected lambda
+#se_residual[num_nonzero == p]
+cat("\n\nResidual standard error (model based):\n")
+se_residual[target_lambda_index]
+
+cat("\n\nModel coefficients:\n")
+coef(fit_glmnet$relax, s=target_s)
+# predict(fit_glmnet$relax, s=target_s, newx=x)
+
+
+```
+
+### Residual analysis
+
+```{}
+```
+
+```{r}
+library(ggplot2)
+
+predictions <- predict(fit_glmnet$relaxed, s=target_s, newx=x)
+
+residuals <- y - predictions
+
+ggplot(data=data.frame(residuals), aes(x=residuals)) + geom_histogram()
+
+sqrt_abs_res <- sqrt(abs(residuals))
+
+ggplot(data=data.frame(residuals, predictions, y), aes(x=predictions, y=residuals)) + geom_point() + geom_smooth()
+
+ggplot(data=data.frame(sqrt_abs_res, predictions, y), aes(x=predictions, y=sqrt_abs_res)) + geom_point() + geom_smooth()
+```
+
+
+In the following residual plots, the nearly-selected predictors are denoted by red dots, the selected predictors by blue dots.
+
+
+```{r}
+
+for(v in active_predictors_ext){
+  cols=ifelse(v %in% active_predictors, "blue", "red")
+  print(ggplot(data=data.frame(residuals, variable=x[,v]), aes(x=variable, y=residuals), xlab(v)) + geom_point(color=cols) + geom_smooth() + xlab(v)) 
+  
+}
+```
+
+
+
