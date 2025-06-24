@@ -1,5 +1,5 @@
 ---
-title: "Analysis (simplified): bodyfat prediction (unfinished!)"
+title: "Analysis (simplified): bodyfat prediction"
 author:
   - name: Georg Heinze
     affiliation: Medical University of Vienna, Center for Medical Data Science
@@ -30,7 +30,7 @@ format:
 
 ## Preliminaries
 
-This analysis report relates to SAPI V1 for the Analysis of bodyfat example (simplified).
+This analysis report relates to SAPI V1.1 for the Analysis of bodyfat example (simplified).
 
 
 ## Load libraries
@@ -58,7 +58,7 @@ library(sjlabelled)
 load("../Datafiles/bodyfatdata.Rdata")
 ```
 
-## Main analysis
+## Main data analysis
 
 ### Description of observational units
 
@@ -110,12 +110,42 @@ label(data$Ankle) <- "Ankle (cm)"
 
 table1(~ Fat + Weight + Height + BMI + Age + Neck + Chest  + Biceps + 
          Hips + Waist + Forearm +  MThigh  + Wrist + Knee + 
-          Ankle | Gender, data = data, render.continuous = my.render.cont)
+          Ankle | Gender, data = data, render.continuous = my.render.cont, overall = NULL)
 ```
 
-### Main data analysis
+
+### Objective 1: Model development and internal assessment
 
 #### Model estimation
+
+Define a function that fits the model.
+
+```{r}
+# Function to derive the model with p predictors
+
+# x = predictor matrix with column names being the labels
+
+
+
+fit_rlasso <- function(x, y, p_final){
+  n <- nrow(x)
+  fit_glmnet <- glmnet(x=x, y=y, family="gaussian", relax=T)
+  coef_mat <- coef(fit_glmnet$relaxed)
+  num_nonzero <- apply(coef_mat, 2, function(v) sum(v != 0))-1
+  target_lambda_index <- max(which(num_nonzero <= p_final))
+  target_s <- min(fit_glmnet$lambda[num_nonzero <=p_final])
+  active_coef <- coef_mat[, target_lambda_index]
+  active_predictors <- rownames(coef_mat)[which(active_coef != 0)]
+  fitted <- cbind(1,x) %*% active_coef
+  residuals <- y - fitted
+  residual_se <- sqrt(sum(residuals^2)/(n-1-p_final))
+  return(list(coef=active_coef, residual_se=residual_se, residuals=residuals, fitted=fitted, relaxed=fit_glmnet$relaxed, fit=fit_glmnet, s=target_s))
+}
+```
+
+
+Fit the model:
+
 
 ```{r, message=TRUE}
 library(glmnet)
@@ -131,86 +161,185 @@ y <- as.numeric(women$Fat)
 n <- nrow(x)
 
 # fit the coefficient path
-fit_glmnet <- glmnet(x=x, y=y, family="gaussian", relax=T)
-
-# plot the coefficient path vs. log(lambda), y axis limited as intercept breaks out
-plot(fit_glmnet$relaxed, xvar="lambda", ylim=c(-2,2), xlim=c(-2,2), label=TRUE)
+fit_glmnet <- fit_rlasso(x=x, y=y, p_final=5)
 
 
-# find lambda where p_active=5
+ypred_orig <- predict(fit_glmnet$relaxed, newx=x, s=fit_glmnet$s)
+```
 
+#### Model stability
 
-# Get coefficient matrix (excluding intercept)
-coef_mat <- coef(fit_glmnet)[-1, ]  # remove intercept row
-# Each column corresponds to a different lambda
-
-# Count how many non-zero coefficients for each lambda
-num_nonzero <- apply(coef_mat, 2, function(v) sum(v != 0))
-
-# Find the largest lambda where the number of nonzero coefficients equals p
-p <- 5
-target_lambda_index <- max(which(num_nonzero == p))
-target_s <- max(fit_glmnet$lambda[num_nonzero ==p])
-
-# Extract names of active predictors at that lambda
-active_coef <- coef_mat[, target_lambda_index]
-active_predictors <- rownames(coef_mat)[which(active_coef != 0)]
-
-
-## find extended set of active predictors (5+3)
-p_ext <- 8
-target_lambda_index_ext <- max(which(num_nonzero == p_ext))
-
-# Extract names of active predictors at that lambda
-active_coef_ext <- coef_mat[, target_lambda_index_ext]
-active_predictors_ext <- rownames(coef_mat)[which(active_coef_ext != 0)]
+Repeat the model building process 1000 times on bootstrap samples and store the coefficients and the predictions from the model on the original data:
 
 
 
+```{r}
+p_final <- 5
+sel_orig <- fit_glmnet$coef !=0
 
-# Result: character vector of predictor names
-cat("\n\nSelected predictors:\n")
-active_predictors
+B <- 1000
+
+coef_b <- matrix(NA, nrow=B, ncol=ncol(x)+1)
+colnames(coef_b) <- names(fit_glmnet$coef)
+
+pred_b <- matrix(NA, nrow=B, ncol=nrow(x))
+
+rsq_app <- rsq_test <- se_b <- model_sel <- (1:B)*0
+
+set.seed(7123981)
+
+for(b in 1:B){
+  indb <- sample(1:nrow(x), repl=T)
+  xb <- x[indb,]
+  yb <- y[indb]
+  
+  fitb <- fit_rlasso(x=xb, y=yb, p_final=p_final)
+  
+  pred_b[b,] <- predict(fitb$relaxed, s=fitb$s, newx=x)
+  coef_b[b,][names(fitb$coef)] <- fitb$coef
+  model_sel <- prod((fitb$coef!=0) == sel_orig) # 1 if exactly equal to originally selected model, 0 else
+  se_b[b] <- fitb$residual_se
+  
+  rsq_app[b] <- 1 - fitb$residual_se^2/var(yb)
+  rsq_test[b] <- 1- var(predict(fitb$relaxed, s=fitb$s, newx=x) - y)/var(y)
+}
 
 
-cat("\n\nExtended set of selected predictors:\n")
-active_predictors_ext
+sel_prob <- apply(coef_b, 2, function(X) mean(X!=0))   # selection probabilities for predictors
+model_prob <- mean(model_sel)   # model selection probability
+
+```
+
+Evaluate stability results:
+
+Instability plot of predictions
+
+```{r}
+matplot(fit_glmnet$fitted, t(pred_b[1:100,]), 
+        pch = 16,              # solid dots
+        cex = 0.3,             # small point size
+        col = rgb(0, 0, 0, 0.1), # semi-transparent black
+        main = "Prediction instability plot",
+        xlab = "Original prediction", ylab = "Bootstrapped prediction")
+```
+
+
+Bootstrap RMSE of prediction vs. model-based standard error of fitted values
+
+```{r}
+# bootstrap RMSE of prediction
+rmse_pred <- apply(pred_b, 1, function(X) sqrt(mean((fit_glmnet$fitted - X)^2)))
+
+cat("Bootstrap RMSE of fitted values (selected):", mean(rmse_pred), "\n")
+
+# model-based RMSE of prediction
+xmod <- cbind(1,x[,fit_glmnet$coef[-1]!=0])
+invXtX <-solve(t(xmod) %*% xmod)
+
+mse_mod <- sapply(1:nrow(x), function(X) fit_glmnet$residual_se^2*t(xmod[X,]) %*% invXtX %*% xmod[X,])
+cat("(Model-based RMSE of fitted values:", sqrt(mean(mse_mod)), ")\n")
+
+```
+```{r}
+# Pairwise selection probabilities
+
+sel_b <- (coef_b!=0)[,-1]
+ncoef <- ncol(sel_b)
+
+exp_pw_sel <- pw_sel <- zscore <- matrix(0,nrow=ncoef, ncol=ncoef)
+rownames(pw_sel) <- colnames(pw_sel) <- rownames(zscore) <- colnames(zscore) <- predictors
+
+diag(pw_sel) <- sel_prob[-1]
 
 
 
-#se_residual
-se_residual <- ((1-fit_glmnet$relaxed$dev.ratio)*fit_glmnet$relaxed$nulldev)/(n-fit_glmnet$relaxed$df-1)
-# at selected lambda
-#se_residual[num_nonzero == p]
-cat("\n\nResidual standard error (model based):\n")
-se_residual[target_lambda_index]
+for(j in 1:(ncoef-1)){
+  for(jj in (j+1):ncoef){
+    exp_pw_sel[j,jj] <- sel_prob[j+1]*sel_prob[jj+1]
+    pw_sel[jj,j] <- pw_sel[j,jj] <- mean(sel_b[,j]*sel_b[,jj])
+    zscore[jj,j] <- zscore[j,jj] <- sign(pw_sel[j,jj]-exp_pw_sel[j,jj])*sqrt((pw_sel[j,jj]-exp_pw_sel[j,jj])^2/exp_pw_sel[j,jj]*B)
+  }
+}
 
-cat("\n\nModel coefficients:\n")
-coef(fit_glmnet$relax, s=target_s)
-# predict(fit_glmnet$relax, s=target_s, newx=x)
+
 
 
 ```
 
-### Residual analysis
 
-```{}
+
+#### Model description
+
+
+```{r}
+library(knitr)
+# assemble data
+
+results_beta <- matrix(0, nrow=length(fit_glmnet$coef), ncol=5)
+rownames(results_beta) <- names(fit_glmnet$coef)
+colnames(results_beta) <- c("Regression coefficient", "Standardized beta", "Variable inclusion frequency", "Lower 95% confidence limit", "Upper 95% confidence limit")
+
+results_beta[,1] <- fit_glmnet$coef
+results_beta[,2] <- fit_glmnet$coef*c(1,apply(x, 2, sd))
+results_beta[,3] <- sel_prob
+results_beta[,4] <- apply(coef_b,2,quantile, 0.025)
+results_beta[,5] <- apply(coef_b,2,quantile, 0.975)
+
+results_beta<-results_beta[order(-abs(results_beta[,3])),]
+kable(results_beta, format="html", caption="Regression coefficients and stability measures")
+```
+
+Global model descriptors:
+
+```{r}
+# Apparent adjusted R-squared:
+Rsq_adj <- (1 - (fit_glmnet$residual_se^2)/var(y))
+Rsq_corr <- Rsq_adj - (mean(rsq_app)-mean(rsq_test))
+
+global_desc <- c(residual_error = fit_glmnet$residual_se, boot_rmse=mean(rmse_pred), mod_rmse=sqrt(mean(mse_mod)), Rsq_adj=Rsq_adj, Rsq_corr=Rsq_corr)
+names(global_desc) <- c("Residual error", "Bootstrap RMSE of fitted", "(Model-based RMSE of fitted)", "R-squared adj.", "Corrected R-squared")
+
+kable(global_desc, caption="Global model descriptors")
+
+```
+
+Pairwise selection probabilities: 
+
+```{r}
+kable(pw_sel*100, caption="Pairwise selection probabilities x 100", digits=0)
+```
+
+The following table of z-scores indicates if some pairs of variables were selected overly together (z-score is positive), or alternatively to each other (z-score negative):
+
+```{r}
+kable(zscore, caption="Z-scores for nonrandom pairwise selection", digits=1)
+```
+
+
+#### Assumptions and diagnostics: residual analysis
+
+```{r}
+# first, find the extended set of active predictors (8 predictors)
+
+fit_ext <- fit_rlasso(x=x, y=y, p_final=8)
+active_predictors <- names(fit_glmnet$coef)[fit_glmnet$coef!=0][-1]
+active_predictors_ext <- names(fit_ext$coef)[fit_ext$coef!=0][-1]
 ```
 
 ```{r}
 library(ggplot2)
 
-predictions <- predict(fit_glmnet$relaxed, s=target_s, newx=x)
+predictions <- fit_glmnet$fitted
 
-residuals <- y - predictions
+residuals <- fit_glmnet$residuals
 
-ggplot(data=data.frame(residuals), aes(x=residuals)) + geom_histogram()
+ggplot(data=data.frame(residuals), aes(x=residuals)) + geom_histogram() + ggtitle(label="Histogram of residuals")
 
 sqrt_abs_res <- sqrt(abs(residuals))
 
-ggplot(data=data.frame(residuals, predictions, y), aes(x=predictions, y=residuals)) + geom_point() + geom_smooth()
+ggplot(data=data.frame(residuals, predictions, y), aes(x=predictions, y=residuals)) + geom_point() + geom_smooth() + ggtitle(label="Residals vs. predictions")
 
-ggplot(data=data.frame(sqrt_abs_res, predictions, y), aes(x=predictions, y=sqrt_abs_res)) + geom_point() + geom_smooth()
+ggplot(data=data.frame(sqrt_abs_res, predictions, y), aes(x=predictions, y=sqrt_abs_res)) + geom_point() + geom_smooth() + ggtitle(label="Assessment of heteroskedasticity: square root of absolute residuals vs. predictions")
 ```
 
 
@@ -221,10 +350,65 @@ In the following residual plots, the nearly-selected predictors are denoted by r
 
 for(v in active_predictors_ext){
   cols=ifelse(v %in% active_predictors, "blue", "red")
-  print(ggplot(data=data.frame(residuals, variable=x[,v]), aes(x=variable, y=residuals), xlab(v)) + geom_point(color=cols) + geom_smooth() + xlab(v)) 
+  print(ggplot(data=data.frame(residuals, variable=x[,v]), aes(x=variable, y=residuals), xlab(v)) + geom_point(color=cols) + geom_smooth() + xlab(v) + ggtitle(label=paste("Residuals vs ",v, collapse=""))) 
   
 }
 ```
 
+### Objective 2: Model validation
+
+```{r}
+# Computing predictions in the men's data set
+
+xmen <- as.matrix(men[, predictors])
+ymen <- as.numeric(men$Fat)
+ymean_men <- mean(ymen)
+nmen <- nrow(xmen)
+
+ypred_men <- predict(fit_glmnet$relaxed, s=fit_glmnet$s, newx=xmen)
+res_men <- ymen - ypred_men
+
+r2_val <- 1 - sum((ymen - ypred_men)^2)/sum((ymen - ymean_men)^2)
+   #negative r2 because of miscalibration
+
+#se_r2_val <- sqrt((4*r2_val*(1-r2_val)^2)/nmen)
+#se_r2_val
 
 
+rmspe <- sqrt(mean(res_men^2))
+
+glob_pm <- c(r2_val, rmspe)
+names(glob_pm) <- c("Validation R-squared", "Root mean squared prediction error")
+
+kable(glob_pm, caption="Overall performance measures")
+
+```
+
+Calibration plot:
+
+```{r}
+# Calibration plot
+
+ggplot(data.frame(ypred_men, ymen), aes(x=ypred_men, y=ymen)) + geom_point() + geom_smooth(col="red") + geom_abline(intercept=0, slope=1, linetype="dashed")
+```
+
+Calibration model:
+
+```{r}
+fit_cal <- lm(ymen ~ ypred_men)
+summary(fit_cal)
+
+cal_slope <- coef(fit_cal)[2]
+
+fit_cal0 <- lm(ymen ~ offset(ypred_men))
+cal_int <- coef(fit_cal0)[1]
+
+
+cal_stats <- c(cal_int, confint(fit_cal0), cal_slope, confint(fit_cal)[2,])
+
+names(cal_stats) <- c("Calibration intercept", "Calibration intercept, lower 95% CL", "Calibration intercept, upper 95% CL", "Calibration slope", "Calibration slope, lower 95% CL", "Calibration slope, upper 95% CL")
+
+kable(cal_stats, caption="Calibration statistics")
+
+```
+It is easily seen that the calibration slope is very close to 1, but the intercept points towards a systematic overestimation of Fat in men by 11.9228 percentage point. As a remedy, one could propose a recalibrated model for men where the intercept is corrected by `r cal_int`. This recalibrated model would achieve an apparent $R^2$ of `r 1 - sum((ymen-ypred_men-cal_int)^2)/sum((ymen-ymean_men)^2)`.
