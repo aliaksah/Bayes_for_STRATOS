@@ -36,7 +36,9 @@ library("see")
 library("bayestestR")
 library("rlist")
 #library("plyr")
-
+#library(dplyr)
+library("DHARMa") 
+library(purrr) 
 library(tidyverse)        # ggplot, dplyr, %>%, and friends
 library(brms)             # Bayesian modeling through Stan
 library(tidybayes)        # Manipulate Stan objects in a tidy way
