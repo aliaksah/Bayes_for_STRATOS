@@ -42,10 +42,10 @@ sampleSID <- function(sgr1){
 #' @details Important to note: The first variable used to split the data set must be ATT4!
 #' @return An interval for the eight combinations of the focal
 #' predictors bull and ATT4.
-drawPosteriorInequalityGroup <- function(sgr = sgr,fit = fit, p = 0.5,linpred = TRUE){
+drawPosteriorInequalityGroup <- function(sgr = sgr,fit = fit, p = 0.5){
   pred.grc <- list()
   grc.conf.pred <- list()
-  pred.grc <- drawPosteriorInequalityGroup.inner(sgr,fit,p = p,linpred)
+  pred.grc <- drawPosteriorInequalityGroup.inner(sgr,fit,p = p)
   l <- length(sgr)
   for (i in 1:l) {
     grc.conf.pred[[i]] <- quantile(pred.grc[[i]], probs = c(0.05,0.5,0.95))
@@ -122,14 +122,14 @@ plot_violin_residuals <- function(qres, data, title) {
 #' @return 4000 draws from the posterior distribution for each of the 
 #' eight combinations of the focalpredictors bull and ATT4
 #' @details Important to note: The first variable used to split the data set must be ATT4!
-drawPosteriorInequalityGroup.inner <- function(sgr = sgr,fit = fit, p = 0.5, linpred = TRUE){
+drawPosteriorInequalityGroup.inner <- function(sgr = sgr,fit = fit, p = 0.5){
   l <- length(sgr)
   sgr2 <- list()
   med <- list()
   for (i in 1:l) {
    sgr2[[i]] <- sgr[[i]][, -which(names(sgr[[i]]) %in% c("school.id","ATT4","CNT"))]
    # Data frame which contains the group specific quantiles for the eight representative students
-   med[[i]] <- as.data.frame(compute_quantiles(sgr2[[i]], prob = p)) #data.frame(lapply(sgr2[[i]],quantile, probs=c(p))) 
+   med[[i]] <- as.data.frame(compute_quantiles(sgr2[[i]], prob = p))
   }
   meds <- do.call(rbind, med)
   f <- as.factor(c(1,2,3,4))
@@ -146,10 +146,9 @@ drawPosteriorInequalityGroup.inner <- function(sgr = sgr,fit = fit, p = 0.5, lin
     # that the outcome is 1 for the eight representative student
    # } 
   meds$school.id <- rep(0,8)
-  if(linpred){
+ 
     ypred <- posterior_linpred(fit, newdata = meds)
-  }
-   else{ypred <- posterior_predict(fit, newdata = meds)}
+  
   
   for (i in 1:l) {
     pred.grc[[i]] <- toP(ypred[,i]) # transfer to the probability scale
@@ -382,23 +381,15 @@ visualPPC <- function(y.obs = pisa2018$LD, yrepM = ypredCore){
 #' @description For each of the 24 representative students the plot informs about the median
 #' and the quartiles of the posterior distribution of the probability that the outcome is 1.
 #' @param gfg The numerical information that is visualized by the plot.
-plot.result <- function(gfg = df_condPr1, PP = FALSE){
+plot.result <- function(gfg = df_condPr1){
   # The error bars overlapped, so use position_dodge to move them horizontally
   pd <- position_dodge(0.01) # move them .05 to the left and right
   cbp1 <- c("#D55E00" , "#E69F00", "#009E73",#,#CC79A7  F0E442
            "#56B4E9", "#999999", "#000090", "#0072B2","#CC79A7")
-#  cbp1 <- c("#D4D4D4" , "#B4B4B4", "#909090",#,#CC79A7  F0E442
-#            "#000000" , "#999999", "#636363", "#494848","#999997"
-#  )
+
   xlab <- "ATT4 quartile (with corres. median)"
   # Set initial title
   tit <- "Prob. of being LD in dep. of ATT4"
-  
-  # Append label if PP is TRUE
-  if (PP) {
-    tit <- paste(tit, "(post. predict)")
-  }
-  
   
   ggplot(gfg, aes(x = x, y = mean, colour = group, group = group)) + 
     geom_errorbar(aes(ymin = low, ymax = up), colour = "grey", width = .01, 
