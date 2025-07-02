@@ -1,33 +1,52 @@
 ---
-title: "Analysis Plan for Kepler Data"
-author: "Aliaksandr Hubin"
-output:
-  html_document:
-    df_print: paged
-  pdf_document: default
+title: "Bacteremia data analysis"
+author: 
+  - Aliaksandr Hubin
+date: now
+date-format: iso
+title-block-banner: "#828282"
+format:
+  html:
+    code-fold: true
+    code-tools: true
+    theme: default
+    toc: true
+    number-sections: true
+    toc-location: right
+    embed-resources: true
+    self-contained: true
+    df-print: kable
+editor: 
+  visual
 ---
 
+## Load FBMS library
+
 ```{r}
-#devtools::install_github("https://github.com/jonlachmann/GMJMCMC/tree/stratos")
+# most recent per 02.07.2025 version from git
+# devtools::install_github("jonlachmann/GMJMCMC@data-inputs", force=T, build_vignettes=F)
 library(FBMS) 
-library(tidyverse) 
-library(DataExplorer)
-#setwd("Task_Kepler")
 ```
 
-### Bayesian generalized nonlinear models
-
-We shall use BGNLM with Jeffreys priors for inference run with 32 parallel chains for 20 populations of GMJMCMC algorithm
+# Load the data
 
 ```{r}
-transforms <- c("sin_deg","exp_dbl","p0","troot","p3")
+data.train <- readRDS("train.RDS")
+data.test <-readRDS("test.RDS")
+```
+
+# Bayesian generalized nonlinear models
+
+We shall use BGNLM with Jeffreys priors with a unit variance for inference run with 32 parallel chains for 20 populations of GMJMCMC algorithm
+
+```{r}
+transforms <- c("p0","troot","p3")
 probs <- gen.probs.gmjmcmc(transforms)
 params <- gen.params.gmjmcmc(ncol(data.train)-1)
-params$loglik$var = "unknown"
 set.seed(1)
-bgnlm <- FBMS::fbms(semimajoraxis ~ ., data = data.train,method = "gmjmcmc.parallel",beta_prior = list(type = "Jeffreys-BIC"),transforms = transforms,runs = 32,cores = 8,P = 20, probs = probs, params = params)
+bgnlm <- FBMS::fbms(semimajoraxis ~ ., data = data.train,method = "gmjmcmc.parallel",beta_prior = list(type = "Jeffreys-BIC", var = 1),transforms = transforms,runs = 32,cores = 8,P = 20, probs = probs, params = params)
 plot(bgnlm)
-summary(bgnlm,labels = names(data.train)[-1])
+summary(bgnlm)
 ```
 
 check convergence
@@ -41,7 +60,7 @@ we see possible convergence for the later generations of GMJMCMC, but let us inc
 
 ```{r}
 set.seed(2)
-bgnlm <- FBMS::fbms(semimajoraxis ~ ., data = data.train,method = "gmjmcmc.parallel",beta_prior = list(type = "Jeffreys-BIC"),transforms = transforms,runs = 64,cores = 8,P = 50,probs = probs, params = params)
+bgnlm <- FBMS::fbms(semimajoraxis ~ ., data = data.train,method = "gmjmcmc.parallel",beta_prior = list(type = "Jeffreys-BIC", var = 1),transforms = transforms,runs = 64,cores = 8,P = 50,probs = probs, params = params)
 plot(bgnlm)
 summary(bgnlm,labels = names(data.train)[-1])
 ```
@@ -58,21 +77,14 @@ Median probability model:
 confint(lm(semimajoraxis ~ 1 +I(troot(period*period*hoststar_mass)),data = data.train))
 ```
 
-```{r}
-preds.train.bgnlm <- predict(bgnlm, data.train[,-1])
-preds.test.bgnlm <- predict(bgnlm, data.test[,-1])
-r.bgnlm <- round(c(cor(data.train[,1],preds.train.bgnlm$aggr$mean)^2,cor(data.test[,1],preds.test.bgnlm$aggr$mean)^2),3)
-plot(x = data.train[, 1], preds.train.bgnlm$aggr$mean, xlab = "data", ylab = "prediction", main = "Title of the Plot", col = "blue", pch = 16)
-points(x = data.test[, 1], preds.test.bgnlm$aggr$mean, col = "red", pch = 17)
-legend("topright", legend = c(paste0("Training Data, R.sqr = ",r.bgnlm[1]), paste0("Test Data, R.sqr = ",r.bgnlm[2])), col = c("blue", "red"), pch = c(16, 17))
-```
-
 \
 In the Bayesian Generalized Nonlinear Model (BGNLM) analysis, you obtained the following results:
 
 **Predictor: `troot(((period*hoststar_mass)*period))`** **Inclusion Probability: 1.000000**
 
 This result indicates a perfect inclusion probability (1.0) for the predictor `troot(((period*hoststar_mass)*period))`, suggesting that this complex non-linear interaction term is crucial for predicting the semimajor axis.
+
+All other predictors have inclusion probabilities below 0.1
 
 ### Interpretation
 
@@ -107,7 +119,7 @@ legend("topright", legend = c(paste0("Training Data, R.sqr = ",r.bgnlm[1]), past
 
 The predictions are expectidely perfect on both training and testing sets, as inclusion of `troot(((period*hoststar_mass)*period))` in the BGNLM model effectively captures the essence of Kepler’s Third Law, incorporating the orbital period and the host star’s mass in a cubic root transformation. This predictor reflects the key physical relationship between these variables, demonstrating that the model is not only statistically sound but also physically meaningful. The high inclusion probability underscores the importance of this non-linear interaction in accurately predicting the semimajor axis.
 
-And use the g-prior and redo the inference.
+## Now, use the g-prior and redo the inference
 
 ```{r}
 set.seed(3)
