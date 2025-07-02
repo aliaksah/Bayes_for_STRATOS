@@ -1,5 +1,5 @@
 ---
-title: "Bacteremia data analysis"
+title: "Kepler analysis"
 author: 
   - Aliaksandr Hubin
 date: now
