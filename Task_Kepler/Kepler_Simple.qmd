@@ -129,7 +129,7 @@ summary(bgnlm,labels = names(data.train)[-1])
 
 ```
 
-Here we perfectly recover the true law! Also good convergence for g - prior.
+Here we perfectly recover the true law! Also good convergence for g - prior. All conclusions are consistent with those obtained with Jeffreys priors.
 
 ```{r}
 diagn_plot(bgnlm,window = 10,FUN = median)
