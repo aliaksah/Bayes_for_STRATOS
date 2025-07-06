@@ -541,7 +541,7 @@ mcmc_areas(as.matrix(calibration_modelW),
 ##### External validation
 
 ```{r predictions for males based on female model}
-y_linpred_male <- proj_linpred(proj_ref_fit, solution_terms= solterms_final_fivel, newdata = men)
+y_linpred_male <- proj_linpred(proj_ref_fit,  newdata = men)
 
 
 color_scheme_set("blue")

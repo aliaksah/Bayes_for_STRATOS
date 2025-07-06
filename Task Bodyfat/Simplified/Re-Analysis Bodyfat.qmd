@@ -1,0 +1,632 @@
+---
+title: "Re-Analysis (simplified): bodyfat prediction"
+author:
+  - name: Mariana Nold
+    affiliation: University of Jena, Institute of Sociology
+date: last-modified                            # "`r Sys.Date()`" for system date
+categories: [2024, Contrast-Bayes-Frequentist, STRATOS, R]
+description: "Classification: confidential"
+editor: visual
+execute:
+  warning: false
+theme: cosmo                                   # cosmo bootswatch theme
+toc: true                                      # table of contents  
+number-sections: true
+colorlinks: true                               # ??
+highlight-style: pygments
+#bibliography: references.bib
+format:
+  html: 
+    code-fold: true
+    code-tools: true
+    html-math-method: katex
+    self-contained: true                      # html is self-contained
+    code-line-numbers: true
+  pdf:
+    geometry: 
+      - top=30mm
+      - left=30mm
+  docx: default                               
+---
+
+## Preliminaries
+
+This analysis report relates to SRe-API for the Analysis of bodyfat example (simplified).
+
+## Load libraries
+
+```{r load package, message = FALSE, warning = FALSE}
+library("rstanarm")
+library("projpred")
+library("ggplot2")
+library("loo")
+library("bayesplot")
+library("bayesrules")
+library("DHARMa")
+library("ggplot2")
+library("dplyr")
+library("tidyr")
+library("patchwork")
+library("posterior")
+library("knitr")
+library("kableExtra")
+```
+
+# Model estimation
+
+## Load data
+
+```{r define functions, include = FALSE}
+
+visualize_variable_selection <- function(vs_cvf) {
+
+  # Extract the summary and store as return object
+  model_summary <- summary(vs_cvf, deltas = FALSE, cumulate = FALSE)
+
+  # Extract predictor ranking
+  rk <- ranking(vs_cvf)
+
+  # Compute variable ranking proportions
+  pr_rk <- cv_proportions(rk)
+  pr_rk2 <- cv_proportions(rk, cumulate = TRUE)
+  # Generate plots
+  gg_pr_rk <- plot(pr_rk) + theme(legend.position = "none")  
+  gg_pr_rk2 <- plot(pr_rk2) + theme(legend.position = "none")
+  combined_plot <- gg_pr_rk / gg_pr_rk2 
+
+
+  # Return both the summary and the plot
+  return(list(summary = model_summary, plot = combined_plot))
+}
+
+#' Extract and round a single model size row (e.g. "<=5") from cv_proportions
+#'
+#' @param cumprop Cumulative proportions matrix from cv_proportions(..., cumulate = TRUE)
+#' @param size Integer value, the exact model size to extract (default: 5)
+#' @param digits Number of decimal places to round to (default: 3)
+#' @return A 1-row matrix with rounded values
+get_cumprop_row_rounded <- function(cumprop, size = 5, digits = 3) {
+  rowname <- paste0("<=", size)
+  if (!(rowname %in% rownames(cumprop))) {
+    stop(paste0("Model size '<=", size, "' not found in row names."))
+  }
+  row <- cumprop[rowname, , drop = FALSE]
+  row[] <- round(row, digits = digits)
+  return(row)
+}
+
+
+#' Inspect and summarize variable selection results
+#'
+#' This function provides a structured summary of variable selection output from 
+#' both Lasso and forward selection methods (e.g. via projpred). It visualizes 
+#' selection stability, shows cumulative selection proportions, and identifies 
+#' top predictors based on ranking and suggested model size.
+#'
+#' @param vs_object A variable selection object (e.g. result from cv_varsel())
+#' @param top_n Number of top variables to display (default is 5)
+#' @return A list containing summary, plot, ranking, top variables, and suggested terms
+
+inspect_variable_selection <- function(vs_object, top_n = 5) {
+  # Run visualization and show textual summary
+  cat("\n Summary of variable selection:\n")
+  result <- visualize_variable_selection(vs_object)
+  print(result$summary)
+  
+  # Plot selection trace
+  cat("\n️ Visualization of selection process:\n")
+  print(result$plot)
+  
+  # Cumulative selection proportions for top_n terms
+  cat(paste0("\n Cumulative selection proportions (Top ", top_n, "):\n"))
+  cumprop <- cv_proportions(ranking(vs_object), cumulate = TRUE)
+  rounded <- get_cumprop_row_rounded(cumprop, size = top_n)
+  print(rounded)
+  
+  # Suggested model size based on selection criteria
+  suggested <- suggest_size(vs_object)
+  cat("\n Suggested model size:\n")
+  print(suggested)
+  
+  # Full ranking table of all variables
+  ranking_data <- ranking(vs_object)$fulldata
+  cat("\n Full ranking table:\n")
+  print(ranking_data)
+  
+  # Final selected terms based on suggested model size
+  cat(paste0("\n Terms selected (suggested size = ", suggested, "):\n"))
+  final_terms <- head(ranking_data, suggested)
+  print(final_terms)
+  
+  # Display top_n terms (fixed number)
+  cat(paste0("\n Top ", top_n, " ranked terms:\n"))
+  top_terms <- head(ranking_data, top_n)
+  print(top_terms)
+  
+  # Return all outputs invisibly for further use
+  invisible(list(
+    result = result,
+    cumprop = rounded,
+    suggested_size = suggested,
+    full_ranking = ranking_data,
+    final_terms = final_terms,
+    top_terms = top_terms
+  ))
+}
+
+# Computes Bayesian R² as defined by Gelman et al. (2019).
+# Measures the proportion of variance in the predictions (ypred) relative to total variance (predictions + residuals).
+# The function returns a vector of R² values across posterior draws.
+# Input: 
+#   - ypred: matrix of posterior linear predictions (rows = draws, columns = observations)
+#   - y: vector of observed outcome values
+# Output:
+#   - r2: numeric vector of Bayesian R² values (one per draw)
+
+bayes_r2 <- function(ypred, y) {
+  resid <- sweep(ypred, 2, y)
+  var_ypred <- apply(ypred, 1, var)
+  var_resid <- apply(resid, 1, var)
+  r2 <- var_ypred / (var_ypred + var_resid)
+  return(r2)
+}
+
+#r2_val <- 1 - sum((ymen - ypred_men)^2)/sum((ymen - ymean_men)^2)
+
+bayes_r2_ext <- function(ypred, y) {
+  # compute mean
+   ymean_men <- mean(y)
+
+  # R² for each row
+   r2_val <- apply(ypred, 1, function(pred_row) {
+  1 - sum((ymen - pred_row)^2) / sum((ymen - ymean_men)^2)
+})
+
+  return(r2_val)
+}
+```
+
+```{r  load data and set path}
+load("../Datafiles/bodyfatdata.Rdata")
+PPath <- "C:/Users/zo95yup/Documents/GitHub/Bayes_for_STRATOS/Task Bodyfat/"
+```
+
+## Main data analysis
+
+### Define and fit reference model
+
+```{r define and fit refernce model, results='hide', cache=TRUE}
+
+# Create the vector of predictor names
+predictors <- c("Weight", "Height", "BMI", "Age",
+  "Neck", "Chest", "Biceps", "Hips", "Waist",
+  "Forearm", "MThigh", "Wrist",
+  "Knee", "Ankle")
+
+# Collapse the predictor names into a single string joined by +
+rhs <- paste(predictors, collapse = " + ")
+
+# Combine with the response variable to create a formula
+rmf <- as.formula(paste("Fat ~", rhs))
+
+# Print it to check
+rmf
+
+# Fit a Bayesian Gaussian regression model using stan_glm 
+ref_fit <- stan_glm(rmf, data = women, family = gaussian())
+```
+
+```{r MCMC diagnostic and prior summary}
+draws <- as.matrix(ref_fit)
+# This function returns Rhat and n_eff diagnostics for each model parameter.
+# Use it to evaluate convergence and sampling efficiency in Bayesian regression.
+# Recommended threshold: Rhat < 1.01 and n_eff_bulk and n_eff_tail > 100 per chain for # reliable inference. see: https://mc-stan.org/rstan/reference/Rhat.html
+
+
+diagnostics <- summarise_draws(draws)
+diagnostics_tbl <- diagnostics[, c("variable", "rhat", "ess_bulk" , "ess_tail")]
+
+kable(diagnostics_tbl, digits = 3, caption = "MCMC diagnostics") %>%
+  kable_styling(full_width = FALSE)
+
+
+prior_summary(ref_fit) # https://cran.r-project.org/web/packages/rstanarm/vignettes/priors.html
+```
+
+```{r summarize estimates of refernce model}
+mat_ref_fit <- as.matrix(ref_fit)
+draws_ref_fit <- posterior::as_draws_matrix(mat_ref_fit)
+mcmc_areas(mat_ref_fit[,2:13])
+summary_tbl_ref_fit <- summarise_draws(draws_ref_fit, mean, sd, median, ~quantile(.x, probs = c(0.05, 0.95)))
+kable(summary_tbl_ref_fit, digits = 3, caption = "Posterior summary statistics")
+```
+
+Investigate quality of the reference model:
+
+```{r LOOPIT and bayesrules summary, cache=TRUE}
+
+pp_check(ref_fit)
+y_rep_rmf <- posterior_predict(ref_fit)
+loo_rmf <- loo(ref_fit , save_psis = TRUE, cores = 4)
+psis1_rmf <- loo_rmf$psis_object
+lw_rmf <- weights(psis1_rmf)
+color_scheme_set("red")
+
+ppc_loo_pit_overlay(y = women$Fat,yrep=y_rep_rmf,lw=lw_rmf)
+
+# Summarize the posterior distributions simple model
+summary_rmf_cv <- prediction_summary_cv(model = ref_fit , data = women, k = 3)
+
+# Print the summary simple model
+print(summary_rmf_cv)
+```
+
+Predictive Projections: Forward search, LOO (internal robustness)
+
+```{r predictive projection, results='hide', cache=TRUE}
+set.seed(2341)
+vs_cvf <- cv_varsel(object = ref_fit, method = 'forward', cv_method = 'loo', validate_search = TRUE, verbose = FALSE)
+
+save(vs_cvf,file = file.path(PPath,"vs_cvf"))
+#load(file = file.path(PPath,"vs_cvf"))
+
+plot(vs_cvf, deltas = TRUE, stats =  c('elpd'))
+```
+
+Predictive Projection: Forward search, five-fold (internal robustness)
+
+```{r 5-fold cross validation, results='hide', cache=TRUE}
+set.seed(2341)
+vs_cvf5 <- cv_varsel(object = ref_fit,  method = "forward",cv_method = "kfold",      
+  K = 5,validate_search = TRUE, verbose = FALSE)
+
+save(vs_cvf5,file = file.path(PPath,"vs_cvs"))
+#load(file = file.path(PPath,"vs_cvs"))
+
+plot(vs_cvf5, deltas = TRUE, stats =  c('elpd'))
+```
+
+Predictive Projections: L1 search,LOO (key results)
+
+```{r predictive lasso projection, results='hide', cache=TRUE}
+# Generate model path: By varying lambda, a sequence of submodels with an increasing number of (non-zero) coefficients is created. ➤ The order in which coefficients “appear” serves as a ranking of the variables.
+
+set.seed(2341)
+vs_cvl <- cv_varsel(object = ref_fit, method = 'L1',  cv_method = 'loo', validate_search = TRUE, verbose = FALSE)
+
+save(vs_cvl,file = file.path(PPath,"vs_cvl"))
+#load(file = file.path(PPath,"vs_cvl"))
+
+plot(vs_cvl, deltas = TRUE, stats =  c('elpd'))
+```
+
+Predictive Projections: L1 search, 5-fold (internal robustness)
+
+```{r predictive lasso projection k-fold, results='hide', cache=TRUE}
+set.seed(2341)
+vs_cvl5 <- cv_varsel( object = ref_fit, method = 'L1',
+  cv_method = "kfold",K = 5, verbose = FALSE)
+
+save(vs_cvl5,file = file.path(PPath,"vs_cvl5"))
+#load(file = file.path(PPath,"vs_cvl5"))
+
+# Plot the variable selection 
+
+plot(vs_cvl5, deltas = TRUE, stats =  c('elpd'))
+```
+
+#### Model stability: Stability of predictive projection
+
+Forward Search (LOO)
+
+```{r forward selection LOO results}
+inspect_variable_selection(vs_cvf, top_n = 5)
+```
+
+Forward Search (5-fold)
+
+```{r forward selection 5-fold results}
+inspect_variable_selection(vs_cvf5, top_n = 5)
+```
+
+L1 Search (LOO)
+
+```{r lasso selection LOO results}
+key_results <- inspect_variable_selection(vs_cvl, top_n = 5)
+solterms_final_fivel <- key_results$top_terms
+```
+
+L1 Search (5-fold)
+
+```{r lasso selection 5-fold results}
+inspect_variable_selection(vs_cvl5, top_n = 5)
+```
+
+Compute Projected Posterior: Post-selection-inference for L1 Search (LOO)
+
+```{r post-selection inference, results='hide'}
+# https://cran.r-project.org/web/packages/projpred/vignettes/projpred.html#post-selection-inference
+proj_ref_fit <- project(vs_cvl, predictor_terms = solterms_final_fivel, ns = 4000)
+```
+
+#### Model description
+
+```{r model summary table}
+
+# assemble data
+results_beta <- matrix(0, nrow = 6 , ncol  = 5)
+rownames(results_beta) <- c("(Intercept)",solterms_final_fivel)
+colnames(results_beta) <- c("Regression coefficient", "Standardized beta", "Cum. proportions <=5", "5% PD-quantile", "95% PD-quantile")
+
+mat <- as.matrix(proj_ref_fit)
+beta <- mat[, 1:(ncol(mat) - 1)]
+
+# Transform matrix to draws format (optional, for posterior-friendly summaries)
+draws1 <- posterior::as_draws_matrix(beta)
+
+summary_tbl <- summarise_draws(draws1, mean,  median, ~ quantile(.x, probs = c(0.05, 0.95)))
+# Compute standard deviations (excluding the first two columns) for women dataset
+sd_women <- apply(women[, -c(1,2)], 2, sd)
+vars_to_select <- c("BMI", "Waist", "Hips", "Knee", "Biceps")
+sd_selected <- sd_women[intersect(vars_to_select, names(sd_women))]
+
+std_coef <- summary_tbl$mean[2:6] * (sd_selected)
+std_coef <- c(summary_tbl$mean[1],std_coef )
+
+results_beta[,1] <- round(summary_tbl$mean,3)
+results_beta[,2] <- round(std_coef,3)
+results_beta[,3] <- round(c(1.0,key_results$cumprop[1:5]),3)
+results_beta[,4] <- round(summary_tbl$`5%`,3)
+results_beta[,5] <- round(summary_tbl$`95%`,3)
+
+
+results_beta<-results_beta[order(-abs(results_beta[,3])),]
+kable(results_beta, format="html", caption="Regression coefficients and stability measures")
+```
+
+Global model descriptors:
+
+```{r R-squared and Sigma}
+y_linpred_female <- proj_linpred(proj_ref_fit, newdata = women)
+women2 <- cbind(women, linpred = colMeans(y_linpred_female$pred))
+R.square <- (cor(women2$linpred, women2$Fat, method = "pearson"))^2
+#R.square
+
+draws1b <- posterior::as_draws_matrix(mat)
+
+summary_tbl_1b <- summarise_draws(draws1b, mean,  median, ~ quantile(.x, probs = c(0.05, 0.95)))
+summary_sigma <- summary_tbl_1b %>% slice(7)
+sigma_mean <- summary_sigma %>% pull(mean)
+
+global_desc <- c(residual_error = round(sigma_mean,3) , Rsq = round(R.square,3))
+names(global_desc) <- c("Residual error",  "R-squared ")
+
+kable(global_desc, caption="Global model descriptors")
+kable(summary_sigma , digits = 3, caption = "Residual Error ") %>%
+  kable_styling(full_width = FALSE)
+
+r2_values  <- bayes_r2(ypred = y_linpred_female$pred, y = women2$Fat)
+
+summary_r2 <- data.frame(
+  mean   = round(mean(r2_values),3),
+  median = round(median(r2_values),3),
+  p05   = round(quantile(r2_values, 0.05),3),
+  p95   = round(quantile(r2_values, 0.95),3)
+)
+#colnames(summary_r2)
+rownames(summary_r2) <- "R²"
+colnames(summary_r2)[colnames(summary_r2) == "p05" ] <- "5%"
+colnames(summary_r2)[colnames(summary_r2) ==  "p95" ] <- "95%"
+
+kable(summary_r2 ,digits = 3 , caption = "R² as defined by Gelman et al. (2019)") %>%
+  kable_styling(full_width = FALSE)
+```
+
+#### Assumptions and diagnostics: residual analysis
+
+```{r Extended set of active predictors}
+print("Five active predictors")
+active_predictors <- solterms_final_fivel
+active_predictors
+print("Eight ext. active predictors")
+active_predictors_ext <- key_results$full_ranking[1:8]
+active_predictors_ext
+
+p <- length(predictors)
+
+x <- as.matrix(women[, predictors])
+y <- as.numeric(women$Fat)
+n <- nrow(x)
+```
+
+```{r residual diagnostics I}
+library(ggplot2)
+
+predictions <- women2$linpred
+y <- women2$Fat
+# Compute residuals
+prj_predictW <- proj_predict(proj_ref_fit)
+
+qres.m1 = createDHARMa(simulatedResponse = t(prj_predictW), 
+                          observedResponse = women2$Fat, 
+                          fittedPredictedResponse = apply(prj_predictW, 2, median), integerResponse = F, seed = 123, method = "PIT")
+# uniform distributed residuals
+print("Uniform residuals")
+summary(residuals(qres.m1))
+# transform to normal scale
+residuals <- qnorm(residuals(qres.m1))
+print("Normal residuals")
+summary(residuals)
+
+
+ggplot(data=data.frame(residuals), aes(x=residuals)) + geom_histogram() + ggtitle(label="Histogram of residuals")
+
+sqrt_abs_res <- sqrt(abs(residuals))
+
+ggplot(data=data.frame(residuals, predictions, y), aes(x=predictions, y=residuals)) + geom_point() + geom_smooth() + ggtitle(label="Residals vs. predictions")
+
+ggplot(data=data.frame(sqrt_abs_res, predictions, y), aes(x=predictions, y=sqrt_abs_res)) + geom_point() + geom_smooth() + ggtitle(label="Assessment of heteroskedasticity: square root of absolute residuals vs. predictions")
+```
+
+In the following residual plots, the nearly-selected predictors are denoted by red dots, the selected predictors by blue dots.
+
+```{r residual diagnostics II}
+
+for(v in active_predictors_ext){
+  cols=ifelse(v %in% active_predictors, "blue", "red")
+  print(ggplot(data=data.frame(residuals, variable=x[,v]), aes(x=variable, y=residuals), xlab(v)) + geom_point(color=cols) + geom_smooth() + xlab(v) + ggtitle(label=paste("Residuals vs ",v, collapse=""))) 
+  }
+```
+
+### Objective 2: Model validation
+
+```{r Overall performance measures}
+# Computing predictions in the men's data set
+
+xmen <- as.matrix(men[, predictors])
+ymen <- as.numeric(men$Fat)
+ymean_men <- mean(ymen)
+nmen <- nrow(xmen)
+
+y_linpred_male <- proj_linpred(proj_ref_fit,  newdata = men)
+ypred_men <- colMeans(y_linpred_male$pred)
+res_men <- ymen - ypred_men
+
+r2_val <- 1 - sum((ymen - ypred_men)^2)/sum((ymen - ymean_men)^2)
+R.squareM <- (cor(ypred_men,ymen, method = "pearson"))^2
+
+
+
+rmspe <- sqrt(mean(res_men^2))
+
+glob_pm <- c(r2_val, rmspe,R.squareM)
+names(glob_pm) <- c("Validation R-squared", "Root mean squared prediction error", "R-squared")
+
+kable(glob_pm, caption="Overall performance measures")
+
+r2_values_men  <- bayes_r2(ypred = y_linpred_male$pred, y = men$Fat)
+
+summary_r2_men  <- data.frame(
+  mean   = round(mean(r2_values_men),3),
+  median = round(median(r2_values_men),3),
+  p05   = round(quantile(r2_values_men, 0.05),3),
+  p95   = round(quantile(r2_values_men, 0.95),3)
+)
+
+rownames(summary_r2_men) <- "R²"
+colnames(summary_r2_men)[colnames(summary_r2_men) == "p05" ] <- "5%"
+colnames(summary_r2_men)[colnames(summary_r2_men) ==  "p95" ] <- "95%"
+
+kable(summary_r2_men  ,digits = 3 , caption = "R² as defined by Gelman et al. (2019) for men") %>%
+  kable_styling(full_width = FALSE)
+
+
+r2_values_men_ext  <- bayes_r2_ext(ypred = y_linpred_male$pred, y = men$Fat)
+
+
+summary_r2_men_ext  <- data.frame(
+  mean   = round(mean(r2_values_men_ext),3),
+  median = round(median(r2_values_men_ext),3),
+  p05   = round(quantile(r2_values_men_ext, 0.05),3),
+  p95   = round(quantile(r2_values_men_ext, 0.95),3)
+)
+
+rownames(summary_r2_men_ext) <- "R²"
+colnames(summary_r2_men_ext)[colnames(summary_r2_men_ext) == "p05" ] <- "5%"
+colnames(summary_r2_men_ext)[colnames(summary_r2_men_ext) ==  "p95" ] <- "95%"
+
+kable(summary_r2_men_ext  ,digits = 3 , caption = "Validation R²  for men") %>%
+  kable_styling(full_width = FALSE)
+```
+
+Calibration plot:
+
+```{r Calibration plot}
+# Calibration plot
+
+ggplot(data.frame(ypred_men, ymen), aes(x=ypred_men, y=ymen)) + geom_point() + geom_smooth(col="red") + geom_abline(intercept=0, slope=1, linetype="dashed")
+```
+
+Calibration model:
+
+```{r compute Calibration intercept and slope (external), results='hide'}
+observed <- men$Fat
+predicted <- ypred_men
+calib_data <- data.frame(observed = observed, predicted = predicted)
+# Compute calibration intercept and slope
+calibration_model <- stan_glm(observed ~ predicted, family = gaussian(), data = calib_data)
+calibration_model0 <- stan_glm(observed ~ offset(predicted), family = gaussian(), data = calib_data)
+```
+
+```{r Calibration intercept and slope (external)}
+summary(calibration_model)
+summary(calibration_model0)
+
+posterior_samples <- as.matrix(calibration_model)
+posterior_samples0 <- as.matrix(calibration_model0)
+intercepts <- posterior_samples0[, "(Intercept)"]
+slopes <- posterior_samples[, "predicted"]
+
+cal_slope <- mean(slopes) 
+conf_slope <- quantile(posterior_samples[, "predicted"], probs = c(0.025,  0.975))
+cal_int <- mean(intercepts)
+conf_int <- quantile(posterior_samples0[, "(Intercept)"], probs = c(0.025,  0.975))
+
+cal_stats <- c(cal_int, conf_int, cal_slope, conf_slope)
+
+names(cal_stats) <- c("Calibration intercept", "Calibration intercept, lower 95% PD", "Calibration intercept, upper 95% PD", "Calibration slope", "Calibration slope, lower 95% PD", "Calibration slope, upper 95% PD")
+
+kable(cal_stats, caption="Calibration statistics")
+
+
+
+
+# Dataframe  for regression lines
+regression_lines <- data.frame(
+  intercept = intercepts,
+  slope = slopes
+)
+
+n_lines <- nrow(as.matrix(calibration_model))
+print(n_lines)
+sampled_lines <- regression_lines[sample(nrow(regression_lines), size = 100), ]
+# plot
+ggplot(calib_data, aes(x = predicted, y = observed)) +
+  geom_point(alpha = 0.9) +
+  geom_abline(data = sampled_lines, aes(intercept = intercept, slope = slope), alpha = 0.1, color = "blue") +
+  labs(title = "Calibration Plot with regression lines",
+       x = "Predicted",
+       y = "Observed") +
+  theme_minimal()
+color_scheme_set("orange")
+
+
+# Intercept
+mcmc_areas(
+  as.matrix(calibration_model0),
+  pars = "(Intercept)",
+  prob = 0.95
+) +
+  ggtitle("Calibration Intercept (external)")
+
+# Slope
+mcmc_areas(
+  as.matrix(calibration_model),
+  pars = "predicted",
+  prob = 0.95
+) +
+  ggtitle("Calibration Slope (external)")
+
+
+
+mcmc_areas(as.matrix(calibration_model0),
+           pars = "sigma",
+           prob = 0.95) + 
+  ggtitle("Sigma of Calibration model for intercept (external)")
+
+mcmc_areas(as.matrix(calibration_model),
+           pars = "sigma",
+           prob = 0.95) + 
+  ggtitle("Sigma of Calibration model for slope (external)")
+
+```
