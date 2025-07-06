@@ -1,0 +1,348 @@
+---
+title: "Kepler analysis"
+author: 
+  - Aliaksandr Hubin
+date: now
+date-format: iso
+title-block-banner: "#828282"
+format:
+  html:
+    code-fold: true
+    code-tools: true
+    theme: default
+    toc: true
+    number-sections: true
+    toc-location: right
+    embed-resources: true
+    self-contained: true
+    df-print: kable
+editor: 
+  visual
+---
+
+## Load FBMS library
+
+```{r}
+# most recent per 02.07.2025 version from git
+# devtools::install_github("jonlachmann/GMJMCMC@data-inputs", force=T, build_vignettes=F)
+library(FBMS) 
+```
+
+# Load the data
+
+```{r}
+# Load data
+data.train <- readRDS("train.RDS")
+data.test <- readRDS("test.RDS")
+
+# Function to compute summary stats
+get_summary_stats <- function(df) {
+  numeric_vars <- sapply(df, is.numeric)
+  df_num <- df[, numeric_vars]
+  t(apply(df_num, 2, function(x) {
+    c(Min = min(x, na.rm = TRUE),
+      Q1 = quantile(x, 0.25, na.rm = TRUE),
+      Median = median(x, na.rm = TRUE),
+      Q3 = quantile(x, 0.75, na.rm = TRUE),
+      Max = max(x, na.rm = TRUE))
+  }))
+}
+
+# Compute summaries
+train_summary <- get_summary_stats(data.train)
+test_summary  <- get_summary_stats(data.test)
+
+```
+
+Display ummary table for training set
+
+```{r}
+knitr::kable(round(train_summary, 4), caption = "Summary statistics for the training set (Min, Q1, Median, Q3, Max)")
+```
+
+and for test set
+
+```{r}
+knitr::kable(round(test_summary, 4), caption = "Summary statistics for the test set (Min, Q1, Median, Q3, Max)")
+```
+
+# Bayesian generalized nonlinear models
+
+We employ Bayesian Generalized Nonlinear Models (BGNLM) using Jeffreys priors under the assumption of unit variance. Inference is performed using the GMJMCMC algorithm, configured with 20 populations and 32 parallel chains to ensure robust exploration of the model space.
+
+```{r}
+transforms <- c("sin_deg","exp_dbl","p0","troot","p3")
+probs <- gen.probs.gmjmcmc(transforms)
+params <- gen.params.gmjmcmc(ncol(data.train)-1)
+set.seed(1)
+bgnlm <- FBMS::fbms(semimajoraxis ~ ., data = data.train,method = "gmjmcmc.parallel",beta_prior = list(type = "Jeffreys-BIC", var = 1),transforms = transforms,runs = 32,cores = 8,P = 20, probs = probs, params = params)
+plot(bgnlm)
+summary(bgnlm)
+```
+
+check convergence
+
+```{r}
+p1 <- diagn_plot(bgnlm,window = 10,FUN = median)
+p2 <- diagn_plot(bgnlm,window = 10,FUN = max)
+```
+
+We observe signs of possible convergence in the later generations of the GMJMCMC algorithm. However, to confirm this, we will increase computational resources and rerun the inference. It is important to note that convergence diagnostics can be misleading—they may indicate apparent convergence when the algorithm has simply become trapped in a strong local mode without adequately exploring other regions of the model space.
+
+```{r}
+set.seed(2)
+bgnlm <- FBMS::fbms(semimajoraxis ~ ., data = data.train,method = "gmjmcmc.parallel",beta_prior = list(type = "Jeffreys-BIC", var = 1),transforms = transforms,runs = 64,cores = 8,P = 50,probs = probs, params = params)
+plot(bgnlm)
+summary(bgnlm,labels = names(data.train)[-1])
+```
+
+```{r}
+p3 <- diagn_plot(bgnlm,window = 10,FUN = median)
+p4 <- diagn_plot(bgnlm,window = 10,FUN = max)
+```
+
+A much stronger indication of convergence is observed in this case. Hence we proceed with the inference.
+
+# Inference
+
+In the Bayesian Generalized Nonlinear Model (BGNLM) analysis, the predictor troot(((period × hoststar_mass) × period))troot(((period × hoststar_mass) × period)) achieved an inclusion probability of 1.000, indicating it is essential for predicting the semi-major axis. This strong support suggests that the non-linear interaction between orbital period and stellar mass captures the underlying physical relationship. All other predictors showed inclusion probabilities below 0.1, reinforcing the dominant role of this term.
+
+Using Jeffreys prior with unit response variance, the median probability model yields the following estimates for the posterior mode and its standard deviation:
+
+```{r}
+# Prepare variables
+x <- (data.train$period^2 * data.train$hoststar_mass)^(1/3)
+y <- data.train$semimajoraxis
+
+# Calculate means
+x_bar <- mean(x)
+y_bar <- mean(y)
+
+# Compute slope (beta1_hat)
+beta1_hat <- sum((x - x_bar) * (y - y_bar)) / sum((x - x_bar)^2)
+
+# Compute intercept (optional)
+beta0_hat <- y_bar - beta1_hat * x_bar
+
+# Compute standard error of beta1 assuming Var(Y) = 1
+se_beta1 <- 1 / sqrt(sum((x - x_bar)^2))
+
+# Output results
+cat(sprintf("Intercept estimate (beta0): %.6f\n", beta0_hat))
+cat(sprintf("Slope estimate (beta1): %.6f\n", beta1_hat))
+cat(sprintf("Standard error of beta1 (assuming unit variance): %.6f\n", se_beta1))
+
+```
+
+The corresponding 95% and 99% credible intervals for G, expressed in SI units, under the specified prior are as follows:\
+
+```{r}
+pi2 <- 4 * pi^2
+
+# ---- Constants for unit conversion ----
+AU_in_m <- 149597870700          # meters
+day_in_s <- 86400                # seconds
+Msun_in_kg <- 1.988475e30        # kg
+unit_conversion <- (AU_in_m^3) / (day_in_s^2 * Msun_in_kg)
+
+# ---- Posterior Sampling ----
+set.seed(123)
+n_samples <- 100000
+beta1_samples <- rnorm(n_samples, mean = beta1_hat, sd = se_beta1)
+G_samples_raw <- pi2 * beta1_samples^3
+G_samples_SI <- G_samples_raw * unit_conversion
+
+# ---- Summarize posterior samples ----
+G_true <- 6.67430e-11
+G_mean_SI <- mean(G_samples_SI)
+G_sd_SI <- sd(G_samples_SI)
+CI_95_SI <- quantile(G_samples_SI, c(0.025, 0.975))
+CI_99_SI <- quantile(G_samples_SI, c(0.005, 0.995))
+
+# ---- Output results ----
+cat("Posterior Sampling (SI units):\n")
+cat(sprintf("G true         = %.3e\n", G_true))
+cat(sprintf("G mean          = %.3e\n", G_mean_SI))
+cat(sprintf("G SD            = %.3e\n", G_sd_SI))
+cat(sprintf("95%% Credible CI = [%.3e, %.3e]\n", CI_95_SI[1], CI_95_SI[2]))
+cat(sprintf("99%% Credible CI = [%.3e, %.3e]\n", CI_99_SI[1], CI_99_SI[2]))
+
+# ---- Plot posterior of G ----
+hist(G_samples_SI, breaks = 100, col = "lightblue",
+     main = "Posterior Distribution of G (SI Units)",
+     xlab = expression(G~~"(m"^3*"/kg/s"^2*")"))
+abline(v = CI_95_SI, col = "red", lty = 2)
+abline(v = G_mean_SI, col = "darkblue", lwd = 2)
+abline(v = G_true, col = "darkgreen", lwd = 2)
+legend("topright", legend = c("Posterior Mean", "95% CrI", "NIST G"),
+       col = c("darkblue", "red", "darkgreen"), lty = c(1, 2, 1), lwd = c(2, 1, 2))
+
+```
+
+\
+The corresponding 95% and 99% credible intervals for G, expressed in SI units, under the specified prior are as follows. We observe that the true value of G lies well within the 95% credible interval and is close to the posterior mode, indicating good agreement between the inferred model and known physical constants.
+
+### Discussion with Relation to Kepler's Third Law
+
+#### 1. Kepler’s Third Law
+
+Kepler’s Third Law states that the square of a planet’s orbital period is proportional to the cube of the semi-major axis of its orbit:
+
+$$
+T^2∝a^3
+$$
+
+In Newtonian mechanics, this law becomes:
+
+$$
+a^3=\frac{G(M+m)T^2}{4\pi^2} \approx ​\frac{GMT^2}{4\pi^2} \text{due to } m\ll M. 
+$$
+
+where a is the semi-major axis, T is the orbital period, M  and  m  are the masses of the host star and a planet, and G is the gravitational constant.
+
+#### 2. Model Selection and Physical Interpretation
+
+**Recovery of the Keplerian Form:**\
+The Bayesian Generalized Nonlinear Model (BGNLM) assigned a posterior inclusion probability of 1.000 to the nonlinear interaction term
+
+troot(((period × hoststar_mass) × period))
+
+This term corresponds to the cube root of $$MT^2$$ which matches the Newtonian formulation of Kepler’s Third Law. The fact that this term was unambiguously selected, while all other predictors had negligible inclusion probabilities (all below 0.1), confirms that the model identified the true physical relationship purely from data, without requiring explicit physical constraints.
+
+**Statistical and Scientific Coherence:**\
+This result demonstrates the capacity of BGNLM to not only model complex nonlinear relationships but also to recover known physical laws in a principled Bayesian framework. The discovery of this term validates both the structure of the model space and the search strategy employed (e.g., GMJMCMC with Jeffreys priors). It also highlights the benefit of combining nonparametric flexibility with rigorous variable selection, leading to models that are both interpretable and scientifically grounded.
+
+#### 3. Estimation of the Gravitational Constant G
+
+**Accurate Quantification via Posterior Sampling:**\
+Using the selected predictor and the relationship implied by Kepler’s Third Law, we derived posterior samples for Gin SI units. The results indicate high precision:
+
+-   The **posterior mean** of G closely matches the true value reference from NIST.
+
+-   The **95% credible interval** fully contains the true value.
+
+-   The **posterior mode** is nearly identical to the true gravitational constant.
+
+These findings confirm that our inference procedure not only selects the correct physical form but also enables **accurate parameter estimation**. This level of agreement with physical constants—derived solely from exoplanet data demonstrates the **empirical adequacy and scientific reliability** of the BGNLM approach.
+
+### Predictions
+
+```{r}
+preds.train.bgnlm <- predict(bgnlm, data.train[,-1])
+preds.test.bgnlm <- predict(bgnlm, data.test[,-1])
+r.bgnlm <- round(c(cor(data.train[,1],preds.train.bgnlm$aggr$mean)^2,cor(data.test[,1],preds.test.bgnlm$aggr$mean)^2),3)
+plot(x = data.train[, 1], preds.train.bgnlm$aggr$mean, xlab = "data", ylab = "prediction", main = "Title of the Plot", col = "blue", pch = 16)
+points(x = data.test[, 1], preds.test.bgnlm$aggr$mean, col = "red", pch = 17)
+legend("topright", legend = c(paste0("Training Data, R.sqr = ",r.bgnlm[1]), paste0("Test Data, R.sqr = ",r.bgnlm[2])), col = c("blue", "red"), pch = c(16, 17))
+```
+
+The predictions are, as expected, nearly perfect on both the training and testing sets. This is a direct consequence of the inclusion of the term
+
+troot(((period × hoststar_mass) × period))troot(((period × hoststar_mass) × period))
+
+in the BGNLM model, which effectively encodes the essence of Kepler’s Third Law and has close to 1 posterior mass.
+
+## Proceed by redoing the inference with the g-prior specified
+
+We use g-prior with $$g = n$$ otherwise the specification of the model and search strategy is just like in the previous case
+
+```{r}
+set.seed(3)
+bgnlm <- FBMS::fbms(semimajoraxis ~ ., data = data.train,method = "gmjmcmc.parallel",beta_prior = list(type = "g-prior", g = nrow(data.train)),transforms = transforms,runs = 64,cores = 8,P = 50,probs = probs, params = params)
+plot(bgnlm)
+summary(bgnlm,labels = names(data.train)[-1])
+
+```
+
+We perfectly recover the true law here, with strong convergence observed under the g-prior. All conclusions remain consistent with those obtained using Jeffreys priors.
+
+```{r}
+p5 <- diagn_plot(bgnlm,window = 10,FUN = median)
+p6 <- diagn_plot(bgnlm,window = 10,FUN = max)
+```
+
+Convergence is also clearly evident. Next, we examine the credible intervals derived under the g-prior.
+
+```{r}
+g <- 639
+pi2 <- 4 * pi^2
+G_true <- 6.67430e-11  # NIST CODATA value for G
+
+# Prepare data
+x <- (data.train$period^2 * data.train$hoststar_mass)^(1/3)
+y <- data.train$semimajoraxis
+x_bar <- mean(x)
+y_bar <- mean(y)
+
+# Calculate sums of squares
+Sxx <- sum((x - x_bar)^2)
+
+# OLS estimates
+beta1_hat <- sum((x - x_bar) * (y - y_bar)) / Sxx
+beta0_hat <- y_bar - beta1_hat * x_bar
+
+# Posterior mean and variance under g-prior
+beta1_post_mean <- (g / (g + 1)) * beta1_hat
+beta1_post_var <- (g / (g + 1)) * (1 / Sxx)
+beta1_post_sd <- sqrt(beta1_post_var)
+
+cat(sprintf("Posterior mean of beta1 under g-prior: %.6f\n", beta1_post_mean))
+cat(sprintf("Posterior SD of beta1 under g-prior: %.6f\n", beta1_post_sd))
+
+# Constants for unit conversion
+AU_in_m <- 149597870700
+day_in_s <- 86400
+Msun_in_kg <- 1.988475e30
+unit_conversion <- (AU_in_m^3) / (day_in_s^2 * Msun_in_kg)
+
+# Posterior sampling for beta1 and G
+set.seed(123)
+n_samples <- 100000
+beta1_samples <- rnorm(n_samples, mean = beta1_post_mean, sd = beta1_post_sd)
+G_samples_raw <- pi2 * beta1_samples^3
+G_samples_SI <- G_samples_raw * unit_conversion
+
+# Summarize posterior samples of G
+G_mean_SI <- mean(G_samples_SI)
+G_sd_SI <- sd(G_samples_SI)
+CI_95_SI <- quantile(G_samples_SI, probs = c(0.025, 0.975))
+CI_99_SI <- quantile(G_samples_SI, probs = c(0.005, 0.995))
+
+# ---- Output results ----
+cat("\nPosterior Sampling (SI units):\n")
+cat(sprintf("G true         = %.3e\n", G_true))
+cat(sprintf("G mean         = %.3e\n", G_mean_SI))
+cat(sprintf("G SD           = %.3e\n", G_sd_SI))
+cat(sprintf("95%% Credible CI = [%.3e, %.3e]\n", CI_95_SI[1], CI_95_SI[2]))
+cat(sprintf("99%% Credible CI = [%.3e, %.3e]\n", CI_99_SI[1], CI_99_SI[2]))
+
+# ---- Plot posterior of G ----
+hist(G_samples_SI, breaks = 100, col = "lightblue",
+     main = "Posterior Distribution of G (SI Units)",
+     xlab = expression(G~~"(m"^3*"/kg/s"^2*")"))
+abline(v = CI_95_SI, col = "red", lty = 2)
+abline(v = G_mean_SI, col = "darkblue", lwd = 2)
+abline(v = G_true, col = "darkgreen", lwd = 2)
+legend("topright", legend = c("Posterior Mean", "95% CrI", "NIST G"),
+       col = c("darkblue", "red", "darkgreen"), lty = c(1, 2, 1), lwd = c(2, 1, 2))
+
+```
+
+Slightly more biased toward zero than with the Jeffreys prior, as expected due to the stronger regularization imposed by the g-prior. This stronger shrinkage pulls estimates closer to zero, but still maintains good coverage. As anticipated, the predictions remain excellent.
+
+```{r}
+preds.train.bgnlm <- predict(bgnlm, data.train[,-1])
+preds.test.bgnlm <- predict(bgnlm, data.test[,-1])
+r.bgnlm <- round(c(cor(data.train[,1],preds.train.bgnlm$aggr$mean)^2,cor(data.test[,1],preds.test.bgnlm$aggr$mean)^2),3)
+plot(x = data.train[, 1], preds.train.bgnlm$aggr$mean, xlab = "data", ylab = "prediction", main = "Title of the Plot", col = "blue", pch = 16)
+points(x = data.test[, 1], preds.test.bgnlm$aggr$mean, col = "red", pch = 17)
+legend("topright", legend = c(paste0("Training Data, R.sqr = ",r.bgnlm[1]), paste0("Test Data, R.sqr = ",r.bgnlm[2])), col = c("blue", "red"), pch = c(16, 17))
+```
+
+# **Summary**
+
+In line with **Objective 1 (Model assumptions and diagnostics)**, convergence of the GMJMCMC algorithm was thoroughly assessed using internal diagnostics from the FBMS package and confirmed by rerunning analyses with different random seeds and for longer time. Sensitivity to prior choice was evaluated through reanalysis with g-priors $$g=\max⁡(n,p^2)$$ confirming the robustness of the inference.
+
+For **Objective 2 (Model description and validation)**, the final model structure was reported with detailed interpretation of selected predictors, demonstrating strong agreement with the known physical law for the semimajor axis. The gravitational constant G was estimated with credible intervals on the SI scale and found to closely match the NIST reference value. Predictive performance was validated on a test set via $$R^2$$, confirming excellent generalization.
+
+Regarding **Objective 3 (Model stability)**, predictor selection probabilities were examined, showing consistent inclusion of only the important predictor, while others had PIP \< 0.1.

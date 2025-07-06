@@ -1,0 +1,99 @@
+---
+title: "Kepler IDA"
+author: 
+  - Aliaksandr Hubin
+date: now
+date-format: iso
+title-block-banner: "#828282"
+format:
+  html:
+    code-fold: true
+    code-tools: true
+    theme: default
+    toc: true
+    number-sections: true
+    toc-location: right
+    embed-resources: true
+    self-contained: true
+    df-print: kable
+editor: 
+  visual
+---
+
+# Load the libraries
+
+```{r}
+library(tidyverse) 
+library(DataExplorer)
+```
+
+# IDA per 02.07.2025 version of the database
+
+Firs the data will be updated from the most recent version of the database (OpenExoplanetCatalogue)
+
+```{r}
+data = read.csv("https://raw.githubusercontent.com/OpenExoplanetCatalogue/oec_tables/master/comma_separated/open_exoplanet_catalogue.txt")
+
+head(data)
+```
+
+The data has 5414 observations over 25 variables.
+
+```{r}
+DataExplorer::plot_str(data = data)
+```
+
+The data has 19 continuous columns and 5 categorical columns and in total 34% missing observations.
+
+```{r}
+DataExplorer::plot_intro(data = data) 
+```
+
+Item missingness is described below
+
+```{r}
+DataExplorer::plot_missing(data = data)
+```
+
+We shall keep data with less than 60% of missing values and further remove planetary system specific variables and irrelevant for the analysis ones such as last-update, list, name, and discovery method. We assume missingness at random at hence observation units with missing data in any predictor variable or the dependent variable are removed.
+
+```{r}
+data <- data %>% select(semimajoraxis,mass, radius, period, eccentricity, hoststar_mass, hoststar_radius, hoststar_metallicity,hoststar_temperature,binaryflag) %>% na.omit()
+```
+
+Univariate distributions of all predictors and the dependent variables are produced below
+
+```{r}
+
+DataExplorer::plot_density(data,nrow = 3,ncol = 3)
+```
+
+Same on the log scale
+
+```{r}
+DataExplorer::plot_density(log(data[,c("eccentricity","mass","period","semimajoraxis","hoststar_radius","hoststar_mass")]),nrow = 2,ncol = 3)
+
+```
+
+A matrix of Spearman correlations is produced below
+
+```{r}
+DataExplorer::plot_correlation(data,type = "continuous",cor_args = list(use = "pairwise.complete.obs", method = "spearman"))
+```
+
+# Splitting into the training and hold out test sets and saving
+
+The data set was split into training and test data set. 300 randomly chosen planets are kept for evaluation.
+
+```{r}
+
+summary(data)
+
+set.seed(1)
+te.ind <- sample.int(n = 939,size = 300,replace = F)
+data.train <- data[-te.ind,]
+data.test <- data[te.ind,]
+
+saveRDS(data.train,file = "train.RDS")
+saveRDS(data.test,file = "test.RDS")
+```

@@ -25,7 +25,8 @@ params:
 This frequentist analysis for the school belonging analysis task follows the 
 statistical analysis plan by Michael Kammer dated 20.5.2025 (and referring
 to the task description for the simplified school belonging task with the same 
-date that addresses a binary outcome variable).
+date that addresses a binary outcome variable). For a very brief initial data
+analysis we refer to `analysis_school-logistic-ida`.
 
 # Setup and data
 
@@ -62,10 +63,6 @@ library(GGally)
 # parallel
 library(doFuture)
 
-# required bot not loaded
-# ranger
-# pracma
-
 rm(list = c("pisa2018"))
 load("Data/Raw/pisa2018.Rdata")
 
@@ -73,6 +70,7 @@ pisa2018 %<>% mutate(
         ATT4 = cut_number(ATT01, 4), 
         bel01 = belong <= quantile(belong, probs = 0.25, na.rm = TRUE)
     )
+levels(pisa2018$ATT4) = 1:4
 ```
 
 ## Helper functions
@@ -85,27 +83,17 @@ Code for helper functions.
 logit = binomial()$linkfun
 expit = binomial()$linkinv
 
-plot_density_and_box <- function(plotdf, v) {
-    list(
-        ggplot(plotdf, aes(x = .data[[v]])) + 
-            geom_density() + 
-            theme_bw() +
-            theme(axis.title.x = element_blank(), 
-                  axis.text.x = element_blank(), 
-                  axis.ticks.x = element_blank(),
-                  plot.margin = margin()), 
-        ggplot(plotdf, aes(x = .data[[v]], y = 0)) + 
-            geom_boxplot(outlier.shape = NA) +
-            geom_jitter(height = 0.25, width = 0, alpha = 0.1) +
-            theme_bw() + 
-            theme(axis.text.y = element_blank(), 
-                  axis.title.y = element_blank(),
-                  axis.ticks.y = element_blank(),
-                  panel.grid.minor.y = element_blank(), 
-                  panel.grid.major.y = element_blank(), 
-                  plot.margin = margin(0))
-    ) %>% 
-        wrap_plots(nrow = 2, heights = c(0.8, 0.2))
+plot_residuals_violin <- function(s, predictor, name = "Predictor") {
+    res_data = data.frame(
+        Residuals = residuals(s),
+        Predictor = factor(predictor)
+    )
+    
+    ggplot(res_data, aes(x = Predictor, y = Residuals)) +
+        geom_violin(fill = "lightgrey", alpha = 0.6) +
+        geom_jitter(width = 0.2, alpha = 0.5) +
+        theme_minimal() +
+        labs(title = paste("Predictor vs Residuals"), x = name, y = "Residuals")
 }
 ```
 
@@ -117,43 +105,12 @@ As outlined in Table 1 in the task description.
 VARIABLES = list(
     outcome = "bel01", 
     focal = c("bull", "ATT4"), 
-    nonfocal = c("female", "nld", "scie_std", "aca", "val", "comp", "ndiff", 
-                 "nfof", "native", "nfewbooks", "joyread", "goal", "mot", 
-                 "res", "swbp", "mean", "parent_sup", "ndis_clim", "GYM", "UNI")
+    nonfocal = c("female", "nld", "aca", "val", "nfof", "native", "joyread", 
+                 "goal", "mot", "res", "ndis_clim", "GYM", "UNI", "NDISH", "N_SC")
 )
 
 glue("{length(VARIABLES$nonfocal)} non-focal variables used for modeling according to SAP: 
      {VARIABLES$nonfocal |> paste0(collapse = ', ')}")
-```
-
-## Overview
-
-Elementary overview of distributions and correlations. 
-
-```{r}
-pisa2018 %>% 
-    select(bel01, one_of(unlist(VARIABLES))) %>% 
-    tbl_summary(
-        type = all_continuous() ~ "continuous2",
-        statistic = list(all_continuous() ~ c("{median} ({p25}, {p75})",
-                                              "{mean} ({sd})",
-                                             "{min}, {max}"))
-    )
-```
-
-```{r fig.width=8, fig.height=8}
-cormat = pisa2018 %>% 
-    select(one_of(unlist(VARIABLES))) %>% 
-    mutate(across(where(is.factor), as.numeric)) %>% 
-    cor(use = "pairwise.complete.obs", method = "spearman")
-
-ggcorrplot::ggcorrplot(cormat)
-```
-
-Focal predictors - important for target estimands.
-
-```{r}
-tbl_cross(pisa2018, bull, ATT4)
 ```
 
 # Analysis
@@ -171,7 +128,7 @@ summary(m)
 
 ### Diagnostics
 
-Calibration including and excluding random effects, respectively. 
+Calibration excluding and including random effects, respectively. 
 
 ```{r}
 rms::val.prob(logit = predict(m, re.form = NA), y = pisa2018$bel01)
@@ -184,7 +141,9 @@ error rates and are likely not relevant here.
 ```{r}
 s = simulateResiduals(m, seed = 26, plot = TRUE)
 plotResiduals(s, pisa2018$ATT4)
+plot_residuals_violin(s, pisa2018$ATT4, "ATT4")
 plotResiduals(s, pisa2018$bull)
+plot_residuals_violin(s, pisa2018$bull, "Bull")
 ```
 
 Random effect distribution (qq-plot for normality).
@@ -249,6 +208,9 @@ ggplot(preddf_1, aes(x = pred_m_prob_rf)) +
 
 ## Secondary model 
 
+Note that the warning on model convergence from lme4 may often be regarded
+as false positive. The optimizer itself must report convergence. 
+
 ```{r}
 f_m2 = sprintf("bel01 ~ %s + (1 | school.id)", 
               paste0(VARIABLES$nonfocal, collapse = " + ")) %>% 
@@ -260,7 +222,7 @@ summary(m2)
 
 ### Diagnostics
 
-Calibration including and excluding random effects, respectively. 
+Calibration excluding and including random effects, respectively. 
 
 ```{r}
 rms::val.prob(logit = predict(m2, re.form = NA), y = pisa2018$bel01)
@@ -268,10 +230,16 @@ rms::val.prob(logit = predict(m2, re.form = NULL), y = pisa2018$bel01)
 ```
 
 Randomized quantile residuals. Note that outlier tests may have inflated
-error rates and are likely not relevant here. 
+error rates and are likely not relevant here. We plot them here also against
+the focal predictors as non-covariates to assess wether they are important to 
+describe the outcome.
 
 ```{r}
 s = simulateResiduals(m2, seed = 26, plot = TRUE)
+plotResiduals(s, pisa2018$ATT4)
+plot_residuals_violin(s, pisa2018$ATT4, "ATT4")
+plotResiduals(s, pisa2018$bull)
+plot_residuals_violin(s, pisa2018$bull, "Bull")
 ```
 
 Random effect distribution (qq-plot for normality).
@@ -291,7 +259,9 @@ model would describe the data as well as the primary model.
 The test is significant, indicating the the larger model "better" describes the
 data based on frequentist likelihood theory. Also the AIC and BIC criteria are
 smaller for the larger model, indicating it is to be preferred despite the 
-larger number of fixed effects. 
+larger number of fixed effects. This is to be taken together with the results
+from the randomized quantile residuals, which also indicated a lack of fit
+for the focal predictors. 
 
 ```{r}
 anova(m, m2)
@@ -398,6 +368,7 @@ summary(map_dbl(res_b, 'runtime')) / 3600
 ```{r}
 #| message: false
 #| warning: false
+
 res_b %>% map_chr(~ .x$optinfo$message) %>% table()
 ```
 
@@ -469,7 +440,7 @@ ggplot(res, aes(group = ATT4, y = pred_marg_prob, color = fct_rev(factor(bull)),
                    linewidth = 1.5) +
     geom_linerange(aes(ymin = q25, ymax = q75), position = position_dodge(0.5), 
                    linewidth = 3) +
-    geom_point(position = position_dodge(0.5), size = 5, shape = 3) + 
+    geom_point(position = position_dodge(0.5), size = 5, stroke = 2, shape = 3) + 
     scale_color_brewer(palette = "Set1", name = "bull") +
     coord_cartesian(ylim = c(0, 1)) +
     ylab("Probability of low sense of belonging") +

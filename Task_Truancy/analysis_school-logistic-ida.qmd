@@ -1,0 +1,160 @@
+---
+title: "School belonging data analysis, short IDA"
+author: 
+  - Michael Kammer
+date: now
+date-format: iso
+title-block-banner: "#828282"
+format:
+  html:
+    code-fold: true
+    code-tools: true
+    theme: default
+    toc: true
+    number-sections: true
+    toc-location: right
+    embed-resources: true
+    self-contained: true
+    df-print: kable
+params: 
+  folder_analysis: Data/Processed/School_FSAP
+---
+
+# Background 
+
+This frequentist analysis for the school belonging analysis task follows the 
+statistical analysis plan by Michael Kammer dated 30.6.2025 (and referring
+to the task description for the simplified school belonging task with the same 
+date that addresses a binary outcome variable). Here we present a very short 
+initial data analysis common to the Frequentist and Bayesian workflows.
+
+# Setup and data
+
+Data were provided by Mariana Nold by mail on 3.1.2025 (`pisa2018.RData`). This
+dataset is already pre-processed with one small exception.
+
+- ATT4 is computed by the `ggplot2::cut_number()` function, as outlined by 
+    Mariana in her SAP. 
+- bel01 is computed as the lowest 25% of students in terms of sense of belonging
+    in `belong`.
+
+```{r message=FALSE, warning=FALSE}
+#| code-fold: true
+
+T_START = Sys.time()
+SUFFIX = ""
+
+# data handling and printing
+library(tidyverse)
+library(glue)
+library(magrittr)
+library(patchwork)
+library(gtsummary)
+library(gt)
+
+# plotting
+library(GGally)
+
+rm(list = c("pisa2018"))
+load("Data/Raw/pisa2018.Rdata")
+
+pisa2018 %<>% mutate(
+        ATT4 = cut_number(ATT01, 4), 
+        bel01 = belong <= quantile(belong, probs = 0.25, na.rm = TRUE)
+    )
+```
+
+## Helper functions
+
+Code for helper functions.
+
+```{r}
+#| code-fold: true
+
+plot_density_and_box <- function(plotdf, v) {
+    list(
+        ggplot(plotdf, aes(x = .data[[v]])) + 
+            geom_density() + 
+            theme_bw() +
+            theme(axis.title.x = element_blank(), 
+                  axis.text.x = element_blank(), 
+                  axis.ticks.x = element_blank(),
+                  plot.margin = margin()), 
+        ggplot(plotdf, aes(x = .data[[v]], y = 0)) + 
+            geom_boxplot(outlier.shape = NA) +
+            geom_jitter(height = 0.25, width = 0, alpha = 0.1) +
+            theme_bw() + 
+            theme(axis.text.y = element_blank(), 
+                  axis.title.y = element_blank(),
+                  axis.ticks.y = element_blank(),
+                  panel.grid.minor.y = element_blank(), 
+                  panel.grid.major.y = element_blank(), 
+                  plot.margin = margin(0))
+    ) %>% 
+        wrap_plots(nrow = 2, heights = c(0.8, 0.2))
+}
+```
+
+# Variables
+
+As outlined in Table 1 in the task description. 
+
+```{r}
+VARIABLES = list(
+    outcome = "bel01", 
+    focal = c("bull", "ATT4"), 
+    nonfocal = c("female", "nld", "aca", "val", "nfof", "native", "joyread", 
+                 "goal", "mot", "res", "ndis_clim", "GYM", "UNI", "NDISH", "N_SC")
+)
+
+glue("{length(VARIABLES$nonfocal)} non-focal variables used for modeling according to SAP: 
+     {VARIABLES$nonfocal |> paste0(collapse = ', ')}")
+```
+
+# IDA
+
+Elementary overview of distributions and correlations. 
+
+```{r}
+pisa2018 %>% 
+    select(bel01, one_of(unlist(VARIABLES))) %>% 
+    tbl_summary(
+        type = all_continuous() ~ "continuous2",
+        statistic = list(all_continuous() ~ c("{median} ({p25}, {p75})",
+                                              "{mean} ({sd})",
+                                             "{min}, {max}"))
+    )
+```
+
+```{r fig.width=8, fig.height=8}
+cormat = pisa2018 %>% 
+    select(one_of(unlist(VARIABLES))) %>% 
+    mutate(across(where(is.factor), as.numeric)) %>% 
+    cor(use = "pairwise.complete.obs", method = "spearman")
+
+ggcorrplot::ggcorrplot(cormat)
+```
+
+Focal predictors - important for target estimands.
+
+```{r}
+tbl_cross(pisa2018, bull, ATT4)
+```
+
+# Sessioninfo
+
+To build this notebook:
+
+- install `quarto`
+- make sure the data is in the correct folder (either in global Data folder, 
+    or as subfolder of the folder containing this notebook).
+- build using the `make.R` script (global Data), or using the Render button in 
+    RStudio (subfolder Data).
+
+```{r}
+params
+
+glue("Runtime {difftime(Sys.time(), T_START, units = 'm') / 60} hours.")
+
+sessioninfo::session_info()
+```
