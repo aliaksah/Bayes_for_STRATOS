@@ -261,7 +261,17 @@ summary_rmf_cv <- prediction_summary_cv(model = ref_fit , data = women, k = 3)
 print(summary_rmf_cv)
 ```
 
-Predictive Projections: Forward search, LOO (internal robustness)
+The reference model passes the checks and therefore I decide to use this model, because it predicts well. In a next step I use the `projpred`-algorithms to find a simpler model that gives similar predictions as the reference model. In `projpred`, variable selection is performed by evaluating submodels of increasing size, starting from zero predictors up to a predefined maximum (`nterms_max`) in case of of **forward excursion.** When fixing the number of variables (which is not possible for L1 search), the best model of that size is chosen by projecting the reference model onto all candidate submodels and selecting the one with minimal expected Kullback-Leibler divergence (KLD)---this ensures the reduced model preserves the predictive distribution of the full model as closely as possible.
+
+In the case of **L1-regularized search**, coefficients are estimated over a grid of penalization values using the reference model's fit in place of the observed response. This produces a sequence of sparse models ranked by the order in which variables enter with non-zero coefficients as the penalty decreases. While computationally efficient, L1 search does not support fixing model size in advance, making it less flexible than forward search in that regard. Importantly, penalization is only used for variable ranking; submodels are later refit using projections without penalization.
+
+To evaluate predictor stability, the search procedure is repeated across data subsets. **In this re-analysis,** **leave-one-out cross-validation (LOO)** **is used in combination with** **L1 search** **as the primary strategy (`LOO-L1`).** Additionally, 5-fold cross-validation is implemented to assess the **robustness** of variable selection and predictive performance. In cross-validation mode, selection is performed on training folds, and performance is evaluated on held-out test data. Results are also computed based on forward excursion, in combination with LOO-CV and 5-fold-CV.
+
+Finally, output visualizations report the proportion of times each variable was selected. If `cumulate = FALSE`, proportions reflect selection at specific ranking positions. If `cumulate = TRUE`, they capture cumulative inclusion up to each rank, as annotated in the "CV ranking proportions matrix" plot.
+
+Before inspecting the results, the primary search strategy was set to LOO-L1 (leave-one-out cross-validation with L1-regularized search), as this most closely aligns with the original SAP. To assess the robustness of predictor selection, forward selection and 5-fold cross-validation were additionally computed, not as alternatives, but to evaluate whether they yield different sets of selected variables, thus to access the internal robustness.
+
+**Predictive Projections: Forward search, LOO (internal robustness)**
 
 ```{r predictive projection, results='hide', cache=TRUE}
 set.seed(2341)
@@ -273,7 +283,7 @@ save(vs_cvf,file = file.path(PPath,"vs_cvf"))
 plot(vs_cvf, deltas = TRUE, stats =  c('elpd'))
 ```
 
-Predictive Projection: Forward search, five-fold (internal robustness)
+**Predictive Projection: Forward search, five-fold (internal robustness)**
 
 ```{r 5-fold cross validation, results='hide', cache=TRUE}
 set.seed(2341)
@@ -286,7 +296,7 @@ save(vs_cvf5,file = file.path(PPath,"vs_cvs"))
 plot(vs_cvf5, deltas = TRUE, stats =  c('elpd'))
 ```
 
-Predictive Projections: L1 search,LOO (key results)
+**Predictive Projections: L1 search,LOO (key results)**
 
 ```{r predictive lasso projection, results='hide', cache=TRUE}
 # Generate model path: By varying lambda, a sequence of submodels with an increasing number of (non-zero) coefficients is created. ➤ The order in which coefficients “appear” serves as a ranking of the variables.
@@ -300,7 +310,7 @@ save(vs_cvl,file = file.path(PPath,"vs_cvl"))
 plot(vs_cvl, deltas = TRUE, stats =  c('elpd'))
 ```
 
-Predictive Projections: L1 search, 5-fold (internal robustness)
+**Predictive Projections: L1 search, 5-fold (internal robustness)**
 
 ```{r predictive lasso projection k-fold, results='hide', cache=TRUE}
 set.seed(2341)
@@ -342,7 +352,9 @@ L1 Search (5-fold)
 inspect_variable_selection(vs_cvl5, top_n = 5)
 ```
 
-Compute Projected Posterior: Post-selection-inference for L1 Search (LOO)
+# **Compute Projected Posterior: Post-selection-inference for L1 Search (LOO)**
+
+Here post-selection inference starts, thus the results retain the uncertainty from the reference model posterior.
 
 ```{r post-selection inference, results='hide'}
 # https://cran.r-project.org/web/packages/projpred/vignettes/projpred.html#post-selection-inference
@@ -629,4 +641,25 @@ mcmc_areas(as.matrix(calibration_model),
            prob = 0.95) + 
   ggtitle("Sigma of Calibration model for slope (external)")
 
+r2_values_men_extK  <- bayes_r2_ext(ypred = y_linpred_male$pred + intercepts, y = men$Fat)
+
+
+summary_r2_men_extK  <- data.frame(
+  mean   = round(mean(r2_values_men_extK),3),
+  median = round(median(r2_values_men_extK),3),
+  p05   = round(quantile(r2_values_men_extK, 0.05),3),
+  p95   = round(quantile(r2_values_men_extK, 0.95),3)
+)
+
+rownames(summary_r2_men_extK) <- "R²"
+colnames(summary_r2_men_extK)[colnames(summary_r2_men_extK) == "p05" ] <- "5%"
+colnames(summary_r2_men_extK)[colnames(summary_r2_men_extK) ==  "p95" ] <- "95%"
+
+kable(summary_r2_men_extK, digits = 3 , caption = "Cor. Validation R²  for men") %>%
+  kable_styling(full_width = FALSE)
+
 ```
+
+The calibration slope is approximately 1.0, exactly `r cal_slope`, suggesting good predictive scaling. However, the intercept indicates a systematic overestimation of body fat in men by `r -cal_int` percentage points.
+
+To address this bias, a re-calibrated model adjusting the intercept by `r cal_int`. could be proposed. This adjusted model yields an apparent ( R\^2 ) of `r summary_r2_men_extK$mean`. The uncertainty of the ( R\^2 )estimate is expressed through a posterior predictive interval, reflecting the range of plausible values based on the model and the observed data.
