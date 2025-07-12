@@ -1,0 +1,329 @@
+---
+title: "Frequentist re-analysis: Kepler law"
+#title-block-banner: true                      # banner with color
+author:
+  - name: Georg Heinze
+    affiliation: Medical University of Vienna, Center for Medical Data Science
+date: last-modified                            # "`r Sys.Date()`" for system date
+categories: [2024, Contrast-Bayes-Frequentist, STRATOS, R]
+description: "Classification: confidential"
+editor: visual
+theme: cosmo                                   # cosmo bootswatch theme
+toc: true                                      # table of contents  
+number-sections: true
+colorlinks: true                               # ??
+highlight-style: pygments
+#bibliography: references.bib
+format:
+  html: 
+    code-fold: true
+    code-tools: true
+    html-math-method: katex
+    self-contained: true                      # html is self-contained
+  pdf:
+    geometry: 
+      - top=30mm
+      - left=30mm
+  docx: default                               
+---
+
+# Frequentist re-analysis: Kepler's law
+
+As part of the robustness check of the Kepler case study, here the frequentist analysis is presented.
+
+It consists of the following steps:
+
+-   Preparations
+-   Symbolic regression run on training data
+-   Computation of G constant with confidence interval
+-   Evaluation of stability of symbolic regression with set hyperparameters:
+    -   Algorithmic stability (impact of different seeds on achieved optimal solution)
+    -   Data stability (impact of different data sets on achieved solution)
+-   Validation with test set
+
+## Preparations
+
+Here we load necessary packages, source code defining functions for symbolic regression, and the data set.
+
+The `read_or_compute` indicator defines if the computations are re-performed (`"compute"`) or only results listed (`"read"`).
+
+```{r}
+library(tidyverse) 
+library(kableExtra)
+library(parallel)
+
+
+source("symbolic.R")
+```
+
+```{r}
+read_or_compute <- "read"
+
+data = read.csv("https://raw.githubusercontent.com/OpenExoplanetCatalogue/oec_tables/master/comma_separated/open_exoplanet_catalogue.txt")
+
+#check first lines of data
+#head(data)
+
+# select relevant variables and remove observations with missing values
+data <- data %>% select(semimajoraxis,mass, radius, period, eccentricity, hoststar_mass, hoststar_radius, hoststar_metallicity,hoststar_temperature,binaryflag) %>% na.omit()
+
+#check summary statistics of data
+#summary(data)
+
+G_true <- 6.67430e-11
+```
+
+Next we divide the data set into training and test data set, in exactly the same way as in the Bayesian primary analysis.
+
+```{r}
+set.seed(1)
+te.ind <- sample.int(n = 939,size = 300,replace = F)
+data.train = data[-te.ind,]
+data.test = data[te.ind,]
+```
+
+## Symbolic regression
+
+In the following code chunk the symbolic regression analysis is performed on the training data set.
+
+```{r}
+if(read_or_compute == "compute"){
+  set.seed(456)
+  fit_kepler_orig <- symbolic_regression(data.train, target = "semimajoraxis", n_trees = 1000000, n_conv = 100000, n_mut = 0, verbose=T, crit_R2 = 0.9999809)
+} else load("fit_kepler_orig.Rdata")
+```
+
+The model converges to the following construct:
+
+```{r}
+tree_to_string(fit_kepler_orig$tree)
+
+```
+
+The fitted symbolic model reveals Kepler's third law. The proportionality factor is given by the slope of a regression model without intercept of semimajoraxis on the construct revealed by the symbolic regression model.
+
+```{r}
+mod.app <- with(data.train, eval(parse(text=tree_to_string(fit_kepler_orig$tree))))
+rsq_app <- summary(refit_orig<-lm(data=data.train, semimajoraxis ~ mod.app -1))$r.squared
+```
+
+The proportionality factor is estimated as $\hat\beta =$ `r coef(refit_orig)`, with an apparent $R^2$ of `r rsq_app`.
+
+Based on the law, one can compute an empirical estimate of the gravity constant $G$, which, in terms of the proportionality factor $\hat\beta$ estimated in the intercept-less regression model, is given by $G = \pi^2\cdot \hat\beta^3 \cdot c$, where $c = 149597870700^3/(1.988475\cdot 10^{30}\cdot 86400) = 2.255426 \cdot 10^{-7}$ is a constant for unit conversion to $m/s^2$.
+
+```{r}
+#  compute estimate of G from coefficient
+
+pi2 <- 4 * pi^2
+
+# ---- Constants for unit conversion ----
+AU_in_m <- 149597870700          # meters
+
+day_in_s <- 86400                # seconds
+
+Msun_in_kg <- 1.988475e30        # kg
+
+unit_conversion <- (AU_in_m^3) / (day_in_s^2 * Msun_in_kg)
+
+# define a function doing the conversion of beta estimate to G
+
+G_conv <- function(beta) unit_conversion*pi2 * beta^3
+```
+
+This calculation gives an estimate $\hat G$ = `r G_conv(coef(refit_orig))*10^11` $\times 10^{-11}$, which compares well with the true value of `r G_true*10^11` $\times 10^{-11}$. However, a model-based 95% confidence interval does not cover the true value: it is \[`r G_conv(confint(refit_orig))*10^11`\] $\times 10^{-11}$.
+
+Since the variables have very skew distributions, one could try to improve this confidence interval in two ways:
+
+-   compute a bootstrap confidence interval for $\beta$
+-   compute a model based on the logarithm of both the outcome and the construct $(period^2 \cdot hoststar\_mass)^{1/3}$. In this model, the slope is fixed at 1 and only the intercept $\gamma_0$ is estimated. The proportionality factor is given by $\exp(\hat\gamma_0)$.
+-   a model-based confidence interval for $\gamma_0$ could be compared to its bootstrap counterpart to evaluate its validity
+
+```{r}
+# log model
+refit_log <- lm(data=data.train, log(semimajoraxis) ~ offset(log(mod.app)))
+
+# bootstrap estimates of both models
+set.seed(123)
+B <- 1000
+beta1_boot <- gamma1_boot <- (1:B)*0
+for(ib in 1:B){
+  isample <- sample(1:nrow(data.train), repl=T)
+  refit_boot<-lm(data=data.train[isample,], semimajoraxis ~ mod.app[isample] -1)
+  beta1_boot[ib] <- coef(refit_boot)
+  refit_boot_log<-lm(data=data.train[isample,], log(semimajoraxis) ~ offset(log(mod.app[isample])))
+  gamma1_boot[ib] <- coef(refit_boot_log)
+}
+```
+
+Below, we have already transformed all confidence intervals for the proportionality factor to confidence intervals for the estimate of $G$. For the bootstrap variants, the median of the bootstrap replicates is given as point estimate. Compare these values to the true value of $G$ = `r G_true*10^11` $\times 10^{-11}$.
+
+```{r}
+all_est <- rbind(
+  G_conv(c(coef(refit_orig), confint(refit_orig))),
+  G_conv(quantile(beta1_boot, c(0.5, 0.025, 0.975))),
+  G_conv(exp(c(coef(refit_log), confint(refit_log)))),
+  G_conv(quantile(exp(gamma1_boot), c(0.5, 0.025, 0.975)))
+  )
+
+colnames(all_est) <- c("Estimate", "Lower 95% CL", "Upper 95% CL")
+rownames(all_est) <- c("Model-based", "Bootstrap", "Log-model, model-based", "Log-model, bootstrapped")
+
+kable(all_est*1e11, caption="Estimates of G (x 1e-11) and confidence intervals")
+```
+
+## Evaluation of stability of the model
+
+Our first model yielded the Kepler model, but it is not guaranteed that
+
+-   the model will always converge to the Kepler model, no matter which seed is used to initiate the random number generator,
+-   the Kepler model is the best simple model in terms of proportionality to semimajoraxis
+
+Moreover, the stability of the model when the data is resampled is also unclear. Hence two stability investigations are performed.
+
+### Stability with respect to random number seed
+
+In the first stability investigation, we repeat symbolic model fitting 100 times with different random number generator seeds. For each model, we will check the involved variables, and we will also evaluate the $R^2$ of the models to see if any of them outperforms the Kepler model in the training data.
+
+```{r}
+### parallelized version:
+if(read_or_compute == "compute"){
+
+  set.seed(1)
+  nstab <- 100
+  rstab <- floor(runif(nstab) * 100000 + 1)
+  
+  cl <- makeCluster(detectCores() - 1)
+  
+  clusterExport(cl, varlist = c("data.train", "symbolic_regression", "tree_to_string", "rstab", "generate_tree", "unary_ops", "binary_ops", "vary_tree", "evaluate_tree"), envir = environment())
+  
+  
+  tree_stab <- parLapply(cl, 1:nstab, function(istab) {
+    set.seed(rstab[istab])
+    fit_kepler <- symbolic_regression(
+      data.train,
+      target = "semimajoraxis",
+      n_trees = 1000000,
+      n_conv = 100000,
+      n_mut = 0,
+      verbose = FALSE,
+      crit_R2 = 0.9999809
+    )
+    cat("repl. ", istab, tree_to_string(fit_kepler$tree), "\n")
+    fit_kepler$tree
+  })
+  
+  stopCluster(cl)
+  
+  save(tree_stab, file="tree_stab.Rdata")
+} else load("tree_stab.Rdata")
+```
+
+```{r}
+predictors_stab <- table(unlist(lapply(tree_stab, function(X) sort(unique(collect_vars(X))))))
+combi_stab <- table(unlist(lapply(tree_stab, function(X) paste(sort(unique(collect_vars(X))), collapse=", "))))
+mod.stab <- (lapply(1:length(tree_stab), function(X) with(data.train, eval(parse(text=tree_to_string(tree_stab[[X]]))))))
+rsq_stab <- unlist(lapply(1:length(tree_stab), function(X) summary(refit_orig<-lm(data=data.train, semimajoraxis ~ mod.stab[[X]] -1))$r.squared))
+```
+
+Which predictors were selected how often?
+
+```{r}
+# which predictors how often
+kable(-sort(-predictors_stab), col.names=c("Variable", "Frequency"))
+```
+
+Which combination of predictors was selected how often?
+
+```{r}
+# which combination of predictors how often
+kable(-sort(-combi_stab), col.names=c("Combination of variables", "Frequency"))
+```
+
+The Kepler model variables were selected most often (`r -sort(-combi_stab)[1]` times), but sometimes in combination with other variables such as eccentricity or hoststar_metallicity. hoststar_mass was missed in 5 out of 100 fits.
+
+Is there a model that yields a higher $R^2$ then the Kepler model?
+
+```{r}
+# is there a model that yields a higher Rsq than cbrt(period*period*hoststar_mass)?
+ind_outp <- rsq_stab > rsq_app 
+any(ind_outp == TRUE)
+```
+
+No, no model ended up in a higher apparent $R^2$ than the Kepler model.
+
+### Bootstrap analysis (stability with respect to random number seed and data)
+
+```{r}
+if(read_or_compute == "compute"){
+  cl <- makeCluster(detectCores() - 1)
+  clusterExport(cl, varlist = c("data.train", "symbolic_regression", "tree_to_string", "rstab", "generate_tree", "unary_ops", "binary_ops", "vary_tree", "evaluate_tree",
+                                "cbrt", "expn", "logs", "cube"), envir = environment())
+  
+  res_boot <- vector("list", length=nstab)
+  res_boot <- parLapply(cl, 1:nstab, function(iboot) {
+    set.seed(rstab[iboot])
+    rsq_boot <- (1:2)*0
+    isample <- sample(1:nrow(data.train), repl=T)
+    fit_boot <- symbolic_regression(data.train[isample,], target = "semimajoraxis", n_trees = 1000000, n_conv = 100000, n_mut = 0, verbose=F, crit_R2 = 0.9999809)
+    mod.app <- with(data.train[isample,], eval(parse(text=tree_to_string(fit_boot$tree))))
+    rsq_boot[1] <- summary(lm(data=data.train[isample,], semimajoraxis ~ mod.app - 1))$r.squared
+    mod.test <- with(data.train, eval(parse(text=tree_to_string(fit_boot$tree))))
+    rsq_boot[2] <- summary(lm(data=data.train, semimajoraxis ~ mod.test - 1))$r.squared
+    fit_boot$mod.test <- mod.test
+    fit_boot$mod.app <- mod.app
+    fit_boot$rsq_boot <- rsq_boot
+  #  cat("Bootstrap ", iboot, tree_to_string(fit_boot$tree), "R-squared: app: ", rsq_boot[iboot,1], " test:", rsq_boot[iboot,2],"\n")
+    fit_boot
+  })
+  
+  stopCluster(cl)
+  
+  save(res_boot, file="res_boot.Rdata")
+} else load("res_boot.Rdata")
+```
+
+First, we evaluate the frequency of each predictor appearing in the model:
+
+```{r}
+predictors_boot <- unlist(lapply(res_boot, function(X) sort(unique(collect_vars(X$tree)))))
+pred_boot_tab <- -sort(-table(predictors_boot))
+
+kable(pred_boot_tab, col.names=c("Variable", "Frequency")) 
+```
+
+Second, we evaluate the frequency of occurrence of combinations of variables:
+
+```{r}
+combi_boot <- table(unlist(lapply(res_boot, function(X) paste(sort(unique(collect_vars(X$tree))), collapse=", "))))
+
+kable(-sort(-combi_boot), col.names=c("Combination of variables", "Frequency"))
+```
+
+It seems that slight variations in the data do not further impact the model stability, as the number of times that the Kepler law was detected was comparable to the previous results on stability with respect to random number initiation.
+
+Lastly, we compute the enhanced bootrap estimate of $R^2$ to remove optimism bias:
+
+```{r}
+# Enhanced bootstrap estimate of Rsquared:
+rsq_app - mean(unlist(lapply(res_boot, function(X) -diff(X$rsq_boot))) )
+```
+
+There is only little if any optimism in the $R^2$ estimate of `r rsq_app`.
+
+## Validation in test set
+
+We now perform validation of the model in the test set.
+
+```{r}
+# make predictions
+pred_test <- predict(refit_orig, newdata=data.frame(mod.app = with(data.test, eval(parse(text=tree_to_string(fit_kepler_orig$tree))))))
+```
+
+Here we provide a calibration plot. The red line is a LOESS smoother.
+
+```{r}
+ggplot(data=data.frame(Predicted=pred_test, Observed=data.test$semimajoraxis), aes(Predicted, Observed)) + geom_point() + geom_abline(intercept=0, slope=1) + geom_smooth(col="red")
+
+```
+
+The validation $R^2$ is given as $R_{test}^2$ = 1 - MSE($\hat y$)/Var($y_{test}$) = $n^{-1}\sum_i (y_{i,test}-\hat y_i)^2$ / Var$(y_{test})$ = `r 1-mean((pred_test-data.test$semimajoraxis)^2)/var(data.test$semimajoraxis)`.
