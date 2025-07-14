@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Georg Heinze">
-<meta name="dcterms.date" content="2025-07-12">
+<meta name="dcterms.date" content="2025-07-14">
 <meta name="description" content="Classification: confidential">
 
 <title>Frequentist re-analysis: Kepler law</title>
@@ -3202,7 +3202,7 @@ window.Quarto = {
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">July 12, 2025</p>
+      <p class="date">July 14, 2025</p>
     </div>
   </div>
   
@@ -3866,7 +3866,7 @@ Das folgende Objekt ist maskiert &#39;package:dplyr&#39;:
 </div>
 </div>
 </div>
-<p>The validation <span class="math inline">R^2</span> is given as <span class="math inline">R_{test}^2</span> = 1 - MSE(<span class="math inline">\hat y</span>)/Var(<span class="math inline">y_{test}</span>) = <span class="math inline">n^{-1}\sum_i (y_{i,test}-\hat y_i)^2</span> / Var<span class="math inline">(y_{test})</span> = 0.9999712.</p>
+<p>The validation <span class="math inline">R^2</span> is given as <span class="math inline">R_{test}^2</span> = 1 - MSE(<span class="math inline">\hat y</span>)/Var(<span class="math inline">y_{test}</span>) = <span class="math inline">1 - n^{-1}\sum_i (y_{i,test}-\hat y_i)^2</span> / Var<span class="math inline">(y_{test})</span> = 0.9999712.</p>
 <!-- -->
 
 </section>
@@ -4673,7 +4673,7 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
 <span id="cb32-366"><a href="#cb32-366" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb32-367"><a href="#cb32-367" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
 <span id="cb32-368"><a href="#cb32-368" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb32-369"><a href="#cb32-369" aria-hidden="true" tabindex="-1"></a>The validation $R^2$ is given as $R_{test}^2$ = 1 - MSE($\hat y$)/Var($y_{test}$) = $n^{-1}\sum_i (y_{i,test}-\hat y_i)^2$ / Var$(y_{test})$ = <span class="in">`r 1-mean((pred_test-data.test$semimajoraxis)^2)/var(data.test$semimajoraxis)`</span>.</span>
+<span id="cb32-369"><a href="#cb32-369" aria-hidden="true" tabindex="-1"></a>The validation $R^2$ is given as $R_{test}^2$ = 1 - MSE($\hat y$)/Var($y_{test}$) = $1 - n^{-1}\sum_i (y_{i,test}-\hat y_i)^2$ / Var$(y_{test})$ = <span class="in">`r 1-mean((pred_test-data.test$semimajoraxis)^2)/var(data.test$semimajoraxis)`</span>.</span>
 </code><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal><i class="bi"></i></button></pre></div>
 </div></div></div></div></div>
 </div> <!-- /content -->

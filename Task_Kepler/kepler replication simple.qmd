@@ -326,4 +326,4 @@ ggplot(data=data.frame(Predicted=pred_test, Observed=data.test$semimajoraxis), a
 
 ```
 
-The validation $R^2$ is given as $R_{test}^2$ = 1 - MSE($\hat y$)/Var($y_{test}$) = $n^{-1}\sum_i (y_{i,test}-\hat y_i)^2$ / Var$(y_{test})$ = `r 1-mean((pred_test-data.test$semimajoraxis)^2)/var(data.test$semimajoraxis)`.
+The validation $R^2$ is given as $R_{test}^2$ = 1 - MSE($\hat y$)/Var($y_{test}$) = $1 - n^{-1}\sum_i (y_{i,test}-\hat y_i)^2$ / Var$(y_{test})$ = `r 1-mean((pred_test-data.test$semimajoraxis)^2)/var(data.test$semimajoraxis)`.
