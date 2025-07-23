@@ -21,32 +21,24 @@ params:
   set: 4K
 ---
 
-# Background 
+# Background
 
-This frequentist analysis follows the simplified statistical analysis plan by
-Michael Kammer dated 2.6.2025 (see version history). IDA and descriptives are 
-presented in an [overview notebook](./analysis_overview-bacteremia.html).
+This frequentist analysis follows the simplified statistical analysis plan by Michael Kammer dated 2.6.2025 (see version history). IDA and descriptives are presented in an [overview notebook](./analysis_overview-bacteremia.html).
 
 ## Histoy
 
-As of May 2025 it was decided to simplify the analysis compared to the first
-versions of the SAP, and to remove variable selection from the task. We now
-use ridge regression instead. 
+As of May 2025 it was decided to simplify the analysis compared to the first versions of the SAP, and to remove variable selection from the task. We now use ridge regression instead.
 
-As of 29.8.2024 it was decided to conduct this analysis also for only one third 
-of the dataset for this example, to make the tradeoff between model complexity 
-and prediction performance more apparent. This notebook contains results for 
-the `params$set` dataset. 
+As of 29.8.2024 it was decided to conduct this analysis also for only one third of the dataset for this example, to make the tradeoff between model complexity and prediction performance more apparent. This notebook contains results for the `params$set` dataset.
 
 # Setup and data
 
-Data were downloaded from [Zenodo](https://zenodo.org/records/7554815) and
-stored locally for ease of use. 
+Data were downloaded from [Zenodo](https://zenodo.org/records/7554815) and stored locally for ease of use.
 
-Processing steps: 
+Processing steps:
 
-- Convert BloodCulture to numeric
-- Reduce the dataset by using only the first 4000 observations
+-   Convert BloodCulture to numeric
+-   Reduce the dataset by using only the first 4000 observations
 
 ```{r message=FALSE, warning=FALSE}
 #| code-fold: true
@@ -472,8 +464,7 @@ do_bootstrap <- function(df, b_ind, variables,
 
 # Variables
 
-As outlined in the SAP, the set of variables for modeling is reduced according 
-to collinearities and high variance inflation factors. 
+As outlined in the SAP, the set of variables for modeling is reduced according to collinearities and high variance inflation factors.
 
 ```{r}
 VARIABLES = names(df) %>%
@@ -502,36 +493,18 @@ glue("Final {length(VARIABLES)} Variables used for modeling:
 
 # Imputation
 
-Imputation model is only re-fitted if no model file in `r params$folder_imputation`
-is found. Note that we used a parallel version of mice to speed up computations.
+Imputation model is only re-fitted if no model file in `r params$folder_imputation` is found. Note that we used a parallel version of mice to speed up computations.
 
 ## Clarifications / deviations from SAP
 
-Based on initial runs and checking trace plots for diagnostics it was clear
-that the initial set of variables as outlined in the SAP did not work well with
-imputation due to difficult sampling from the Markov chains. The reason for this
-were extremely high correlation between certain pairs of variables. In theory, 
-one could just increase the number of iterations to obtain mixing chains. 
-To keep the analysis feasible however, further variables were excluded from 
-analysis to reduce autocorrelation of the chains:
+Based on initial runs and checking trace plots for diagnostics it was clear that the initial set of variables as outlined in the SAP did not work well with imputation due to difficult sampling from the Markov chains. The reason for this were extremely high correlation between certain pairs of variables. In theory, one could just increase the number of iterations to obtain mixing chains. To keep the analysis feasible however, further variables were excluded from analysis to reduce autocorrelation of the chains:
 
-- NEU (neutrophiles) were extremely strongly correlated (0.97) with WBC (white 
-    blood cells), even though they represent only a subset of white blood cells. 
-    Both variables were affected by badly mixing chains, so NEU was removed.
-- PDW (platelet distribution width) and MPV (mean platelet volume) showed
-    extremely high correlation (0.94), so PDW was removed.
-    
-Note that these choices were not made based on any association with the outcome, 
-but purely for reasons of imputation and correlation. Increasing the number of 
-iterations beyond 100 would have removed these issues as well, but that leads
-to very long runtimes for bootstrapping.
+-   NEU (neutrophiles) were extremely strongly correlated (0.97) with WBC (white blood cells), even though they represent only a subset of white blood cells. Both variables were affected by badly mixing chains, so NEU was removed.
+-   PDW (platelet distribution width) and MPV (mean platelet volume) showed extremely high correlation (0.94), so PDW was removed.
 
-Further, the number of iterations in the mice algorithm was not mentioned in 
-the SAP. Based on MCMC traceplots diagnostics it was increased to 20 from the 
-default value to accomodate high autocorrelation in the chains (which is 
-itself due to high correlations between groups of variables as seen in the 
-correlation matrix). The value of 20 was conservative, even 15 might have been 
-enough.
+Note that these choices were not made based on any association with the outcome, but purely for reasons of imputation and correlation. Increasing the number of iterations beyond 100 would have removed these issues as well, but that leads to very long runtimes for bootstrapping.
+
+Further, the number of iterations in the mice algorithm was not mentioned in the SAP. Based on MCMC traceplots diagnostics it was increased to 20 from the default value to accomodate high autocorrelation in the chains (which is itself due to high correlations between groups of variables as seen in the correlation matrix). The value of 20 was conservative, even 15 might have been enough.
 
 ## Fit / load
 
@@ -566,7 +539,7 @@ if (!file.exists(file_model_imputation)) {
 
 ## Check
 
-Mixing of the chains looks well after increasing iterations. 
+Mixing of the chains looks well after increasing iterations.
 
 ```{r}
 glue("Fitting time: {dt} seconds")
@@ -620,13 +593,13 @@ res = fit_ridge(d_imp, f_m)
 
 Ridge coefficient paths.
 
-```{r} 
+```{r}
 plot(res$m_ridge, xvar = "lambda")
 ```
 
 ## CV
 
-Doing 5-fold CV. 
+Doing 5-fold CV.
 
 ```{r}
 set.seed(15)
@@ -685,9 +658,7 @@ data.frame(dimnames(coef_m)[1], as.numeric(coef_m)) %>%
 
 # Main model fit on all imputations
 
-According to SAP the main model is fitted on the 20 imputed datasets and 
-the apparent performance is computed. For this we simply repeat the steps 
-done for a single imputation. 
+According to SAP the main model is fitted on the 20 imputed datasets and the apparent performance is computed. For this we simply repeat the steps done for a single imputation.
 
 ```{r}
 f_m = glue("BloodCulture ~ {paste0(VARIABLES, collapse = '+')}") %>% 
@@ -723,7 +694,7 @@ plan(sequential)
 
 ## Results
 
-Performance metrics over all imputations. 
+Performance metrics over all imputations.
 
 ```{r, fig.height=10, fig.width=10}
 glue("Mean runtime per imputation {map_dbl(res_imp, 'time') %>% mean()} seconds.")
@@ -746,7 +717,7 @@ perf_cv_imp %>%
     theme_bw()
 ```
 
-Obtain optimal lambda in each imputation and report metrics over imputations. 
+Obtain optimal lambda in each imputation and report metrics over imputations.
 
 ```{r}
 perf_cv_imp_opt = perf_cv_imp %>% 
@@ -796,9 +767,7 @@ coef_final %>%
 
 ## Apparent performance
 
-Based on runtimes for the imputation we reduce the number of imputations
-per bootstrap to two, and reduce the number of bootstraps to 500. This is 
-according to the SAP.
+Based on runtimes for the imputation we reduce the number of imputations per bootstrap to two, and reduce the number of bootstraps to 500. This is according to the SAP.
 
 ```{r}
 # apparent performance estimates
@@ -888,8 +857,7 @@ p_M_0.632 = (1 - w) * p_M_DD[-2] + w * p_M_BS[-2]
 p_M_0.632
 ```
 
-Compute quantiles for confidence intervals and show distribution of 
-statistics from which they are derived.
+Compute quantiles for confidence intervals and show distribution of statistics from which they are derived.
 
 ```{r}
 p_Mi_Di_Di = res_b %>% map_df("p_Mi_Di_Di", .id = "bootstrap") %>% 
@@ -924,54 +892,31 @@ glue("Calibration slope: {p_M_0.632$Slope} ({p_M_0.632$Slope - abs(xi[1, 'Slope'
 
 # Clarifications / deviations from SAP
 
-- Two more variables remove due to problems with imputation model (not 
-    anticipated in SAP, see above for details).
-- Iterations in imputation model increased based on diagnostics (not mentioned 
-    in SAP).
-- Data were standardised for all model fitting procedures (after imputation, 
-    not mentioned in SAP, but common for penalized models).
-- CV was stratified to keep similar outcome prevalence (not specified in SAP, 
-    done due to larger differences between folds).
-- Alignment of lambda sequences in the CV was based on model trained on full 
-    data (this was not explicitly specified in the protocol, but is the default
-    in cv.glmnet so can be considered a "default" way to handle this).
-- Creating folds indices for CV in different imputations was now done 
-    independently (but you might choose the same indices for all imputations, 
-    this was not specified in the SAP).
-- There is a typo in Section 6, in the definition of $\hat{p}_M^{D, D}$ (an 
-    index $j$ is missing in the summation).
-- The construction of the 95% CIs is actually unclear, but also in the paper.
-    Due to negative values I introduced an absolute value, but I'm not sure if
-    that is correct.
-- The definition of the 0.632+ estimate requires non-effect weights for 
-    calibration slope and intercept. These were now estimated by an 
-    empty logistic model mimicking no association of the variables with the
-    outcome. 
+-   Two more variables remove due to problems with imputation model (not anticipated in SAP, see above for details).
+-   Iterations in imputation model increased based on diagnostics (not mentioned in SAP).
+-   Data were standardised for all model fitting procedures (after imputation, not mentioned in SAP, but common for penalized models).
+-   CV was stratified to keep similar outcome prevalence (not specified in SAP, done due to larger differences between folds).
+-   Alignment of lambda sequences in the CV was based on model trained on full data (this was not explicitly specified in the protocol, but is the default in cv.glmnet so can be considered a "default" way to handle this).
+-   Creating folds indices for CV in different imputations was now done independently (but you might choose the same indices for all imputations, this was not specified in the SAP).
+-   There is a typo in Section 6, in the definition of $\hat{p}_M^{D, D}$ (an index $j$ is missing in the summation).
+-   The construction of the 95% CIs is actually unclear, but also in the paper. Due to negative values I introduced an absolute value, but I'm not sure if that is correct.
+-   The definition of the 0.632+ estimate requires non-effect weights for calibration slope and intercept. These were now estimated by an empty logistic model mimicking no association of the variables with the outcome.
 
 # Further notes
 
-- A "fix" / bug in the optimisation of the pseudo-log optimisation was found
-    when looking at the coefficient paths of the lasso model.
+-   A "fix" / bug in the optimisation of the pseudo-log optimisation was found when looking at the coefficient paths of the lasso model.
 
 # Conclusions
 
-Overall the results from the analysis as outlined in the SAP are not that great. 
-While discrimination is close to the published model (both full and 4K data), 
-the calibration is not excellent during bootstrap validation. That is likely
-because the separate imputation of out-of-bootstrap data leads to slight 
-differences in the distribution and miscalibrated predictions. This effect is
-smaller for the full dataset, indicating that the 4K dataset is "at the limit"
-for this kind of approach to work well. 
+Overall the results from the analysis as outlined in the SAP are not that great. While discrimination is close to the published model (both full and 4K data), the calibration is not excellent during bootstrap validation. That is likely because the separate imputation of out-of-bootstrap data leads to slight differences in the distribution and miscalibrated predictions. This effect is smaller for the full dataset, indicating that the 4K dataset is "at the limit" for this kind of approach to work well.
 
 # Sessioninfo
 
 To build this notebook:
 
-- install `quarto`
-- make sure the data is in the correct folder (either in global Data folder, 
-    or as subfolder of the folder containing this notebook).
-- build using the `make.R` script (global Data), or using the Render button in 
-    RStudio (subfolder Data).
+-   install `quarto`
+-   make sure the data is in the correct folder (either in global Data folder, or as subfolder of the folder containing this notebook).
+-   build using the `make.R` script (global Data), or using the Render button in RStudio (subfolder Data).
 
 ```{r}
 params
