@@ -79,22 +79,7 @@ Code for helper functions.
 
 ```{r}
 #| code-fold: true
-
-logit = binomial()$linkfun
-expit = binomial()$linkinv
-
-plot_residuals_violin <- function(s, predictor, name = "Predictor") {
-    res_data = data.frame(
-        Residuals = residuals(s),
-        Predictor = factor(predictor)
-    )
-    
-    ggplot(res_data, aes(x = Predictor, y = Residuals)) +
-        geom_violin(fill = "lightgrey", alpha = 0.6) +
-        geom_jitter(width = 0.2, alpha = 0.5) +
-        theme_minimal() +
-        labs(title = paste("Predictor vs Residuals"), x = name, y = "Residuals")
-}
+source(file.path(PPath,"RFiles/02_functions_KD.R"))
 ```
 
 # Variables

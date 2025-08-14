@@ -17,6 +17,8 @@ library("bayesplot")
 library("labelled")
 library("HuraultMisc")
 library("loo")
+library("janitor")
+library("glue")
 # Windows 10 users: loo may be very slow if 'mc.cores' is set in your .Rprofile file (see https://github.com/stan-dev/loo/issues/94).
 library("LaplacesDemon")
 library("xtable")
@@ -35,9 +37,13 @@ library("sjPlot")
 library("see")
 library("bayestestR")
 library("rlist")
+library("knitr")
 #library("plyr")
 #library(dplyr)
 library("DHARMa") 
+# Load required packages
+
+
 library(purrr) 
 library(tidyverse)        # ggplot, dplyr, %>%, and friends
 library(brms)             # Bayesian modeling through Stan

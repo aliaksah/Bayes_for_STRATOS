@@ -78,9 +78,9 @@ models[[1]] <- as.formula(bel01 ~ bull*ATT4 + female + nld +  aca  + val  + nfof
 # Background model, variable selection based on PIM without focal variables
 models[[2]] <- as.formula(bel01 ~ female + nld +  aca  + val  + nfof  + native + joyread + goal + mot + res +  ndis_clim    + GYM + UNI  + NDISH + N_SC + (1 | school.id))
 ```
+
+
 ##### Check the convergence criteria (Step 5 in SAP)
-
-
 
 ```{r fit modesl and do MCMC diagnostic,results='hide', message = FALSE, warning = FALSE, cache=TRUE}
 a.seed <- 12345 
@@ -145,7 +145,7 @@ source(file.path(PPath,"RFiles/02_functions_KD.R"))
 # Compute posterior predictions
 posterior_predictions <- lapply(fits, posterior_predict)
 
-qres.m1=createDHARMa(simulatedResponse = t(posterior_predictions[[1]]), 
+qres.m1 = createDHARMa(simulatedResponse = t(posterior_predictions[[1]]), 
                           observedResponse = pisa2018$bel01, 
                           fittedPredictedResponse = apply(posterior_predictions[[1]], 2, median), integerResponse = T, seed = 123, method = "PIT") 
 summary(residuals(qres.m1))
