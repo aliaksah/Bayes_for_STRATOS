@@ -1,0 +1,281 @@
+---
+title: "Bacteremia data Bayesian reanalysis"
+author: 
+  - Aliaksandr Hubin
+date: now
+date-format: iso
+title-block-banner: "#828282"
+format:
+  html:
+    code-fold: true
+    code-tools: true
+    theme: default
+    toc: true
+    number-sections: true
+    toc-location: right
+    embed-resources: true
+    self-contained: true
+    df-print: kable
+params: 
+  folder_analysis: Data/Processed/Bacteremia_SAP
+  set: 4K
+---
+
+## **Overview**
+
+This analysis evaluates a binary classification model for predicting BloodCulture (bacteremia presence) using the FBMS package. We use a bootstrap approach to estimate model performance, including **C-index,** and **calibration slope**. The bootstrap loop is parallelized using mclapply to improve efficiency. We compute the .632+ bootstrap estimates and 95% confidence intervals for each metric as well as the relative over-fitting rate.
+
+The dataset is sourced from [Zenodo](https://zenodo.org/records/7554815/files/Bacteremia_public_S2.csv). The analysis includes data preprocessing, model fitting, performance evaluation, and bootstrap resampling.
+
+**Step 1: Load Libraries and Set Seed**
+
+We load required packages: Metrics for C-index, FBMS for model fitting, and parallel for parallelized bootstrapping. The random seed is set for reproducibility.
+
+```{r}
+# Install FBMS if needed
+# devtools::install_github("https://github.com/jonlachmann/GMJMCMC/tree/stratos")
+
+library(Metrics)  # For C-index
+library(FBMS)     # For model fitting
+library(parallel) # For mclapply
+set.seed(123)     # For reproducibility
+read.results <- TRUE # If we should read saved results here
+```
+
+## **Define Performance Metric Functions**
+
+We use the following metrics:
+
+-   **C-index**;
+
+-   **Calibration Slope**;
+
+-   **Calibration Intercept**.
+
+**Step 3: Load and Preprocess Data**
+
+We load the bacteremia dataset, remove unnecessary columns, and convert the BloodCulture variable to a binary (0/1) format.
+
+```{r}
+# Load dataset
+df <- read.csv("https://zenodo.org/records/7554815/files/Bacteremia_public_S2.csv", 
+               header = TRUE, sep = ",", dec = ".")
+
+# Remove unnecessary columns
+df <- df[, !(names(df) %in% c("MONOR", "LYMR", "NEUR", "EOSR", "BASOR"))]
+
+# Convert BloodCulture to binary
+df$BloodCulture <- ifelse(df$BloodCulture == "yes", 1, 0)
+
+
+df.train <- df[1:4000,]
+df.valid<- df[-c(1:4000),]
+
+rm(df)
+```
+
+## **Fit Full Models**
+
+We fit two models using the FBMS package:
+
+-   A **nonlinear model** using gmjmcmc.parallel with transformations (sigmoid, sin, cos, exp_dbl).
+
+Predictions are made on the training set (optimistic) using the nonlinear model, and we compute C-index, and calibration slope.
+
+```{r}
+# Fit nonlinear model
+result.nonlinear <- fbms(formula = BloodCulture ~ 1 + ., family = "binomial", beta_prior =   list(type = "g-prior", g = 3),model_prior = list(r = exp(-0.5)), 
+data = df.train, impute = TRUE, method = "gmjmcmc.parallel", 
+P = 10, cores = 6, runs = 6, 
+transforms = c("sigmoid", "sin", "cos", "exp_dbl"))
+summary(result.nonlinear)
+
+
+# Predictions on test data (using nonlinear model)
+prob_full <- predict(result.nonlinear, df.train[, -48], link = sigmoid)$aggr$mean
+prob_full_test <- predict(result.nonlinear, df.valid[, -48], link = sigmoid)$aggr$mean
+
+#as a robust baseline (commented)
+#mod<-ranger::ranger(formula = BloodCulture ~ 1 + ., probability = T,data = df.train)
+# Predictions on test data (using nonlinear model)
+#prob_full <- predict(mod, df.train[, -48])$predictions[,2]
+#prob_full_test <- predict(mod, df.valid[, -48])$predictions[,2]
+
+# Metrics on full model
+cindex_full <- rms::val.prob(prob_full, df.train$BloodCulture, pl = FALSE)["C (ROC)"]
+calib_slope_full <- rms::val.prob(prob_full, df.train$BloodCulture, pl = FALSE)["Slope"]
+calib_inter_full <- rms::val.prob(prob_full, df.train$BloodCulture, pl = FALSE)["Intercept"]
+calib_brier_full <- rms::val.prob(prob_full, df.train$BloodCulture, pl = FALSE)["Brier"]
+
+
+
+# Metrics on full model
+cindex_full_test <- rms::val.prob(prob_full_test, df.valid$BloodCulture, pl = FALSE)["C (ROC)"]
+calib_slope_full_test <- rms::val.prob(prob_full_test, df.valid$BloodCulture, pl = FALSE)["Slope"]
+calib_inter_full_test <- rms::val.prob(prob_full_test, df.valid$BloodCulture, pl = FALSE)["Intercept"]
+calib_brier_full_test <- rms::val.prob(prob_full_test, df.valid$BloodCulture, pl = FALSE)["Brier"]
+
+
+cat("train cindex_full: ", cindex_full," train calib_slope_full: ",calib_slope_full," train calib_intercept_full: ",calib_inter_full," train calib_brier_full: ",calib_brier_full)
+cat("test cindex_full: ", cindex_full_test," test calib_slope_full: ",calib_slope_full_test," test calib_intercept_full: ",calib_inter_full_test," test calib_brier_full: ",calib_brier_full_test)
+```
+
+Only linear terms are present, hence we continue with linear models as discussed in the reanalysis plan.
+
+## **Define Theoretical Performance**
+
+We define baseline performance for a model with no predictive power (absence of effect):
+
+-   **C-index (AUC)**: 0.5 (no discrimination).
+
+-   **Calibration Slope**: 0.
+
+-   **Calibration Intercept**: intercept only model.
+
+```{r}
+# Theoretical performance (no effect)
+p_M0_cindex <- 0.5  # For C-index (equivalent to AUC)
+p_M0_calib_slope <- 0.0  # For calibration slope (perfect calibration)
+p_M0_calib_intercept <- glm(BloodCulture ~ 1, data = df.train, family = "binomial")$coefficients[1] #For calibration intercept
+```
+
+## **Bootstrap Procedure with Parallelization**
+
+We perform n_bootstrap = 1000 bootstrap iterations to estimate model performance. Each iteration:
+
+-   Resamples the training data with replacement.
+
+-   Fits a model using mjmcmc.
+
+-   Computes C-index, calibration intercept, and calibration slope for in-sample (bootstrap) and out-of-bag (test) predictions.
+
+The loop is parallelized using mclapply with multiple cores to improve computational efficiency.
+
+```{r}
+# Number of bootstrap iterations
+n_bootstrap <- 1000
+# Define bootstrap iteration function
+bootstrap_iter <- function(i) {
+  # Bootstrap resample from training data
+  boot_indices <- sample(1:nrow(df.train), replace = TRUE)
+  df_boot <- df.train[boot_indices, ]
+  df.test <- df.train[-boot_indices, ]
+  # Fit model on bootstrap sample
+  result_boot <- fbms(formula = BloodCulture ~ 1 + ., family = "binomial", beta_prior =   list(type = "g-prior", g = 3),model_prior = list(r = exp(-0.5)),
+  data = df_boot, impute = TRUE, method = "mjmcmc", N = 1000)
+  
+  # Predictions on bootstrap sample (in-sample performance)
+  prob_boot <- predict(result_boot, df_boot[, -48], link = sigmoid)$mean
+  #prob_boot <- sigmoid(preds_boot$mean)
+  
+  # Predictions on test data (out-of-bag performance)
+  prob_oob <- predict(result_boot, df.test[, -48], link = sigmoid)$mean
+  #prob_oob <- sigmoid(preds_oob$mean)
+  
+  # Calculate metrics
+  
+  #boot
+  cindex_boot <- rms::val.prob(prob_boot, df_boot$BloodCulture, pl = FALSE)["C (ROC)"]
+  calib_slope_boot <- rms::val.prob(prob_boot, df_boot$BloodCulture, pl = FALSE)["Slope"]
+  calib_inter_boot <- rms::val.prob(prob_boot, df_boot$BloodCulture, pl = FALSE)["Intercept"]
+  calib_brier_boot <- rms::val.prob(prob_boot, df_boot$BloodCulture, pl = FALSE)["Brier"]
+  
+  #oob
+  cindex_oob <- rms::val.prob(prob_oob, df.test$BloodCulture, pl = FALSE)["C (ROC)"]
+  calib_slope_oob <- rms::val.prob(prob_oob, df.test$BloodCulture, pl = FALSE)["Slope"]
+  calib_inter_oob <- rms::val.prob(prob_oob, df.test$BloodCulture, pl = FALSE)["Intercept"]
+  calib_brier_oob <- rms::val.prob(prob_oob, df.test$BloodCulture, pl = FALSE)["Brier"]
+
+
+  
+  return(c(cindex_boot = cindex_boot, cindex_oob = cindex_oob, calib_inter_boot = calib_inter_boot, calib_inter_oob = calib_inter_oob,
+           calib_slope_boot = calib_slope_boot, calib_slope_oob = calib_slope_oob,
+           calib_brier_boot = calib_brier_boot, calib_brier_oob = calib_brier_oob))
+}
+
+# Run bootstrap iterations in parallel with 9 cores
+if(!read.results)
+{
+  results <- mclapply(1:n_bootstrap, bootstrap_iter, mc.cores = 5)
+  saveRDS(object = results,file = "res.rds")
+}else
+{
+  results <- readRDS("res.rds")
+}
+
+print(length(results))
+```
+
+proceed with analyzing the output of bootstrap
+
+```{r}
+# Convert results to a matrix
+results_matrix <- do.call(rbind, results)
+
+# Extract metrics
+cindex_boot <- results_matrix[, "cindex_boot.C (ROC)"]
+cindex_oob <- results_matrix[, "cindex_oob.C (ROC)"]
+calib_slope_boot <- results_matrix[, "calib_slope_boot.Slope"]
+calib_slope_oob <- results_matrix[, "calib_slope_oob.Slope"]
+calib_brier_boot <- results_matrix[, "calib_brier_boot.Brier"]
+calib_brier_oob <- results_matrix[, "calib_brier_oob.Brier"]
+calib_inter_boot <- results_matrix[, "calib_inter_boot.Intercept"]
+calib_inter_oob <- results_matrix[, "calib_inter_oob.Intercept"]
+```
+
+## **Calculate Overfitting Rates and .632+ Estimates**
+
+We compute the **relative overfitting rate (R)** for each metric to quantify the degree of overfitting. Using these, we calculate the **.632+ bootstrap estimates**, which combine full model performance with bootstrap performance to correct for bias.
+
+```{r}
+# Calculate overfitting rate R
+R_cindex <- mean(cindex_oob - cindex_full) / (p_M0_cindex - cindex_full)
+
+R_calib_slope <- mean(calib_slope_oob - calib_slope_full) / (p_M0_calib_slope - calib_slope_full)
+
+# .632+ weights
+w_cindex <- 0.632 / (1 - 0.368 * R_cindex)
+w_calib_slope <- 0.632 / (1 - 0.368 * R_calib_slope)
+
+# .632+ estimates
+cindex_632plus <- (1 - w_cindex) * cindex_full + w_cindex * mean(cindex_oob)
+calib_slope_632plus <- (1 - w_calib_slope) * calib_slope_full + w_calib_slope * mean(calib_slope_oob)
+```
+
+**Compute Confidence Intervals**
+
+We calculate 95% confidence intervals for each metric using the 2.5th and 97.5th percentiles of the bootstrap distributions.
+
+```{r}
+# Confidence intervals (95% CI using bootstrap percentiles)
+cindex_ci <- quantile(cindex_oob, probs = c(0.025, 0.975))
+calib_slope_ci <- quantile(calib_slope_oob, probs = c(0.025, 0.975))
+calib_inter_ci <- quantile(calib_inter_oob, probs = c(0.025, 0.975))
+calib_brier_ci <- quantile(calib_brier_oob, probs = c(0.025, 0.975))
+```
+
+## **Display Results**
+
+Finally, we print the full model performance, .632+ estimates, and 95% confidence intervals for accuracy, C-index (AUC), and calibration slope.
+
+```{r}
+# Print results
+cat("Full model Train C-index (AUC):", cindex_full, "\n")
+cat("Full model Test C-index (AUC):", cindex_full_test, "\n")
+cat(".632+ C-index (AUC) estimate:", cindex_632plus, "\n")
+cat("C-index (AUC) 95% CI from bootstrap:", cindex_ci, "\n\n")
+
+cat("Full model Train Calibration Slope:", calib_slope_full, "\n")
+cat("Full model Test Calibration Slope:", calib_slope_full_test, "\n")
+cat(".632+ Calibration Slope estimate:", calib_slope_632plus, "\n")
+cat("Calibration Slope 95% CI from bootstrap:", calib_slope_ci, "\n")
+
+cat("Full model Train Calibration Intercept:", calib_inter_full, "\n")
+cat("Full model Test Calibration Intercept:", calib_inter_full_test, "\n")
+#cat(".632+ Calibration Intercept estimate:", calib_inter_632plus, "\n")
+cat("Calibration Intercept 95% CI from bootstrap:", calib_inter_ci, "\n")
+```
+
+## **Conclusion**
+
+This analysis provides a robust evaluation of the classification model using bootstrap resampling. The .632+ estimates account for overfitting, and the calibration slope ensures the reliability of predicted probabilities. Parallelization with 9 cores improves computational efficiency. Future work could include visualizing the calibration curve or comparing linear and nonlinear models.
