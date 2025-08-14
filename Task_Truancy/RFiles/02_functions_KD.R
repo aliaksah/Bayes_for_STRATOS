@@ -286,7 +286,6 @@ KD <- function(ypredCore = ypredCore, yrep = ypredCand){
   return(ppc.kd)
 }
 
-
 #' @title Returns a series of (two sided) posterior predictive p-values
 #' @description The function contains all the PPCs that are of substantive 
 #' interest. The summary statistic is the mean. It computes the corresponding
