@@ -39,7 +39,7 @@ library(Metrics)  # For C-index
 library(FBMS)     # For model fitting
 library(parallel) # For mclapply
 set.seed(123)     # For reproducibility
-read.results <- TRUE # If we should read saved results here
+read.results <- F # If we should read saved results here
 ```
 
 ## **Define Performance Metric Functions**
@@ -62,7 +62,7 @@ df <- read.csv("https://zenodo.org/records/7554815/files/Bacteremia_public_S2.cs
                header = TRUE, sep = ",", dec = ".")
 
 # Remove unnecessary columns
-df <- df[, !(names(df) %in% c("MONOR", "LYMR", "NEUR", "EOSR", "BASOR"))]
+df <- df[, !(names(df) %in% c("ID", "MONOR", "LYMR", "NEUR", "EOSR", "BASOR"))]
 
 # Convert BloodCulture to binary
 df$BloodCulture <- ifelse(df$BloodCulture == "yes", 1, 0)
@@ -71,7 +71,75 @@ df$BloodCulture <- ifelse(df$BloodCulture == "yes", 1, 0)
 df.train <- df[1:4000,]
 df.valid<- df[-c(1:4000),]
 
-rm(df)
+#rm(df)
+```
+
+```{r}
+# library(dplyr)
+# library(purrr)
+# 
+# # Define pseudolog transformation
+# pseudolog_transform <- function(x, sigma) {
+#   asinh(x / (2 * sigma)) / log(10)
+# }
+# 
+# # Optimize sigma for a given numeric vector
+# optimize_sigma <- function(vec) {
+#   x <- vec[!is.na(vec)]
+#   if (length(unique(x)) < 5) return(list(opt_sigma = NA, transformed = rep(NA, length(vec))))
+#   
+#   sigma_grid <- 2^seq(-10, 10)
+#   
+#   # Pearson correlation to normal quantiles
+#   cor_results <- map_dbl(sigma_grid, function(sigma) {
+#     x_t <- pseudolog_transform(x, sigma)
+#     qn <- qnorm(ppoints(length(x_t)))
+#     cor(x_t, qn, method = "pearson")
+#   })
+#   
+#   best_sigma <- sigma_grid[which.max(cor_results)]
+#   
+#   transformed_full <- rep(NA, length(vec))
+#   transformed_full[!is.na(vec)] <- pseudolog_transform(x, best_sigma)
+#   
+#   #transformed_full <- (transformed_full - mean(transformed_full,na.rm = T))/sd(transformed_full,na.rm = T)
+#   
+#   list(opt_sigma = best_sigma, transformed = transformed_full)
+# }
+# 
+# # Apply to all numeric columns except the last one (response)
+# symmetrize_df <- function(df) {
+#   df_numeric <- df[, sapply(df, is.numeric)]
+#   df_numeric <- df_numeric[, -c(1:2,ncol(df_numeric)), drop = FALSE]  # drop response
+#   
+#   result_df <- df
+#   sigma_list <- list()
+#   
+#   for (col in names(df_numeric)) {
+#     opt <- optimize_sigma(df[[col]])
+#     result_df[[col]] <- opt$transformed
+#     sigma_list[[col]] <- opt$opt_sigma
+#   }
+#   
+#   list(symmetrized_df = result_df, sigmas = sigma_list)
+# }
+# 
+# # === Apply it to your data frame ===
+# result <- symmetrize_df(df)
+# symmetrized_df <- result$symmetrized_df
+# sigma_used <- result$sigmas
+# 
+# # View example output
+# head(symmetrized_df)
+# 
+# str(sigma_used)
+# 
+# symmetrized_df$SEX = symmetrized_df$SEX-1
+# 
+# df.train <- symmetrized_df[1:4000,-1]
+# df.valid<- symmetrized_df[-c(1:4000),-1]
+
+
 ```
 
 ## **Fit Full Models**
@@ -84,7 +152,12 @@ Predictions are made on the training set (optimistic) using the nonlinear model,
 
 ```{r}
 # Fit nonlinear model
-result.nonlinear <- fbms(formula = BloodCulture ~ 1 + ., family = "binomial", beta_prior =   list(type = "g-prior", g = 3),model_prior = list(r = exp(-0.5)), 
+
+params <- gen.params.gmjmcmc(94)
+
+params$feat$pop.max <- 150
+
+result.nonlinear <- fbms(formula = BloodCulture ~ 1 + ., family = "binomial", beta_prior =   list(type = "Jeffreys-BIC"), params = params,
 data = df.train, impute = TRUE, method = "gmjmcmc.parallel", 
 P = 10, cores = 6, runs = 6, 
 transforms = c("sigmoid", "sin", "cos", "exp_dbl"))
@@ -94,12 +167,6 @@ summary(result.nonlinear)
 # Predictions on test data (using nonlinear model)
 prob_full <- predict(result.nonlinear, df.train[, -48], link = sigmoid)$aggr$mean
 prob_full_test <- predict(result.nonlinear, df.valid[, -48], link = sigmoid)$aggr$mean
-
-#as a robust baseline (commented)
-#mod<-ranger::ranger(formula = BloodCulture ~ 1 + ., probability = T,data = df.train)
-# Predictions on test data (using nonlinear model)
-#prob_full <- predict(mod, df.train[, -48])$predictions[,2]
-#prob_full_test <- predict(mod, df.valid[, -48])$predictions[,2]
 
 # Metrics on full model
 cindex_full <- rms::val.prob(prob_full, df.train$BloodCulture, pl = FALSE)["C (ROC)"]
@@ -120,6 +187,7 @@ cat("train cindex_full: ", cindex_full," train calib_slope_full: ",calib_slope_f
 cat("test cindex_full: ", cindex_full_test," test calib_slope_full: ",calib_slope_full_test," test calib_intercept_full: ",calib_inter_full_test," test calib_brier_full: ",calib_brier_full_test)
 ```
 
+\
 Only linear terms are present, hence we continue with linear models as discussed in the reanalysis plan.
 
 ## **Define Theoretical Performance**
@@ -161,7 +229,7 @@ bootstrap_iter <- function(i) {
   df_boot <- df.train[boot_indices, ]
   df.test <- df.train[-boot_indices, ]
   # Fit model on bootstrap sample
-  result_boot <- fbms(formula = BloodCulture ~ 1 + ., family = "binomial", beta_prior =   list(type = "g-prior", g = 3),model_prior = list(r = exp(-0.5)),
+  result_boot <- fbms(formula = BloodCulture ~ 1 + ., family = "binomial", beta_prior =   list(type = "Jeffreys-BIC"),
   data = df_boot, impute = TRUE, method = "mjmcmc", N = 1000)
   
   # Predictions on bootstrap sample (in-sample performance)
@@ -197,10 +265,10 @@ bootstrap_iter <- function(i) {
 if(!read.results)
 {
   results <- mclapply(1:n_bootstrap, bootstrap_iter, mc.cores = 5)
-  saveRDS(object = results,file = "res.rds")
+  saveRDS(object = results,file = "result.rds")
 }else
 {
-  results <- readRDS("res.rds")
+  results <- readRDS("result.rds")
 }
 
 print(length(results))
