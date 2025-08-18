@@ -287,6 +287,10 @@ cat("Full model Train Calibration Intercept:", calib_inter_full, "\n")
 cat("Full model Test Calibration Intercept:", calib_inter_full_test, "\n")
 #cat(".632+ Calibration Intercept estimate:", calib_inter_632plus, "\n")
 cat("Calibration Intercept 95% CI from bootstrap:", calib_inter_ci, "\n")
+
+cat("Full model Train Brier Score:", calib_brier_full, "\n")
+cat("Full model Test Brier Score:", calib_brier_full_test, "\n")
+cat("C-index Brier Score  95% CI from bootstrap:", calib_brier_ci, "\n\n")
 ```
 
 ## **Conclusion**
