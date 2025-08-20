@@ -108,8 +108,8 @@ and predictions
 
 
 # Predictions on test data (using nonlinear model)
-prob_full <- predict(result.nonlinear, df.train[, -48], link = sigmoid)$aggr$mean
-prob_full_test <- predict(result.nonlinear, df.valid[, -48], link = sigmoid)$aggr$mean
+prob_full <- predict(result.nonlinear, df.train[, -47], link = sigmoid)$aggr$mean
+prob_full_test <- predict(result.nonlinear, df.valid[, -47], link = sigmoid)$aggr$mean
 
 # Metrics on full model
 cindex_full <- rms::val.prob(prob_full, df.train$BloodCulture, pl = FALSE)["C (ROC)"]
@@ -130,7 +130,47 @@ cat("train cindex_full: ", cindex_full," train calib_slope_full: ",calib_slope_f
 cat("test cindex_full: ", cindex_full_test," test calib_slope_full: ",calib_slope_full_test," test calib_intercept_full: ",calib_inter_full_test," test calib_brier_full: ",calib_brier_full_test)
 ```
 
-Only linear terms are present above, hence we continue with linear models as discussed in the reanalysis plan.
+Now for linear models only
+
+```{r, echo=FALSE, results='hide'}
+params.mj <- gen.params.mjmcmc(94)
+
+result.linear <- fbms(formula = BloodCulture ~ 1 + ., family = "binomial", beta_prior =   list(type = "Jeffreys-BIC"), params = params.mj,N = 1000,
+data = df.train, impute = TRUE, method = "mjmcmc")
+```
+
+Get summary
+
+```{r}
+summary(result.linear)
+```
+
+and make predictions
+
+```{r}
+
+# Predictions on test data (using linear model)
+prob_full_linear <- predict(result.linear, df.train[, -47], link = sigmoid)$mean
+prob_full_test_linear <- predict(result.linear, df.valid[, -47], link = sigmoid)$mean
+
+# Metrics on full model
+cindex_full_linear <- rms::val.prob(prob_full_linear, df.train$BloodCulture, pl = FALSE)["C (ROC)"]
+calib_slope_full_linear <- rms::val.prob(prob_full_linear, df.train$BloodCulture, pl = FALSE)["Slope"]
+calib_inter_full_linear <- rms::val.prob(prob_full_linear, df.train$BloodCulture, pl = FALSE)["Intercept"]
+calib_brier_full_linear <- rms::val.prob(prob_full_linear, df.train$BloodCulture, pl = FALSE)["Brier"]
+
+
+
+# Metrics on full model
+cindex_full_test_linear <- rms::val.prob(prob_full_test_linear, df.valid$BloodCulture, pl = FALSE)["C (ROC)"]
+calib_slope_full_test_linear <- rms::val.prob(prob_full_test_linear, df.valid$BloodCulture, pl = FALSE)["Slope"]
+calib_inter_full_test_linear <- rms::val.prob(prob_full_test_linear, df.valid$BloodCulture, pl = FALSE)["Intercept"]
+calib_brier_full_test_linear <- rms::val.prob(prob_full_test_linear, df.valid$BloodCulture, pl = FALSE)["Brier"]
+
+
+cat("train cindex_full_linear: ", cindex_full_linear," train calib_slope_full_linear: ",calib_slope_full_linear," train calib_intercept_full_linear: ",calib_inter_full_linear," train calib_brier_full_linear: ",calib_brier_full_linear)
+cat("test cindex_full_linear: ", cindex_full_test_linear," test calib_slope_full_linear: ",calib_slope_full_test_linear," test calib_intercept_full_linear: ",calib_inter_full_test_linear," test calib_brier_full_linear: ",calib_brier_full_test_linear)
+```
 
 ## **Define Theoretical Performance**
 
@@ -163,23 +203,47 @@ The loop is parallelized using mclapply with multiple cores to improve computati
 
 ```{r}
 # Number of bootstrap iterations
-n_bootstrap <- 1000
+n_bootstrap <- 1
 # Define bootstrap iteration function
-bootstrap_iter <- function(i) {
+bootstrap_iter <- function(i,lin = TRUE) {
   # Bootstrap resample from training data
   boot_indices <- sample(1:nrow(df.train), replace = TRUE)
   df_boot <- df.train[boot_indices, ]
   df.test <- df.train[-boot_indices, ]
   # Fit model on bootstrap sample
+  if(lin){
   result_boot <- fbms(formula = BloodCulture ~ 1 + ., family = "binomial", beta_prior =   list(type = "Jeffreys-BIC"),
   data = df_boot, impute = TRUE, method = "mjmcmc", N = 1000)
+  }else
+  {
+    params <- gen.params.gmjmcmc(94)
   
-  # Predictions on bootstrap sample (in-sample performance)
-  prob_boot <- predict(result_boot, df_boot[, -48], link = sigmoid)$mean
-  #prob_boot <- sigmoid(preds_boot$mean)
+  params$feat$pop.max <- 150
   
-  # Predictions on test data (out-of-bag performance)
-  prob_oob <- predict(result_boot, df.test[, -48], link = sigmoid)$mean
+  result_boot <- fbms(formula = BloodCulture ~ 1 + ., family = "binomial", beta_prior =   list(type = "g-prior", g = 3),model_prior = list(r = exp(-0.5)), 
+                           data = df.train, impute = TRUE, method = "gmjmcmc.parallel", 
+                           P = 10, cores = 1, runs = 6, 
+                           transforms = c("sigmoid", "sin", "cos", "exp_dbl"))
+
+  }
+  if(lin)
+  {
+    # Predictions on bootstrap sample (in-sample performance)
+    prob_boot <- predict(result_boot, df_boot[, -47], link = sigmoid)$mean
+    #prob_boot <- sigmoid(preds_boot$mean)
+    
+    # Predictions on test data (out-of-bag performance)
+    prob_oob <- predict(result_boot, df.test[, -47], link = sigmoid)$mean
+  }else
+  {
+        # Predictions on bootstrap sample (in-sample performance)
+    prob_boot <- predict(result_boot, df_boot[, -47], link = sigmoid)$aggr$mean
+    #prob_boot <- sigmoid(preds_boot$mean)
+    
+    # Predictions on test data (out-of-bag performance)
+    prob_oob <- predict(result_boot, df.test[, -47], link = sigmoid)$aggr$mean
+    
+  }
   #prob_oob <- sigmoid(preds_oob$mean)
   
   # Calculate metrics
@@ -212,12 +276,16 @@ bootstrap results or read them in
 # Run bootstrap iterations in parallel with 9 cores
 if(!read.results)
 {
-  results <- mclapply(1:n_bootstrap, bootstrap_iter, mc.cores = 5)
+  results <- mclapply(1:n_bootstrap, bootstrap_iter, mc.cores = 1,lin = F)
+  results.lin <- mclapply(1:n_bootstrap, bootstrap_iter, mc.cores = 1)
   results_matrix <- do.call(rbind, results)
-  saveRDS(object = results,file = "resultmat1.rds")
+  results_matrix_linear <- do.call(rbind, results)
+  saveRDS(object = results_matrix,file = "resultmatnl.rds")
+  saveRDS(object = results_matrix_linear,file = "resultmat.rds")
 }else
 {
-  results_matrix <- readRDS("resultmat.rds")
+  results_matrix <- readRDS("resultmatnl.rds")
+  results_matrix_linear <- readRDS("resultmat.rds")
 }
 ```
 
@@ -234,6 +302,16 @@ calib_brier_boot <- results_matrix[, "calib_brier_boot.Brier"]
 calib_brier_oob <- results_matrix[, "calib_brier_oob.Brier"]
 calib_inter_boot <- results_matrix[, "calib_inter_boot.Intercept"]
 calib_inter_oob <- results_matrix[, "calib_inter_oob.Intercept"]
+
+
+cindex_boot_linear <- results_matrix_linear[, "cindex_boot.C (ROC)"]
+cindex_oob_linear <- results_matrix_linear[, "cindex_oob.C (ROC)"]
+calib_slope_boot_linear <- results_matrix_linear[, "calib_slope_boot.Slope"]
+calib_slope_oob_linear <- results_matrix_linear[, "calib_slope_oob.Slope"]
+calib_brier_boot_linear <- results_matrix_linear[, "calib_brier_boot.Brier"]
+calib_brier_oob_linear <- results_matrix_linear[, "calib_brier_oob.Brier"]
+calib_inter_boot_linear <- results_matrix_linear[, "calib_inter_boot.Intercept"]
+calib_inter_oob_linear <- results_matrix_linear[, "calib_inter_oob.Intercept"]
 ```
 
 ## **Calculate Overfitting Rates and .632+ Estimates**
@@ -246,13 +324,43 @@ R_cindex <- mean(cindex_oob - cindex_full) / (p_M0_cindex - cindex_full)
 
 R_calib_slope <- mean(calib_slope_oob - calib_slope_full) / (p_M0_calib_slope - calib_slope_full)
 
+R_calib_intercept <- mean(calib_inter_oob - calib_inter_full) / (p_M0_calib_intercept - calib_inter_full)
+
 # .632+ weights
 w_cindex <- 0.632 / (1 - 0.368 * R_cindex)
 w_calib_slope <- 0.632 / (1 - 0.368 * R_calib_slope)
-
+w_calib_intercept <- 0.632 / (1 - 0.368 * R_calib_intercept)
 # .632+ estimates
 cindex_632plus <- (1 - w_cindex) * cindex_full + w_cindex * mean(cindex_oob)
+
 calib_slope_632plus <- (1 - w_calib_slope) * calib_slope_full + w_calib_slope * mean(calib_slope_oob)
+
+calib_intercept_632plus <- (1 - w_calib_intercept) * calib_inter_full + w_calib_intercept * mean(calib_inter_oob)
+
+
+
+# and for the linear case 
+
+# Calculate overfitting rate R
+R_cindex_linear <- mean(cindex_oob_linear - cindex_full_linear) / (p_M0_cindex - cindex_full_linear)
+
+R_calib_slope_linear <- mean(calib_slope_oob_linear - calib_slope_full_linear) / (p_M0_calib_slope - calib_slope_full_linear)
+
+R_calib_intercept_linear <- mean(calib_inter_oob_linear - calib_inter_full_linear) / (p_M0_calib_intercept - calib_inter_full_linear)
+
+
+# .632+ weights
+w_cindex_linear <- 0.632 / (1 - 0.368 * R_cindex_linear)
+w_calib_slope_linear <- 0.632 / (1 - 0.368 * R_calib_slope_linear)
+w_calib_intercept_linear <- 0.632 / (1 - 0.368 * R_calib_intercept)
+
+# .632+ estimates
+cindex_632plus_linear <- (1 - w_cindex_linear) * cindex_full_linear + w_cindex_linear * mean(cindex_oob_linear)
+
+calib_slope_632plus_linear <- (1 - w_calib_slope_linear) * calib_slope_full_linear + w_calib_slope_linear * mean(calib_slope_oob_linear)
+
+calib_intercept_632plus_linear <- (1 - w_calib_intercept_linear) * calib_inter_full_linear + w_calib_intercept_linear * mean(calib_inter_oob_linear)
+
 ```
 
 **Compute Confidence Intervals**
@@ -265,11 +373,19 @@ cindex_ci <- quantile(cindex_oob, probs = c(0.025, 0.975))
 calib_slope_ci <- quantile(calib_slope_oob, probs = c(0.025, 0.975))
 calib_inter_ci <- quantile(calib_inter_oob, probs = c(0.025, 0.975))
 calib_brier_ci <- quantile(calib_brier_oob, probs = c(0.025, 0.975))
+
+# Confidence intervals (95% CI using bootstrap percentiles)
+cindex_ci_linear <- quantile(cindex_oob_linear, probs = c(0.025, 0.975))
+calib_slope_ci_linear <- quantile(calib_slope_oob_linear, probs = c(0.025, 0.975))
+calib_inter_ci_linear <- quantile(calib_inter_oob_linear, probs = c(0.025, 0.975))
+calib_brier_ci_linear <- quantile(calib_brier_oob_linear, probs = c(0.025, 0.975))
 ```
 
 ## **Display Results**
 
 Finally, we print the full model performance, .632+ estimates, and 95% confidence intervals for accuracy, C-index (AUC), and calibration slope.
+
+### Nonlinear case first
 
 ```{r}
 # Print results
@@ -285,7 +401,7 @@ cat("Calibration Slope 95% CI from bootstrap:", calib_slope_ci, "\n")
 
 cat("Full model Train Calibration Intercept:", calib_inter_full, "\n")
 cat("Full model Test Calibration Intercept:", calib_inter_full_test, "\n")
-#cat(".632+ Calibration Intercept estimate:", calib_inter_632plus, "\n")
+cat(".632+ Calibration Intercept estimate:", calib_intercept_632plus, "\n")
 cat("Calibration Intercept 95% CI from bootstrap:", calib_inter_ci, "\n")
 
 cat("Full model Train Brier Score:", calib_brier_full, "\n")
@@ -293,6 +409,30 @@ cat("Full model Test Brier Score:", calib_brier_full_test, "\n")
 cat("C-index Brier Score  95% CI from bootstrap:", calib_brier_ci, "\n\n")
 ```
 
+### And now linear case only
+
+```{r}
+# Print results
+cat("Full model Train C-index (AUC) for linear case:", cindex_full_linear, "\n")
+cat("Full model Test C-index (AUC) for linear case:", cindex_full_test_linear, "\n")
+cat(".632+ C-index (AUC) estimate for linear case:", cindex_632plus_linear, "\n")
+cat("C-index (AUC) 95% CI from bootstrap for linear case:", cindex_ci_linear, "\n\n")
+
+cat("Full model Train Calibration Slope for linear case:", calib_slope_full_linear, "\n")
+cat("Full model Test Calibration Slope for linear case:", calib_slope_full_test_linear, "\n")
+cat(".632+ Calibration Slope estimate for linear case:", calib_slope_632plus_linear, "\n")
+cat("Calibration Slope 95% CI from bootstrap for linear case:", calib_slope_ci_linear, "\n")
+
+cat("Full model Train Calibration Intercept for linear case:", calib_inter_full_linear, "\n")
+cat("Full model Test Calibration Intercept for linear case:", calib_inter_full_test_linear, "\n")
+cat(".632+ Calibration Intercept estimate for linear case:", calib_intercept_632plus_linear, "\n")
+cat("Calibration Intercept 95% CI from bootstrap for linear case:", calib_inter_ci_linear, "\n")
+
+cat("Full model Train Brier Score for linear case:", calib_brier_full_linear, "\n")
+cat("Full model Test Brier Score for linear case:", calib_brier_full_test_linear, "\n")
+cat("C-index Brier Score  95% CI from bootstrap for linear case:", calib_brier_ci_linear, "\n\n")
+```
+
 ## **Conclusion**
 
-This analysis provides a robust evaluation of the classification model using bootstrap resampling. The .632+ estimates account for overfitting, and the calibration slope ensures the reliability of predicted probabilities. Parallelization with 9 cores improves computational efficiency. Future work could include visualizing the calibration curve or comparing linear and nonlinear models.
+This analysis provides a robust evaluation of the classification model using bootstrap resampling. The .632+ estimates account for overfitting, and the calibration slope ensures the reliability of predicted probabilities. Full BGNLM over-performs linear BMA.
