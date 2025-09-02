@@ -342,7 +342,7 @@ kable(brier_df, digits = 3, caption = "Brier Scores for Models full and bg")
 
 # Summarizing results based on the posterior distribution of full model
 
-```{r Summarizing results, cache = TRUE}
+```{r Summarizing results}
 # For each quartile compute the median ATT01.
 pisa18condPr1 <- pisa2018 %>%
   group_by(ATT4) %>%
@@ -383,10 +383,11 @@ lowQ <- c(pint_condPr25[,1],pint_condPr50[,1],pint_condPr75[,1])
 med <-  c(pint_condPr25[,2],pint_condPr50[,2],pint_condPr75[,2])
 upQ <-  c(pint_condPr25[,3],pint_condPr50[,3],pint_condPr75[,3])
 
+
 df_condPr1 <- data.frame(x = rep(round(meancondPr1,2),6),
-                            group = c(rep("bv = 25%, nbull.",brE),rep("bv = 25%, bull.",brE),
-                                  rep("bv = 50%, nbull.",brE),rep("bv = 50%, bull.",brE),
-                                  rep("bv = 75%, nbull.",brE),rep("bv = 75%, bull.",brE)),
+                            group = c(rep("bv = 25%, nb.",brE),rep("bv = 25%, b.",brE),
+                                  rep("bv = 50%, nb.",brE),rep("bv = 50%, b.",brE),
+                                  rep("bv = 75%, nb.",brE),rep("bv = 75%, b.",brE)),
                                   mean =  med,low = lowQ, 
                                    up = upQ)
 

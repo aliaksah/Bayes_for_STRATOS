@@ -386,19 +386,20 @@ plot.result <- function(gfg = df_condPr1){
   cbp1 <- c("#D55E00" , "#E69F00", "#009E73",#,#CC79A7  F0E442
            "#56B4E9", "#999999", "#000090", "#0072B2","#CC79A7")
 
-  xlab <- "ATT4 quartile (with corres. median)"
+  xlab <- "Truancy level (with corres. median)"
   # Set initial title
-  tit <- "Prob. of being LD in dep. of ATT4"
+  tit <- "Risk of Withdrawal"
   
   ggplot(gfg, aes(x = x, y = mean, colour = group, group = group)) + 
     geom_errorbar(aes(ymin = low, ymax = up), colour = "grey", width = .01, 
                   position = pd) +
    # geom_line(position = pd, size = 1.25, 
       #        linetype = "solid") +
-     geom_line(position = pd, aes(linetype=group), size=1) +
+    geom_line(position = pd, linetype = "solid", size = 1)+
+  # geom_line(position = pd, aes(linetype=group), size=1) +
     geom_point(position = pd, size = 3, shape = 21) + # 21 is filled circle
     xlab(xlab) +
-    ylab("Prob. of being LD") +
+    ylab("Risk of Withdrawal") +
     ggtitle(tit) +
     expand_limits(y = 0.8) +    #expand_limits(x=1.52)   +                 # Expand y range
     scale_y_continuous(breaks = seq(0,0.9,0.10)) + 
