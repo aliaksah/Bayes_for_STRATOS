@@ -1,0 +1,132 @@
+---
+title: "IDA_Background"
+author: 
+  - Mariana Nold
+date: now
+date-format: iso
+title-block-banner: "#828282"
+format:
+  html:
+    code-fold: true
+    code-tools: true
+    theme: default
+    toc: true
+    number-sections: true
+    toc-location: right
+    embed-resources: true
+    self-contained: true
+    df-print: kable
+params: 
+  folder_analysis: Data/Processed/School_FSAP
+---
+
+## Aim: Distribution of background variables within focal groups 
+
+```{r load package, message = FALSE, warning = FALSE}
+#| code-fold: true
+PPath <- "C:/Users/zo95yup/Documents/GitHub/Bayes_for_STRATOS/Task_Truancy"
+source(file.path(PPath,"RFiles/packages.r"))
+# Load original PISA data, single imputed data set, to avoid missing data as statistical issue here
+load(file = file.path(PPath,"Orgdata/IMPDAT_PISA.RData"))
+# Prepare data, thus build PISA scales 
+# Pole so that high values indicate a higher sense of belonging based on PIM
+source(file.path(PPath,"RFiles/01_datapreperation.r"))
+to.rm <- objects()[!objects() %in% c("PPath","pisa18")]
+# There should be at least ten students per school. Schools with fewer observations are excluded from the analysis. 
+pisa18$school.id <- as.factor(pisa18$school.id)
+help <- split(pisa18,pisa18$school.id)
+nst <- lapply(help, function(x) length(x[[1]]))
+tf <- lapply(nst, function(x) x[[1]] > 9)
+utf <- unlist(tf)
+large_school <- help[utf]
+pisa2018 <- list.rbind(large_school)
+pisa2018$school.id <- droplevels(pisa2018$school.id)
+#table(pisa2018$school.id)
+
+rm(pisa18,tf,nst,help,large_school,utf)
+
+save(pisa2018,file = file.path(PPath,"Files/pisa2018.RData")) 
+
+```
+
+```{r  define second focal variable and outcome}
+
+# Compute quartiles of being bullied at school level
+pisa2018$ATT4 <- cut_number(pisa2018$ATT01,4)
+levels(pisa2018$ATT4)
+levels(pisa2018$ATT4) <- 1:4
+threshold <- quantile(pisa2018$belong, 0.25)
+threshold
+# Focal variable is 1, if student has a low sense of school-belonging
+pisa2018$bel01 <- ifelse(pisa2018$belong <= threshold, 1, 0)
+#print("Focal variables")
+#print("ATT4")
+#table(pisa2018$ATT4)
+#print("Bel01")
+#table(pisa2018$bel01)
+print("Joint distribution of ATT4 and Bel01")
+
+library(janitor)
+
+pisa2018 %>%
+  tabyl(ATT4, bel01) %>%
+  adorn_totals(where = c("row", "col"))
+
+
+```
+
+```{r non-focal variables}
+
+VARIABLES = list(
+    outcome = "bel01", 
+    focal = c("bull", "ATT4"), 
+    nonfocal = c("female", "nld", "aca", "val", "nfof", "native", "joyread", 
+                 "goal", "mot", "res", "ndis_clim", "GYM", "UNI", "NDISH", "N_SC")
+)
+
+glue("{length(VARIABLES$nonfocal)} non-focal variables used for modeling according to SAP: 
+     {VARIABLES$nonfocal |> paste0(collapse = ', ')}")
+```
+
+```{r distributions of BV}
+# Schritt 1: Gruppierung nach Kombinationen von bull und ATT4
+df <- pisa2018
+df$group <- interaction(df$bull, df$ATT4, drop = TRUE)
+
+# Schritt 2: Variablen definieren
+binary_vars <- c("female", "nld", "aca", "native")
+continuous_vars <- c("val", "nfof", "joyread", "goal", "mot", "res", 
+                     "ndis_clim", "GYM", "UNI", "NDISH", "N_SC")
+
+library(dplyr)
+
+# Tabelle 1: Binäre Variablen – nur Mittelwerte
+binary_summary <- df %>%
+  group_by(group) %>%
+  summarise(across(all_of(binary_vars), 
+                   ~round(mean(.x, na.rm = TRUE), 2), 
+                   .names = "{.col}_mean"))
+
+
+# Tabelle 2: Stetige Variablen – Mittelwert und SD
+continuous_summary <- df %>%
+  group_by(group) %>%
+  summarise(across(all_of(continuous_vars), list(
+    mean = ~round(mean(.x, na.rm = TRUE), 2),
+    sd   = ~round(sd(.x, na.rm = TRUE), 2)
+  ), .names = "{.col}_{.fn}"))
+
+
+# Ausgabe
+#print(binary_summary)
+#print(continuous_summary)
+
+print("Summary of Binary Variables within focal groups")
+binary_summary
+print("Summary of Continuous Variables within focal groups")
+continuous_summary_df <- continuous_summary
+continuous_vars
+continuous_summary_df[,1:7]
+continuous_summary_df[,8:15]
+continuous_summary_df[,16:23]
+```

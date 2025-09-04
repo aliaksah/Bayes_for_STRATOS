@@ -126,7 +126,7 @@ pisa2018 %>%
     )
 ```
 
-```{r fig.width=8, fig.height=8}
+```{r fig.width=8, fig.height=8, cache=TRUE}
 cormat = pisa2018 %>% 
     select(one_of(unlist(VARIABLES))) %>% 
     mutate(across(where(is.factor), as.numeric)) %>% 

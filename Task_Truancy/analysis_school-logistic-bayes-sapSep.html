@@ -3811,7 +3811,7 @@ See help(&#39;prior_summary.stanreg&#39;) for more details</code></pre>
 <div class="cell">
 <details>
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="fu">source</span>(<span class="fu">file.path</span>(PPath,<span class="st">&quot;RFiles/02_functions_KD.R&quot;</span>))</span>
+<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="co">#source(file.path(PPath,&quot;RFiles/02_functions_KD.R&quot;))</span></span>
 <span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Compute posterior predictions</span></span>
 <span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>posterior_predictions <span class="ot">&lt;-</span> <span class="fu">lapply</span>(fits, posterior_predict)</span>
 <span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a></span>
@@ -4942,318 +4942,317 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
 <span id="cb72-89"><a href="#cb72-89" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb72-90"><a href="#cb72-90" aria-hidden="true" tabindex="-1"></a><span class="in">```{r helper functions}</span></span>
 <span id="cb72-91"><a href="#cb72-91" aria-hidden="true" tabindex="-1"></a><span class="co">#| code-fold: true</span></span>
-<span id="cb72-92"><a href="#cb72-92" aria-hidden="true" tabindex="-1"></a><span class="fu">source</span>(<span class="fu">file.path</span>(PPath,<span class="st">&quot;RFiles/02_functions_KD.R&quot;</span>))</span>
-<span id="cb72-93"><a href="#cb72-93" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb72-94"><a href="#cb72-94" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-95"><a href="#cb72-95" aria-hidden="true" tabindex="-1"></a><span class="fu">## Variables</span></span>
-<span id="cb72-96"><a href="#cb72-96" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-97"><a href="#cb72-97" aria-hidden="true" tabindex="-1"></a>As outlined in Table 1 in the task description. </span>
-<span id="cb72-98"><a href="#cb72-98" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-99"><a href="#cb72-99" aria-hidden="true" tabindex="-1"></a><span class="in">```{r non-focal variables}</span></span>
-<span id="cb72-100"><a href="#cb72-100" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-101"><a href="#cb72-101" aria-hidden="true" tabindex="-1"></a>VARIABLES <span class="ot">=</span> <span class="fu">list</span>(</span>
-<span id="cb72-102"><a href="#cb72-102" aria-hidden="true" tabindex="-1"></a>    <span class="at">outcome =</span> <span class="st">&quot;bel01&quot;</span>, </span>
-<span id="cb72-103"><a href="#cb72-103" aria-hidden="true" tabindex="-1"></a>    <span class="at">focal =</span> <span class="fu">c</span>(<span class="st">&quot;bull&quot;</span>, <span class="st">&quot;ATT4&quot;</span>), </span>
-<span id="cb72-104"><a href="#cb72-104" aria-hidden="true" tabindex="-1"></a>    <span class="at">nonfocal =</span> <span class="fu">c</span>(<span class="st">&quot;female&quot;</span>, <span class="st">&quot;nld&quot;</span>, <span class="st">&quot;aca&quot;</span>, <span class="st">&quot;val&quot;</span>, <span class="st">&quot;nfof&quot;</span>, <span class="st">&quot;native&quot;</span>, <span class="st">&quot;joyread&quot;</span>, </span>
-<span id="cb72-105"><a href="#cb72-105" aria-hidden="true" tabindex="-1"></a>                 <span class="st">&quot;goal&quot;</span>, <span class="st">&quot;mot&quot;</span>, <span class="st">&quot;res&quot;</span>, <span class="st">&quot;ndis_clim&quot;</span>, <span class="st">&quot;GYM&quot;</span>, <span class="st">&quot;UNI&quot;</span>, <span class="st">&quot;NDISH&quot;</span>, <span class="st">&quot;N_SC&quot;</span>)</span>
-<span id="cb72-106"><a href="#cb72-106" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb72-107"><a href="#cb72-107" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-108"><a href="#cb72-108" aria-hidden="true" tabindex="-1"></a><span class="fu">glue</span>(<span class="st">&quot;{length(VARIABLES$nonfocal)} non-focal variables used for modeling according to SAP: </span></span>
-<span id="cb72-109"><a href="#cb72-109" aria-hidden="true" tabindex="-1"></a><span class="st">     {VARIABLES$nonfocal |&gt; paste0(collapse = &#39;, &#39;)}&quot;</span>)</span>
-<span id="cb72-110"><a href="#cb72-110" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb72-111"><a href="#cb72-111" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-112"><a href="#cb72-112" aria-hidden="true" tabindex="-1"></a><span class="fu"># Analysis</span></span>
-<span id="cb72-113"><a href="#cb72-113" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-114"><a href="#cb72-114" aria-hidden="true" tabindex="-1"></a><span class="fu">## Define model two models, first full model, second background model</span></span>
-<span id="cb72-115"><a href="#cb72-115" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-116"><a href="#cb72-116" aria-hidden="true" tabindex="-1"></a><span class="in">```{r  fit model,results=&#39;hide&#39;, message=FALSE, warning=FALSE}</span></span>
-<span id="cb72-117"><a href="#cb72-117" aria-hidden="true" tabindex="-1"></a>models<span class="ot">&lt;-</span><span class="fu">list</span>()</span>
-<span id="cb72-118"><a href="#cb72-118" aria-hidden="true" tabindex="-1"></a><span class="co"># Full model, variable selection based on PIM  including focal variables</span></span>
-<span id="cb72-119"><a href="#cb72-119" aria-hidden="true" tabindex="-1"></a>models[[<span class="dv">1</span>]] <span class="ot">&lt;-</span> <span class="fu">as.formula</span>(bel01 <span class="sc">~</span> bull<span class="sc">*</span>ATT4 <span class="sc">+</span> female <span class="sc">+</span> nld <span class="sc">+</span>  aca  <span class="sc">+</span> val  <span class="sc">+</span> nfof  <span class="sc">+</span> native<span class="sc">+</span> joyread <span class="sc">+</span> goal <span class="sc">+</span> mot <span class="sc">+</span> res <span class="sc">+</span>  ndis_clim    <span class="sc">+</span> GYM <span class="sc">+</span> UNI  <span class="sc">+</span>  NDISH <span class="sc">+</span> N_SC <span class="sc">+</span> (<span class="dv">1</span> <span class="sc">|</span> school.id))</span>
-<span id="cb72-120"><a href="#cb72-120" aria-hidden="true" tabindex="-1"></a><span class="co"># Background model, variable selection based on PIM without focal variables</span></span>
-<span id="cb72-121"><a href="#cb72-121" aria-hidden="true" tabindex="-1"></a>models[[<span class="dv">2</span>]] <span class="ot">&lt;-</span> <span class="fu">as.formula</span>(bel01 <span class="sc">~</span> female <span class="sc">+</span> nld <span class="sc">+</span>  aca  <span class="sc">+</span> val  <span class="sc">+</span> nfof  <span class="sc">+</span> native <span class="sc">+</span> joyread <span class="sc">+</span> goal <span class="sc">+</span> mot <span class="sc">+</span> res <span class="sc">+</span>  ndis_clim    <span class="sc">+</span> GYM <span class="sc">+</span> UNI  <span class="sc">+</span> NDISH <span class="sc">+</span> N_SC <span class="sc">+</span> (<span class="dv">1</span> <span class="sc">|</span> school.id))</span>
-<span id="cb72-122"><a href="#cb72-122" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb72-123"><a href="#cb72-123" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-92"><a href="#cb72-92" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-93"><a href="#cb72-93" aria-hidden="true" tabindex="-1"></a><span class="fu">source</span>(<span class="fu">file.path</span>(PPath,<span class="st">&quot;RFiles/02_functions_KD.R&quot;</span>))</span>
+<span id="cb72-94"><a href="#cb72-94" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb72-95"><a href="#cb72-95" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-96"><a href="#cb72-96" aria-hidden="true" tabindex="-1"></a><span class="fu">## Variables</span></span>
+<span id="cb72-97"><a href="#cb72-97" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-98"><a href="#cb72-98" aria-hidden="true" tabindex="-1"></a>As outlined in Table 1 in the task description. </span>
+<span id="cb72-99"><a href="#cb72-99" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-100"><a href="#cb72-100" aria-hidden="true" tabindex="-1"></a><span class="in">```{r non-focal variables}</span></span>
+<span id="cb72-101"><a href="#cb72-101" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-102"><a href="#cb72-102" aria-hidden="true" tabindex="-1"></a>VARIABLES <span class="ot">=</span> <span class="fu">list</span>(</span>
+<span id="cb72-103"><a href="#cb72-103" aria-hidden="true" tabindex="-1"></a>    <span class="at">outcome =</span> <span class="st">&quot;bel01&quot;</span>, </span>
+<span id="cb72-104"><a href="#cb72-104" aria-hidden="true" tabindex="-1"></a>    <span class="at">focal =</span> <span class="fu">c</span>(<span class="st">&quot;bull&quot;</span>, <span class="st">&quot;ATT4&quot;</span>), </span>
+<span id="cb72-105"><a href="#cb72-105" aria-hidden="true" tabindex="-1"></a>    <span class="at">nonfocal =</span> <span class="fu">c</span>(<span class="st">&quot;female&quot;</span>, <span class="st">&quot;nld&quot;</span>, <span class="st">&quot;aca&quot;</span>, <span class="st">&quot;val&quot;</span>, <span class="st">&quot;nfof&quot;</span>, <span class="st">&quot;native&quot;</span>, <span class="st">&quot;joyread&quot;</span>, </span>
+<span id="cb72-106"><a href="#cb72-106" aria-hidden="true" tabindex="-1"></a>                 <span class="st">&quot;goal&quot;</span>, <span class="st">&quot;mot&quot;</span>, <span class="st">&quot;res&quot;</span>, <span class="st">&quot;ndis_clim&quot;</span>, <span class="st">&quot;GYM&quot;</span>, <span class="st">&quot;UNI&quot;</span>, <span class="st">&quot;NDISH&quot;</span>, <span class="st">&quot;N_SC&quot;</span>)</span>
+<span id="cb72-107"><a href="#cb72-107" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb72-108"><a href="#cb72-108" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-109"><a href="#cb72-109" aria-hidden="true" tabindex="-1"></a><span class="fu">glue</span>(<span class="st">&quot;{length(VARIABLES$nonfocal)} non-focal variables used for modeling according to SAP: </span></span>
+<span id="cb72-110"><a href="#cb72-110" aria-hidden="true" tabindex="-1"></a><span class="st">     {VARIABLES$nonfocal |&gt; paste0(collapse = &#39;, &#39;)}&quot;</span>)</span>
+<span id="cb72-111"><a href="#cb72-111" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb72-112"><a href="#cb72-112" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-113"><a href="#cb72-113" aria-hidden="true" tabindex="-1"></a><span class="fu"># Analysis</span></span>
+<span id="cb72-114"><a href="#cb72-114" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-115"><a href="#cb72-115" aria-hidden="true" tabindex="-1"></a><span class="fu">## Define model two models, first full model, second background model</span></span>
+<span id="cb72-116"><a href="#cb72-116" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-117"><a href="#cb72-117" aria-hidden="true" tabindex="-1"></a><span class="in">```{r  define model,results=&#39;hide&#39;, message=FALSE, warning=FALSE}</span></span>
+<span id="cb72-118"><a href="#cb72-118" aria-hidden="true" tabindex="-1"></a>models<span class="ot">&lt;-</span><span class="fu">list</span>()</span>
+<span id="cb72-119"><a href="#cb72-119" aria-hidden="true" tabindex="-1"></a><span class="co"># Full model, variable selection based on PIM  including focal variables</span></span>
+<span id="cb72-120"><a href="#cb72-120" aria-hidden="true" tabindex="-1"></a>models[[<span class="dv">1</span>]] <span class="ot">&lt;-</span> <span class="fu">as.formula</span>(bel01 <span class="sc">~</span> bull<span class="sc">*</span>ATT4 <span class="sc">+</span> female <span class="sc">+</span> nld <span class="sc">+</span>  aca  <span class="sc">+</span> val  <span class="sc">+</span> nfof  <span class="sc">+</span> native<span class="sc">+</span> joyread <span class="sc">+</span> goal <span class="sc">+</span> mot <span class="sc">+</span> res <span class="sc">+</span>  ndis_clim    <span class="sc">+</span> GYM <span class="sc">+</span> UNI  <span class="sc">+</span>  NDISH <span class="sc">+</span> N_SC <span class="sc">+</span> (<span class="dv">1</span> <span class="sc">|</span> school.id))</span>
+<span id="cb72-121"><a href="#cb72-121" aria-hidden="true" tabindex="-1"></a><span class="co"># Background model, variable selection based on PIM without focal variables</span></span>
+<span id="cb72-122"><a href="#cb72-122" aria-hidden="true" tabindex="-1"></a>models[[<span class="dv">2</span>]] <span class="ot">&lt;-</span> <span class="fu">as.formula</span>(bel01 <span class="sc">~</span> female <span class="sc">+</span> nld <span class="sc">+</span>  aca  <span class="sc">+</span> val  <span class="sc">+</span> nfof  <span class="sc">+</span> native <span class="sc">+</span> joyread <span class="sc">+</span> goal <span class="sc">+</span> mot <span class="sc">+</span> res <span class="sc">+</span>  ndis_clim    <span class="sc">+</span> GYM <span class="sc">+</span> UNI  <span class="sc">+</span> NDISH <span class="sc">+</span> N_SC <span class="sc">+</span> (<span class="dv">1</span> <span class="sc">|</span> school.id))</span>
+<span id="cb72-123"><a href="#cb72-123" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
 <span id="cb72-124"><a href="#cb72-124" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-125"><a href="#cb72-125" aria-hidden="true" tabindex="-1"></a><span class="fu">## Check the convergence criteria </span></span>
-<span id="cb72-126"><a href="#cb72-126" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-127"><a href="#cb72-127" aria-hidden="true" tabindex="-1"></a><span class="in">```{r fit modesl and do MCMC diagnostic,results=&#39;hide&#39;, message = FALSE, warning = FALSE, cache=TRUE}</span></span>
-<span id="cb72-128"><a href="#cb72-128" aria-hidden="true" tabindex="-1"></a>a.seed <span class="ot">&lt;-</span> <span class="dv">12345</span> </span>
-<span id="cb72-129"><a href="#cb72-129" aria-hidden="true" tabindex="-1"></a>a.iter <span class="ot">&lt;-</span>  <span class="dv">2000</span> </span>
-<span id="cb72-130"><a href="#cb72-130" aria-hidden="true" tabindex="-1"></a>a.chains <span class="ot">&lt;-</span> <span class="dv">4</span>  </span>
-<span id="cb72-131"><a href="#cb72-131" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-132"><a href="#cb72-132" aria-hidden="true" tabindex="-1"></a>fits <span class="ot">&lt;-</span> <span class="fu">list</span>()</span>
-<span id="cb72-133"><a href="#cb72-133" aria-hidden="true" tabindex="-1"></a><span class="co"># full model</span></span>
-<span id="cb72-134"><a href="#cb72-134" aria-hidden="true" tabindex="-1"></a>fits[[<span class="dv">1</span>]] <span class="ot">&lt;-</span> <span class="fu">stan_glmer</span>(models[[<span class="dv">1</span>]], <span class="at">data =</span> pisa2018, <span class="at">seed =</span> a.seed,</span>
-<span id="cb72-135"><a href="#cb72-135" aria-hidden="true" tabindex="-1"></a>                      <span class="at">iter =</span> a.iter, <span class="at">chains =</span> a.chains,<span class="at">family =</span> <span class="fu">binomial</span>()) </span>
-<span id="cb72-136"><a href="#cb72-136" aria-hidden="true" tabindex="-1"></a><span class="co"># background model</span></span>
-<span id="cb72-137"><a href="#cb72-137" aria-hidden="true" tabindex="-1"></a>fits[[<span class="dv">2</span>]] <span class="ot">&lt;-</span> <span class="fu">stan_glmer</span>(models[[<span class="dv">2</span>]], <span class="at">data =</span> pisa2018, <span class="at">seed =</span> a.seed,</span>
-<span id="cb72-138"><a href="#cb72-138" aria-hidden="true" tabindex="-1"></a>                      <span class="at">iter =</span> a.iter, <span class="at">chains =</span> a.chains,<span class="at">family =</span> <span class="fu">binomial</span>()) </span>
-<span id="cb72-139"><a href="#cb72-139" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-140"><a href="#cb72-140" aria-hidden="true" tabindex="-1"></a>res.path <span class="ot">&lt;-</span> <span class="fu">file.path</span>(PPath,<span class="st">&quot;Result&quot;</span>)</span>
-<span id="cb72-141"><a href="#cb72-141" aria-hidden="true" tabindex="-1"></a><span class="fu">save</span>(fits, <span class="at">file =</span> <span class="fu">file.path</span>(res.path,<span class="st">&quot;fits.RData&quot;</span>))</span>
-<span id="cb72-142"><a href="#cb72-142" aria-hidden="true" tabindex="-1"></a>summary_list <span class="ot">&lt;-</span> <span class="fu">lapply</span>(fits, summary) <span class="co"># mcse Rhat n_eff</span></span>
-<span id="cb72-143"><a href="#cb72-143" aria-hidden="true" tabindex="-1"></a><span class="co"># launch_shinystan(fits[[1]])</span></span>
-<span id="cb72-144"><a href="#cb72-144" aria-hidden="true" tabindex="-1"></a><span class="co"># launch_shinystan(fits[[2]])</span></span>
-<span id="cb72-145"><a href="#cb72-145" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb72-146"><a href="#cb72-146" aria-hidden="true" tabindex="-1"></a><span class="fu">## Summary of results</span></span>
-<span id="cb72-147"><a href="#cb72-147" aria-hidden="true" tabindex="-1"></a><span class="in">```{r Summary of results}</span></span>
-<span id="cb72-148"><a href="#cb72-148" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-125"><a href="#cb72-125" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-126"><a href="#cb72-126" aria-hidden="true" tabindex="-1"></a><span class="fu">## Check the convergence criteria </span></span>
+<span id="cb72-127"><a href="#cb72-127" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-128"><a href="#cb72-128" aria-hidden="true" tabindex="-1"></a><span class="in">```{r fit modesl and do MCMC diagnostic,results=&#39;hide&#39;, message = FALSE, warning = FALSE, cache=TRUE}</span></span>
+<span id="cb72-129"><a href="#cb72-129" aria-hidden="true" tabindex="-1"></a>a.seed <span class="ot">&lt;-</span> <span class="dv">12345</span> </span>
+<span id="cb72-130"><a href="#cb72-130" aria-hidden="true" tabindex="-1"></a>a.iter <span class="ot">&lt;-</span>  <span class="dv">2000</span> </span>
+<span id="cb72-131"><a href="#cb72-131" aria-hidden="true" tabindex="-1"></a>a.chains <span class="ot">&lt;-</span> <span class="dv">4</span>  </span>
+<span id="cb72-132"><a href="#cb72-132" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-133"><a href="#cb72-133" aria-hidden="true" tabindex="-1"></a>fits <span class="ot">&lt;-</span> <span class="fu">list</span>()</span>
+<span id="cb72-134"><a href="#cb72-134" aria-hidden="true" tabindex="-1"></a><span class="co"># full model</span></span>
+<span id="cb72-135"><a href="#cb72-135" aria-hidden="true" tabindex="-1"></a>fits[[<span class="dv">1</span>]] <span class="ot">&lt;-</span> <span class="fu">stan_glmer</span>(models[[<span class="dv">1</span>]], <span class="at">data =</span> pisa2018, <span class="at">seed =</span> a.seed,</span>
+<span id="cb72-136"><a href="#cb72-136" aria-hidden="true" tabindex="-1"></a>                      <span class="at">iter =</span> a.iter, <span class="at">chains =</span> a.chains,<span class="at">family =</span> <span class="fu">binomial</span>()) </span>
+<span id="cb72-137"><a href="#cb72-137" aria-hidden="true" tabindex="-1"></a><span class="co"># background model</span></span>
+<span id="cb72-138"><a href="#cb72-138" aria-hidden="true" tabindex="-1"></a>fits[[<span class="dv">2</span>]] <span class="ot">&lt;-</span> <span class="fu">stan_glmer</span>(models[[<span class="dv">2</span>]], <span class="at">data =</span> pisa2018, <span class="at">seed =</span> a.seed,</span>
+<span id="cb72-139"><a href="#cb72-139" aria-hidden="true" tabindex="-1"></a>                      <span class="at">iter =</span> a.iter, <span class="at">chains =</span> a.chains,<span class="at">family =</span> <span class="fu">binomial</span>()) </span>
+<span id="cb72-140"><a href="#cb72-140" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-141"><a href="#cb72-141" aria-hidden="true" tabindex="-1"></a>res.path <span class="ot">&lt;-</span> <span class="fu">file.path</span>(PPath,<span class="st">&quot;Result&quot;</span>)</span>
+<span id="cb72-142"><a href="#cb72-142" aria-hidden="true" tabindex="-1"></a><span class="fu">save</span>(fits, <span class="at">file =</span> <span class="fu">file.path</span>(res.path,<span class="st">&quot;fits.RData&quot;</span>))</span>
+<span id="cb72-143"><a href="#cb72-143" aria-hidden="true" tabindex="-1"></a>summary_list <span class="ot">&lt;-</span> <span class="fu">lapply</span>(fits, summary) <span class="co"># mcse Rhat n_eff</span></span>
+<span id="cb72-144"><a href="#cb72-144" aria-hidden="true" tabindex="-1"></a><span class="co"># launch_shinystan(fits[[1]])</span></span>
+<span id="cb72-145"><a href="#cb72-145" aria-hidden="true" tabindex="-1"></a><span class="co"># launch_shinystan(fits[[2]])</span></span>
+<span id="cb72-146"><a href="#cb72-146" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb72-147"><a href="#cb72-147" aria-hidden="true" tabindex="-1"></a><span class="fu">## Summary of results</span></span>
+<span id="cb72-148"><a href="#cb72-148" aria-hidden="true" tabindex="-1"></a><span class="in">```{r Summary of results}</span></span>
 <span id="cb72-149"><a href="#cb72-149" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-150"><a href="#cb72-150" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-151"><a href="#cb72-151" aria-hidden="true" tabindex="-1"></a><span class="co"># Calculate summaries for all models in fits</span></span>
-<span id="cb72-152"><a href="#cb72-152" aria-hidden="true" tabindex="-1"></a>summaryFixed <span class="ot">&lt;-</span> <span class="fu">map</span>(fits, <span class="sc">~</span> <span class="fu">tidy</span>(.x, <span class="at">conf.int =</span> <span class="cn">TRUE</span>, <span class="at">conf.level =</span> .<span class="dv">95</span>, <span class="at">effects =</span> <span class="st">&quot;fixed&quot;</span>))</span>
-<span id="cb72-153"><a href="#cb72-153" aria-hidden="true" tabindex="-1"></a>summarySchools <span class="ot">&lt;-</span> <span class="fu">map</span>(fits, <span class="sc">~</span> <span class="fu">tidy</span>(.x, <span class="at">conf.int =</span> <span class="cn">TRUE</span>, <span class="at">conf.level =</span> .<span class="dv">95</span>, <span class="at">effects =</span> <span class="st">&quot;ran_vals&quot;</span>))</span>
-<span id="cb72-154"><a href="#cb72-154" aria-hidden="true" tabindex="-1"></a>summaryVar <span class="ot">&lt;-</span> <span class="fu">map</span>(fits, <span class="sc">~</span> <span class="fu">tidy</span>(.x, <span class="at">conf.int =</span> <span class="cn">TRUE</span>, <span class="at">conf.level =</span> .<span class="dv">95</span>, <span class="at">effects =</span> <span class="st">&quot;ran_pars&quot;</span>))</span>
-<span id="cb72-155"><a href="#cb72-155" aria-hidden="true" tabindex="-1"></a>summaryPrior <span class="ot">&lt;-</span> <span class="fu">map</span>(fits, <span class="sc">~</span> <span class="fu">tidy</span>(.x, <span class="at">conf.int =</span> <span class="cn">TRUE</span>, <span class="at">conf.level =</span> .<span class="dv">95</span>, <span class="at">effects =</span> <span class="st">&quot;ran_pars&quot;</span>))</span>
+<span id="cb72-150"><a href="#cb72-150" aria-hidden="true" tabindex="-1"></a><span class="co"># Calculate summaries for all models in fits</span></span>
+<span id="cb72-151"><a href="#cb72-151" aria-hidden="true" tabindex="-1"></a>summaryFixed <span class="ot">&lt;-</span> <span class="fu">map</span>(fits, <span class="sc">~</span> <span class="fu">tidy</span>(.x, <span class="at">conf.int =</span> <span class="cn">TRUE</span>, <span class="at">conf.level =</span> .<span class="dv">95</span>, <span class="at">effects =</span> <span class="st">&quot;fixed&quot;</span>))</span>
+<span id="cb72-152"><a href="#cb72-152" aria-hidden="true" tabindex="-1"></a>summarySchools <span class="ot">&lt;-</span> <span class="fu">map</span>(fits, <span class="sc">~</span> <span class="fu">tidy</span>(.x, <span class="at">conf.int =</span> <span class="cn">TRUE</span>, <span class="at">conf.level =</span> .<span class="dv">95</span>, <span class="at">effects =</span> <span class="st">&quot;ran_vals&quot;</span>))</span>
+<span id="cb72-153"><a href="#cb72-153" aria-hidden="true" tabindex="-1"></a>summaryVar <span class="ot">&lt;-</span> <span class="fu">map</span>(fits, <span class="sc">~</span> <span class="fu">tidy</span>(.x, <span class="at">conf.int =</span> <span class="cn">TRUE</span>, <span class="at">conf.level =</span> .<span class="dv">95</span>, <span class="at">effects =</span> <span class="st">&quot;ran_pars&quot;</span>))</span>
+<span id="cb72-154"><a href="#cb72-154" aria-hidden="true" tabindex="-1"></a>summaryPrior <span class="ot">&lt;-</span> <span class="fu">map</span>(fits, <span class="sc">~</span> <span class="fu">tidy</span>(.x, <span class="at">conf.int =</span> <span class="cn">TRUE</span>, <span class="at">conf.level =</span> .<span class="dv">95</span>, <span class="at">effects =</span> <span class="st">&quot;ran_pars&quot;</span>))</span>
+<span id="cb72-155"><a href="#cb72-155" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb72-156"><a href="#cb72-156" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb72-157"><a href="#cb72-157" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-158"><a href="#cb72-158" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-159"><a href="#cb72-159" aria-hidden="true" tabindex="-1"></a><span class="co"># Fixed effects</span></span>
-<span id="cb72-160"><a href="#cb72-160" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-161"><a href="#cb72-161" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(<span class="st">&quot;## Fixed Effects for Model&quot;</span>)</span>
-<span id="cb72-162"><a href="#cb72-162" aria-hidden="true" tabindex="-1"></a>summaryFixed[[<span class="dv">1</span>]]</span>
-<span id="cb72-163"><a href="#cb72-163" aria-hidden="true" tabindex="-1"></a>summaryFixed[[<span class="dv">2</span>]]</span>
-<span id="cb72-164"><a href="#cb72-164" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-165"><a href="#cb72-165" aria-hidden="true" tabindex="-1"></a><span class="co"># Optional: Random effects (school-level)</span></span>
-<span id="cb72-166"><a href="#cb72-166" aria-hidden="true" tabindex="-1"></a><span class="co">#print(&quot;## Random Effects (Schools) for Model&quot;)</span></span>
-<span id="cb72-167"><a href="#cb72-167" aria-hidden="true" tabindex="-1"></a><span class="co">#summarySchools[[1]]</span></span>
-<span id="cb72-168"><a href="#cb72-168" aria-hidden="true" tabindex="-1"></a><span class="co">#summarySchools[[2]]</span></span>
-<span id="cb72-169"><a href="#cb72-169" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-170"><a href="#cb72-170" aria-hidden="true" tabindex="-1"></a><span class="co"># Random effect variances</span></span>
-<span id="cb72-171"><a href="#cb72-171" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(<span class="st">&quot;## Random Effect Variances for Model&quot;</span>)</span>
-<span id="cb72-172"><a href="#cb72-172" aria-hidden="true" tabindex="-1"></a>summaryVar[[<span class="dv">1</span>]]</span>
-<span id="cb72-173"><a href="#cb72-173" aria-hidden="true" tabindex="-1"></a>summaryVar[[<span class="dv">2</span>]]</span>
-<span id="cb72-174"><a href="#cb72-174" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-175"><a href="#cb72-175" aria-hidden="true" tabindex="-1"></a>prior_summaries <span class="ot">&lt;-</span> <span class="fu">lapply</span>(fits, prior_summary)</span>
-<span id="cb72-176"><a href="#cb72-176" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(prior_summaries[[<span class="dv">1</span>]])</span>
-<span id="cb72-177"><a href="#cb72-177" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(prior_summaries[[<span class="dv">2</span>]])</span>
-<span id="cb72-178"><a href="#cb72-178" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-179"><a href="#cb72-179" aria-hidden="true" tabindex="-1"></a><span class="co"># Prior summaries</span></span>
-<span id="cb72-180"><a href="#cb72-180" aria-hidden="true" tabindex="-1"></a><span class="co"># show prior_summaries </span></span>
-<span id="cb72-181"><a href="#cb72-181" aria-hidden="true" tabindex="-1"></a><span class="co">#for (i in seq_along(prior_summaries)) {</span></span>
-<span id="cb72-182"><a href="#cb72-182" aria-hidden="true" tabindex="-1"></a><span class="co">#  cat(&quot;Prior Summary for model&quot;, i, &quot;:\n&quot;)</span></span>
-<span id="cb72-183"><a href="#cb72-183" aria-hidden="true" tabindex="-1"></a><span class="co">#  print(prior_summaries[[i]])</span></span>
-<span id="cb72-184"><a href="#cb72-184" aria-hidden="true" tabindex="-1"></a><span class="co">#  cat(&quot;\n----------------------\n&quot;)</span></span>
-<span id="cb72-185"><a href="#cb72-185" aria-hidden="true" tabindex="-1"></a><span class="co">#}</span></span>
-<span id="cb72-186"><a href="#cb72-186" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb72-158"><a href="#cb72-158" aria-hidden="true" tabindex="-1"></a><span class="co"># Fixed effects</span></span>
+<span id="cb72-159"><a href="#cb72-159" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-160"><a href="#cb72-160" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(<span class="st">&quot;## Fixed Effects for Model&quot;</span>)</span>
+<span id="cb72-161"><a href="#cb72-161" aria-hidden="true" tabindex="-1"></a>summaryFixed[[<span class="dv">1</span>]]</span>
+<span id="cb72-162"><a href="#cb72-162" aria-hidden="true" tabindex="-1"></a>summaryFixed[[<span class="dv">2</span>]]</span>
+<span id="cb72-163"><a href="#cb72-163" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-164"><a href="#cb72-164" aria-hidden="true" tabindex="-1"></a><span class="co"># Optional: Random effects (school-level)</span></span>
+<span id="cb72-165"><a href="#cb72-165" aria-hidden="true" tabindex="-1"></a><span class="co">#print(&quot;## Random Effects (Schools) for Model&quot;)</span></span>
+<span id="cb72-166"><a href="#cb72-166" aria-hidden="true" tabindex="-1"></a><span class="co">#summarySchools[[1]]</span></span>
+<span id="cb72-167"><a href="#cb72-167" aria-hidden="true" tabindex="-1"></a><span class="co">#summarySchools[[2]]</span></span>
+<span id="cb72-168"><a href="#cb72-168" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-169"><a href="#cb72-169" aria-hidden="true" tabindex="-1"></a><span class="co"># Random effect variances</span></span>
+<span id="cb72-170"><a href="#cb72-170" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(<span class="st">&quot;## Random Effect Variances for Model&quot;</span>)</span>
+<span id="cb72-171"><a href="#cb72-171" aria-hidden="true" tabindex="-1"></a>summaryVar[[<span class="dv">1</span>]]</span>
+<span id="cb72-172"><a href="#cb72-172" aria-hidden="true" tabindex="-1"></a>summaryVar[[<span class="dv">2</span>]]</span>
+<span id="cb72-173"><a href="#cb72-173" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-174"><a href="#cb72-174" aria-hidden="true" tabindex="-1"></a>prior_summaries <span class="ot">&lt;-</span> <span class="fu">lapply</span>(fits, prior_summary)</span>
+<span id="cb72-175"><a href="#cb72-175" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(prior_summaries[[<span class="dv">1</span>]])</span>
+<span id="cb72-176"><a href="#cb72-176" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(prior_summaries[[<span class="dv">2</span>]])</span>
+<span id="cb72-177"><a href="#cb72-177" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-178"><a href="#cb72-178" aria-hidden="true" tabindex="-1"></a><span class="co"># Prior summaries</span></span>
+<span id="cb72-179"><a href="#cb72-179" aria-hidden="true" tabindex="-1"></a><span class="co"># show prior_summaries </span></span>
+<span id="cb72-180"><a href="#cb72-180" aria-hidden="true" tabindex="-1"></a><span class="co">#for (i in seq_along(prior_summaries)) {</span></span>
+<span id="cb72-181"><a href="#cb72-181" aria-hidden="true" tabindex="-1"></a><span class="co">#  cat(&quot;Prior Summary for model&quot;, i, &quot;:\n&quot;)</span></span>
+<span id="cb72-182"><a href="#cb72-182" aria-hidden="true" tabindex="-1"></a><span class="co">#  print(prior_summaries[[i]])</span></span>
+<span id="cb72-183"><a href="#cb72-183" aria-hidden="true" tabindex="-1"></a><span class="co">#  cat(&quot;\n----------------------\n&quot;)</span></span>
+<span id="cb72-184"><a href="#cb72-184" aria-hidden="true" tabindex="-1"></a><span class="co">#}</span></span>
+<span id="cb72-185"><a href="#cb72-185" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb72-186"><a href="#cb72-186" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb72-187"><a href="#cb72-187" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb72-188"><a href="#cb72-188" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb72-189"><a href="#cb72-189" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb72-190"><a href="#cb72-190" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb72-191"><a href="#cb72-191" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-192"><a href="#cb72-192" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-193"><a href="#cb72-193" aria-hidden="true" tabindex="-1"></a><span class="fu">## LOOIC</span></span>
-<span id="cb72-194"><a href="#cb72-194" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-195"><a href="#cb72-195" aria-hidden="true" tabindex="-1"></a><span class="in">```{r looic, cache = TRUE}</span></span>
-<span id="cb72-196"><a href="#cb72-196" aria-hidden="true" tabindex="-1"></a>loo_list <span class="ot">&lt;-</span> <span class="fu">list</span>()</span>
-<span id="cb72-197"><a href="#cb72-197" aria-hidden="true" tabindex="-1"></a><span class="co"># Compute loo</span></span>
-<span id="cb72-198"><a href="#cb72-198" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-199"><a href="#cb72-199" aria-hidden="true" tabindex="-1"></a>loo_list <span class="ot">&lt;-</span> <span class="fu">lapply</span>(fits, loo, <span class="at">cores =</span> <span class="dv">1</span>)</span>
-<span id="cb72-200"><a href="#cb72-200" aria-hidden="true" tabindex="-1"></a><span class="co"># Save loo</span></span>
-<span id="cb72-201"><a href="#cb72-201" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-202"><a href="#cb72-202" aria-hidden="true" tabindex="-1"></a><span class="fu">save</span>(<span class="st">&quot;loo_list&quot;</span>, <span class="at">file =</span> <span class="fu">file.path</span>(res.path,<span class="st">&quot;loo_list.RData&quot;</span>))</span>
-<span id="cb72-203"><a href="#cb72-203" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-204"><a href="#cb72-204" aria-hidden="true" tabindex="-1"></a>loo_comparison <span class="ot">&lt;-</span> <span class="fu">loo_compare</span>(loo_list[[<span class="dv">1</span>]], loo_list[[<span class="dv">2</span>]])</span>
-<span id="cb72-205"><a href="#cb72-205" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-206"><a href="#cb72-206" aria-hidden="true" tabindex="-1"></a>loo_df <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(loo_comparison)</span>
-<span id="cb72-207"><a href="#cb72-207" aria-hidden="true" tabindex="-1"></a><span class="fu">rownames</span>(loo_df) <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;full&quot;</span>, <span class="st">&quot;bg&quot;</span>)</span>
-<span id="cb72-208"><a href="#cb72-208" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-209"><a href="#cb72-209" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(loo_df, <span class="at">digits =</span> <span class="dv">2</span>, <span class="at">caption =</span> <span class="st">&quot;LOO Model Comparison&quot;</span>)</span>
-<span id="cb72-210"><a href="#cb72-210" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb72-211"><a href="#cb72-211" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-212"><a href="#cb72-212" aria-hidden="true" tabindex="-1"></a><span class="fu">## Randomized Quantile Residuals</span></span>
-<span id="cb72-213"><a href="#cb72-213" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-214"><a href="#cb72-214" aria-hidden="true" tabindex="-1"></a><span class="in">```{r Randomized Quantile Residuals}</span></span>
-<span id="cb72-215"><a href="#cb72-215" aria-hidden="true" tabindex="-1"></a><span class="fu">source</span>(<span class="fu">file.path</span>(PPath,<span class="st">&quot;RFiles/02_functions_KD.R&quot;</span>))</span>
-<span id="cb72-216"><a href="#cb72-216" aria-hidden="true" tabindex="-1"></a><span class="co"># Compute posterior predictions</span></span>
-<span id="cb72-217"><a href="#cb72-217" aria-hidden="true" tabindex="-1"></a>posterior_predictions <span class="ot">&lt;-</span> <span class="fu">lapply</span>(fits, posterior_predict)</span>
-<span id="cb72-218"><a href="#cb72-218" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-219"><a href="#cb72-219" aria-hidden="true" tabindex="-1"></a>qres.m1 <span class="ot">=</span> <span class="fu">createDHARMa</span>(<span class="at">simulatedResponse =</span> <span class="fu">t</span>(posterior_predictions[[<span class="dv">1</span>]]), </span>
-<span id="cb72-220"><a href="#cb72-220" aria-hidden="true" tabindex="-1"></a>                          <span class="at">observedResponse =</span> pisa2018<span class="sc">$</span>bel01, </span>
-<span id="cb72-221"><a href="#cb72-221" aria-hidden="true" tabindex="-1"></a>                          <span class="at">fittedPredictedResponse =</span> <span class="fu">apply</span>(posterior_predictions[[<span class="dv">1</span>]], <span class="dv">2</span>, median), <span class="at">integerResponse =</span> T, <span class="at">seed =</span> <span class="dv">123</span>, <span class="at">method =</span> <span class="st">&quot;PIT&quot;</span>) </span>
-<span id="cb72-222"><a href="#cb72-222" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(<span class="fu">residuals</span>(qres.m1))</span>
-<span id="cb72-223"><a href="#cb72-223" aria-hidden="true" tabindex="-1"></a><span class="co"># QQ-Plot </span></span>
-<span id="cb72-224"><a href="#cb72-224" aria-hidden="true" tabindex="-1"></a>res <span class="ot">&lt;-</span> <span class="fu">qnorm</span>(<span class="fu">residuals</span>(qres.m1))</span>
-<span id="cb72-225"><a href="#cb72-225" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-226"><a href="#cb72-226" aria-hidden="true" tabindex="-1"></a><span class="co"># QQ-Plot mit ggplot2</span></span>
-<span id="cb72-227"><a href="#cb72-227" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(<span class="fu">data.frame</span>(res), <span class="fu">aes</span>(<span class="at">sample =</span> res)) <span class="sc">+</span></span>
-<span id="cb72-228"><a href="#cb72-228" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stat_qq</span>(<span class="at">color =</span> <span class="st">&quot;steelblue&quot;</span>, <span class="at">size =</span> <span class="dv">2</span>) <span class="sc">+</span></span>
-<span id="cb72-229"><a href="#cb72-229" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stat_qq_line</span>(<span class="at">color =</span> <span class="st">&quot;firebrick&quot;</span>, <span class="at">linetype =</span> <span class="st">&quot;dashed&quot;</span>) <span class="sc">+</span></span>
-<span id="cb72-230"><a href="#cb72-230" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
-<span id="cb72-231"><a href="#cb72-231" aria-hidden="true" tabindex="-1"></a>     <span class="at">title =</span> <span class="st">&quot;QQ Plot of Transformed Residuals&quot;</span>,</span>
-<span id="cb72-232"><a href="#cb72-232" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">&quot;Theoretical Quantiles&quot;</span>,</span>
-<span id="cb72-233"><a href="#cb72-233" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">&quot;Observed Quantiles&quot;</span></span>
-<span id="cb72-234"><a href="#cb72-234" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb72-235"><a href="#cb72-235" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>(<span class="at">base_size =</span> <span class="dv">14</span>)</span>
-<span id="cb72-236"><a href="#cb72-236" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-237"><a href="#cb72-237" aria-hidden="true" tabindex="-1"></a>plots1 <span class="ot">&lt;-</span> <span class="fu">plot_violin_residuals</span>(qres.m1, pisa2018, <span class="st">&quot;Residual Diagnostics Full model&quot;</span>)</span>
-<span id="cb72-238"><a href="#cb72-238" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(plots1)</span>
-<span id="cb72-239"><a href="#cb72-239" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-240"><a href="#cb72-240" aria-hidden="true" tabindex="-1"></a>qres.m2<span class="ot">=</span><span class="fu">createDHARMa</span>(<span class="at">simulatedResponse =</span> <span class="fu">t</span>(posterior_predictions[[<span class="dv">2</span>]]), </span>
-<span id="cb72-241"><a href="#cb72-241" aria-hidden="true" tabindex="-1"></a>                          <span class="at">observedResponse =</span> pisa2018<span class="sc">$</span>bel01, </span>
-<span id="cb72-242"><a href="#cb72-242" aria-hidden="true" tabindex="-1"></a>                          <span class="at">fittedPredictedResponse =</span> <span class="fu">apply</span>(posterior_predictions[[<span class="dv">2</span>]], <span class="dv">2</span>, <span class="cf">function</span>(x) <span class="fu">ifelse</span>(<span class="fu">median</span>(x) <span class="sc">==</span> <span class="fl">0.5</span>, <span class="dv">1</span>, <span class="fu">median</span>(x))), <span class="at">integerResponse =</span> T, <span class="at">seed =</span> <span class="dv">123</span>, <span class="at">method =</span> <span class="st">&quot;PIT&quot;</span>) </span>
-<span id="cb72-243"><a href="#cb72-243" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(<span class="fu">residuals</span>(qres.m2))</span>
-<span id="cb72-244"><a href="#cb72-244" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-245"><a href="#cb72-245" aria-hidden="true" tabindex="-1"></a><span class="co"># QQ-Plot </span></span>
-<span id="cb72-246"><a href="#cb72-246" aria-hidden="true" tabindex="-1"></a>res2 <span class="ot">&lt;-</span> <span class="fu">qnorm</span>(<span class="fu">residuals</span>(qres.m2))</span>
-<span id="cb72-247"><a href="#cb72-247" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-248"><a href="#cb72-248" aria-hidden="true" tabindex="-1"></a><span class="co"># QQ-Plot mit ggplot2</span></span>
-<span id="cb72-249"><a href="#cb72-249" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(<span class="fu">data.frame</span>(res2), <span class="fu">aes</span>(<span class="at">sample =</span> res2)) <span class="sc">+</span></span>
-<span id="cb72-250"><a href="#cb72-250" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stat_qq</span>(<span class="at">color =</span> <span class="st">&quot;steelblue&quot;</span>, <span class="at">size =</span> <span class="dv">2</span>) <span class="sc">+</span></span>
-<span id="cb72-251"><a href="#cb72-251" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stat_qq_line</span>(<span class="at">color =</span> <span class="st">&quot;firebrick&quot;</span>, <span class="at">linetype =</span> <span class="st">&quot;dashed&quot;</span>) <span class="sc">+</span></span>
-<span id="cb72-252"><a href="#cb72-252" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
-<span id="cb72-253"><a href="#cb72-253" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">&quot;QQ Plot of Transformed Residuals&quot;</span>,</span>
-<span id="cb72-254"><a href="#cb72-254" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">&quot;Theoretical Quantiles&quot;</span>,</span>
-<span id="cb72-255"><a href="#cb72-255" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">&quot;Observed Quantiles&quot;</span></span>
-<span id="cb72-256"><a href="#cb72-256" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb72-257"><a href="#cb72-257" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>(<span class="at">base_size =</span> <span class="dv">14</span>)</span>
-<span id="cb72-258"><a href="#cb72-258" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-259"><a href="#cb72-259" aria-hidden="true" tabindex="-1"></a>plots2 <span class="ot">&lt;-</span> <span class="fu">plot_violin_residuals</span>(qres.m2, pisa2018, <span class="st">&quot;Residual Diagnostics Background model&quot;</span>)</span>
-<span id="cb72-260"><a href="#cb72-260" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(plots2)</span>
-<span id="cb72-261"><a href="#cb72-261" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb72-262"><a href="#cb72-262" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-263"><a href="#cb72-263" aria-hidden="true" tabindex="-1"></a><span class="fu">## PPN based on Kolmogorov distance</span></span>
-<span id="cb72-264"><a href="#cb72-264" aria-hidden="true" tabindex="-1"></a><span class="in">```{r KDs}</span></span>
-<span id="cb72-265"><a href="#cb72-265" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-266"><a href="#cb72-266" aria-hidden="true" tabindex="-1"></a><span class="co"># Compute Kolmogorov distance</span></span>
-<span id="cb72-267"><a href="#cb72-267" aria-hidden="true" tabindex="-1"></a>kds <span class="ot">&lt;-</span> <span class="fu">KD</span>(<span class="at">ypredCore =</span> posterior_predictions[[<span class="dv">1</span>]], <span class="at">yrep =</span> posterior_predictions[[<span class="dv">2</span>]])</span>
+<span id="cb72-192"><a href="#cb72-192" aria-hidden="true" tabindex="-1"></a><span class="fu">## LOOIC</span></span>
+<span id="cb72-193"><a href="#cb72-193" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-194"><a href="#cb72-194" aria-hidden="true" tabindex="-1"></a><span class="in">```{r looic, cache = TRUE}</span></span>
+<span id="cb72-195"><a href="#cb72-195" aria-hidden="true" tabindex="-1"></a>loo_list <span class="ot">&lt;-</span> <span class="fu">list</span>()</span>
+<span id="cb72-196"><a href="#cb72-196" aria-hidden="true" tabindex="-1"></a><span class="co"># Compute loo</span></span>
+<span id="cb72-197"><a href="#cb72-197" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-198"><a href="#cb72-198" aria-hidden="true" tabindex="-1"></a>loo_list <span class="ot">&lt;-</span> <span class="fu">lapply</span>(fits, loo, <span class="at">cores =</span> <span class="dv">1</span>)</span>
+<span id="cb72-199"><a href="#cb72-199" aria-hidden="true" tabindex="-1"></a><span class="co"># Save loo</span></span>
+<span id="cb72-200"><a href="#cb72-200" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-201"><a href="#cb72-201" aria-hidden="true" tabindex="-1"></a><span class="fu">save</span>(<span class="st">&quot;loo_list&quot;</span>, <span class="at">file =</span> <span class="fu">file.path</span>(res.path,<span class="st">&quot;loo_list.RData&quot;</span>))</span>
+<span id="cb72-202"><a href="#cb72-202" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-203"><a href="#cb72-203" aria-hidden="true" tabindex="-1"></a>loo_comparison <span class="ot">&lt;-</span> <span class="fu">loo_compare</span>(loo_list[[<span class="dv">1</span>]], loo_list[[<span class="dv">2</span>]])</span>
+<span id="cb72-204"><a href="#cb72-204" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-205"><a href="#cb72-205" aria-hidden="true" tabindex="-1"></a>loo_df <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(loo_comparison)</span>
+<span id="cb72-206"><a href="#cb72-206" aria-hidden="true" tabindex="-1"></a><span class="fu">rownames</span>(loo_df) <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;full&quot;</span>, <span class="st">&quot;bg&quot;</span>)</span>
+<span id="cb72-207"><a href="#cb72-207" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-208"><a href="#cb72-208" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(loo_df, <span class="at">digits =</span> <span class="dv">2</span>, <span class="at">caption =</span> <span class="st">&quot;LOO Model Comparison&quot;</span>)</span>
+<span id="cb72-209"><a href="#cb72-209" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb72-210"><a href="#cb72-210" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-211"><a href="#cb72-211" aria-hidden="true" tabindex="-1"></a><span class="fu">## Randomized Quantile Residuals</span></span>
+<span id="cb72-212"><a href="#cb72-212" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-213"><a href="#cb72-213" aria-hidden="true" tabindex="-1"></a><span class="in">```{r Randomized Quantile Residuals}</span></span>
+<span id="cb72-214"><a href="#cb72-214" aria-hidden="true" tabindex="-1"></a><span class="co">#source(file.path(PPath,&quot;RFiles/02_functions_KD.R&quot;))</span></span>
+<span id="cb72-215"><a href="#cb72-215" aria-hidden="true" tabindex="-1"></a><span class="co"># Compute posterior predictions</span></span>
+<span id="cb72-216"><a href="#cb72-216" aria-hidden="true" tabindex="-1"></a>posterior_predictions <span class="ot">&lt;-</span> <span class="fu">lapply</span>(fits, posterior_predict)</span>
+<span id="cb72-217"><a href="#cb72-217" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-218"><a href="#cb72-218" aria-hidden="true" tabindex="-1"></a>qres.m1 <span class="ot">=</span> <span class="fu">createDHARMa</span>(<span class="at">simulatedResponse =</span> <span class="fu">t</span>(posterior_predictions[[<span class="dv">1</span>]]), </span>
+<span id="cb72-219"><a href="#cb72-219" aria-hidden="true" tabindex="-1"></a>                          <span class="at">observedResponse =</span> pisa2018<span class="sc">$</span>bel01, </span>
+<span id="cb72-220"><a href="#cb72-220" aria-hidden="true" tabindex="-1"></a>                          <span class="at">fittedPredictedResponse =</span> <span class="fu">apply</span>(posterior_predictions[[<span class="dv">1</span>]], <span class="dv">2</span>, median), <span class="at">integerResponse =</span> T, <span class="at">seed =</span> <span class="dv">123</span>, <span class="at">method =</span> <span class="st">&quot;PIT&quot;</span>) </span>
+<span id="cb72-221"><a href="#cb72-221" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(<span class="fu">residuals</span>(qres.m1))</span>
+<span id="cb72-222"><a href="#cb72-222" aria-hidden="true" tabindex="-1"></a><span class="co"># QQ-Plot </span></span>
+<span id="cb72-223"><a href="#cb72-223" aria-hidden="true" tabindex="-1"></a>res <span class="ot">&lt;-</span> <span class="fu">qnorm</span>(<span class="fu">residuals</span>(qres.m1))</span>
+<span id="cb72-224"><a href="#cb72-224" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-225"><a href="#cb72-225" aria-hidden="true" tabindex="-1"></a><span class="co"># QQ-Plot mit ggplot2</span></span>
+<span id="cb72-226"><a href="#cb72-226" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(<span class="fu">data.frame</span>(res), <span class="fu">aes</span>(<span class="at">sample =</span> res)) <span class="sc">+</span></span>
+<span id="cb72-227"><a href="#cb72-227" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stat_qq</span>(<span class="at">color =</span> <span class="st">&quot;steelblue&quot;</span>, <span class="at">size =</span> <span class="dv">2</span>) <span class="sc">+</span></span>
+<span id="cb72-228"><a href="#cb72-228" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stat_qq_line</span>(<span class="at">color =</span> <span class="st">&quot;firebrick&quot;</span>, <span class="at">linetype =</span> <span class="st">&quot;dashed&quot;</span>) <span class="sc">+</span></span>
+<span id="cb72-229"><a href="#cb72-229" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb72-230"><a href="#cb72-230" aria-hidden="true" tabindex="-1"></a>     <span class="at">title =</span> <span class="st">&quot;QQ Plot of Transformed Residuals&quot;</span>,</span>
+<span id="cb72-231"><a href="#cb72-231" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">&quot;Theoretical Quantiles&quot;</span>,</span>
+<span id="cb72-232"><a href="#cb72-232" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">&quot;Observed Quantiles&quot;</span></span>
+<span id="cb72-233"><a href="#cb72-233" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb72-234"><a href="#cb72-234" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>(<span class="at">base_size =</span> <span class="dv">14</span>)</span>
+<span id="cb72-235"><a href="#cb72-235" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-236"><a href="#cb72-236" aria-hidden="true" tabindex="-1"></a>plots1 <span class="ot">&lt;-</span> <span class="fu">plot_violin_residuals</span>(qres.m1, pisa2018, <span class="st">&quot;Residual Diagnostics Full model&quot;</span>)</span>
+<span id="cb72-237"><a href="#cb72-237" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(plots1)</span>
+<span id="cb72-238"><a href="#cb72-238" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-239"><a href="#cb72-239" aria-hidden="true" tabindex="-1"></a>qres.m2<span class="ot">=</span><span class="fu">createDHARMa</span>(<span class="at">simulatedResponse =</span> <span class="fu">t</span>(posterior_predictions[[<span class="dv">2</span>]]), </span>
+<span id="cb72-240"><a href="#cb72-240" aria-hidden="true" tabindex="-1"></a>                          <span class="at">observedResponse =</span> pisa2018<span class="sc">$</span>bel01, </span>
+<span id="cb72-241"><a href="#cb72-241" aria-hidden="true" tabindex="-1"></a>                          <span class="at">fittedPredictedResponse =</span> <span class="fu">apply</span>(posterior_predictions[[<span class="dv">2</span>]], <span class="dv">2</span>, <span class="cf">function</span>(x) <span class="fu">ifelse</span>(<span class="fu">median</span>(x) <span class="sc">==</span> <span class="fl">0.5</span>, <span class="dv">1</span>, <span class="fu">median</span>(x))), <span class="at">integerResponse =</span> T, <span class="at">seed =</span> <span class="dv">123</span>, <span class="at">method =</span> <span class="st">&quot;PIT&quot;</span>) </span>
+<span id="cb72-242"><a href="#cb72-242" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(<span class="fu">residuals</span>(qres.m2))</span>
+<span id="cb72-243"><a href="#cb72-243" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-244"><a href="#cb72-244" aria-hidden="true" tabindex="-1"></a><span class="co"># QQ-Plot </span></span>
+<span id="cb72-245"><a href="#cb72-245" aria-hidden="true" tabindex="-1"></a>res2 <span class="ot">&lt;-</span> <span class="fu">qnorm</span>(<span class="fu">residuals</span>(qres.m2))</span>
+<span id="cb72-246"><a href="#cb72-246" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-247"><a href="#cb72-247" aria-hidden="true" tabindex="-1"></a><span class="co"># QQ-Plot mit ggplot2</span></span>
+<span id="cb72-248"><a href="#cb72-248" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(<span class="fu">data.frame</span>(res2), <span class="fu">aes</span>(<span class="at">sample =</span> res2)) <span class="sc">+</span></span>
+<span id="cb72-249"><a href="#cb72-249" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stat_qq</span>(<span class="at">color =</span> <span class="st">&quot;steelblue&quot;</span>, <span class="at">size =</span> <span class="dv">2</span>) <span class="sc">+</span></span>
+<span id="cb72-250"><a href="#cb72-250" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stat_qq_line</span>(<span class="at">color =</span> <span class="st">&quot;firebrick&quot;</span>, <span class="at">linetype =</span> <span class="st">&quot;dashed&quot;</span>) <span class="sc">+</span></span>
+<span id="cb72-251"><a href="#cb72-251" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb72-252"><a href="#cb72-252" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">&quot;QQ Plot of Transformed Residuals&quot;</span>,</span>
+<span id="cb72-253"><a href="#cb72-253" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">&quot;Theoretical Quantiles&quot;</span>,</span>
+<span id="cb72-254"><a href="#cb72-254" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">&quot;Observed Quantiles&quot;</span></span>
+<span id="cb72-255"><a href="#cb72-255" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb72-256"><a href="#cb72-256" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>(<span class="at">base_size =</span> <span class="dv">14</span>)</span>
+<span id="cb72-257"><a href="#cb72-257" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-258"><a href="#cb72-258" aria-hidden="true" tabindex="-1"></a>plots2 <span class="ot">&lt;-</span> <span class="fu">plot_violin_residuals</span>(qres.m2, pisa2018, <span class="st">&quot;Residual Diagnostics Background model&quot;</span>)</span>
+<span id="cb72-259"><a href="#cb72-259" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(plots2)</span>
+<span id="cb72-260"><a href="#cb72-260" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb72-261"><a href="#cb72-261" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-262"><a href="#cb72-262" aria-hidden="true" tabindex="-1"></a><span class="fu">## PPN based on Kolmogorov distance</span></span>
+<span id="cb72-263"><a href="#cb72-263" aria-hidden="true" tabindex="-1"></a><span class="in">```{r KDs}</span></span>
+<span id="cb72-264"><a href="#cb72-264" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-265"><a href="#cb72-265" aria-hidden="true" tabindex="-1"></a><span class="co"># Compute Kolmogorov distance</span></span>
+<span id="cb72-266"><a href="#cb72-266" aria-hidden="true" tabindex="-1"></a>kds <span class="ot">&lt;-</span> <span class="fu">KD</span>(<span class="at">ypredCore =</span> posterior_predictions[[<span class="dv">1</span>]], <span class="at">yrep =</span> posterior_predictions[[<span class="dv">2</span>]])</span>
+<span id="cb72-267"><a href="#cb72-267" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb72-268"><a href="#cb72-268" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb72-269"><a href="#cb72-269" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-270"><a href="#cb72-270" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-271"><a href="#cb72-271" aria-hidden="true" tabindex="-1"></a><span class="co"># Tabelle 1: Summary</span></span>
-<span id="cb72-272"><a href="#cb72-272" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(kds[[<span class="dv">1</span>]], <span class="at">digits =</span> <span class="dv">3</span>, <span class="at">caption =</span> <span class="st">&quot;Bull &amp; ATT04&quot;</span>)</span>
-<span id="cb72-273"><a href="#cb72-273" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-274"><a href="#cb72-274" aria-hidden="true" tabindex="-1"></a><span class="co"># Tabelle 2: Details</span></span>
-<span id="cb72-275"><a href="#cb72-275" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(kds[[<span class="dv">2</span>]], <span class="at">digits =</span> <span class="dv">3</span>, <span class="at">caption =</span> <span class="st">&quot;Bull&quot;</span>)</span>
-<span id="cb72-276"><a href="#cb72-276" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-277"><a href="#cb72-277" aria-hidden="true" tabindex="-1"></a><span class="co"># Tabelle 3: Diagnostics</span></span>
-<span id="cb72-278"><a href="#cb72-278" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(kds[[<span class="dv">3</span>]], <span class="at">digits =</span> <span class="dv">3</span>, <span class="at">caption =</span> <span class="st">&quot;ATT04&quot;</span>)</span>
+<span id="cb72-270"><a href="#cb72-270" aria-hidden="true" tabindex="-1"></a><span class="co"># Tabelle 1: Summary</span></span>
+<span id="cb72-271"><a href="#cb72-271" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(kds[[<span class="dv">1</span>]], <span class="at">digits =</span> <span class="dv">3</span>, <span class="at">caption =</span> <span class="st">&quot;Bull &amp; ATT04&quot;</span>)</span>
+<span id="cb72-272"><a href="#cb72-272" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-273"><a href="#cb72-273" aria-hidden="true" tabindex="-1"></a><span class="co"># Tabelle 2: Details</span></span>
+<span id="cb72-274"><a href="#cb72-274" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(kds[[<span class="dv">2</span>]], <span class="at">digits =</span> <span class="dv">3</span>, <span class="at">caption =</span> <span class="st">&quot;Bull&quot;</span>)</span>
+<span id="cb72-275"><a href="#cb72-275" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-276"><a href="#cb72-276" aria-hidden="true" tabindex="-1"></a><span class="co"># Tabelle 3: Diagnostics</span></span>
+<span id="cb72-277"><a href="#cb72-277" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(kds[[<span class="dv">3</span>]], <span class="at">digits =</span> <span class="dv">3</span>, <span class="at">caption =</span> <span class="st">&quot;ATT04&quot;</span>)</span>
+<span id="cb72-278"><a href="#cb72-278" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb72-279"><a href="#cb72-279" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-280"><a href="#cb72-280" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-281"><a href="#cb72-281" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb72-282"><a href="#cb72-282" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-283"><a href="#cb72-283" aria-hidden="true" tabindex="-1"></a><span class="fu">## Posterior predictive checks</span></span>
-<span id="cb72-284"><a href="#cb72-284" aria-hidden="true" tabindex="-1"></a><span class="in">```{r ppcs}</span></span>
-<span id="cb72-285"><a href="#cb72-285" aria-hidden="true" tabindex="-1"></a><span class="fu">color_scheme_set</span>(<span class="at">scheme =</span> <span class="st">&quot;pink&quot;</span>)</span>
-<span id="cb72-286"><a href="#cb72-286" aria-hidden="true" tabindex="-1"></a>ppcModelFull <span class="ot">&lt;-</span> <span class="fu">visualPPC</span>(<span class="at">y.obs =</span> pisa2018<span class="sc">$</span>bel01, <span class="at">yrepM =</span> posterior_predictions[[<span class="dv">1</span>]])</span>
-<span id="cb72-287"><a href="#cb72-287" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-288"><a href="#cb72-288" aria-hidden="true" tabindex="-1"></a>ppcModelFull</span>
+<span id="cb72-280"><a href="#cb72-280" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb72-281"><a href="#cb72-281" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-282"><a href="#cb72-282" aria-hidden="true" tabindex="-1"></a><span class="fu">## Posterior predictive checks</span></span>
+<span id="cb72-283"><a href="#cb72-283" aria-hidden="true" tabindex="-1"></a><span class="in">```{r ppcs}</span></span>
+<span id="cb72-284"><a href="#cb72-284" aria-hidden="true" tabindex="-1"></a><span class="fu">color_scheme_set</span>(<span class="at">scheme =</span> <span class="st">&quot;pink&quot;</span>)</span>
+<span id="cb72-285"><a href="#cb72-285" aria-hidden="true" tabindex="-1"></a>ppcModelFull <span class="ot">&lt;-</span> <span class="fu">visualPPC</span>(<span class="at">y.obs =</span> pisa2018<span class="sc">$</span>bel01, <span class="at">yrepM =</span> posterior_predictions[[<span class="dv">1</span>]])</span>
+<span id="cb72-286"><a href="#cb72-286" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-287"><a href="#cb72-287" aria-hidden="true" tabindex="-1"></a>ppcModelFull</span>
+<span id="cb72-288"><a href="#cb72-288" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb72-289"><a href="#cb72-289" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-290"><a href="#cb72-290" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-291"><a href="#cb72-291" aria-hidden="true" tabindex="-1"></a><span class="fu">color_scheme_set</span>(<span class="at">scheme =</span> <span class="st">&quot;blue&quot;</span>)</span>
-<span id="cb72-292"><a href="#cb72-292" aria-hidden="true" tabindex="-1"></a><span class="co">#color_scheme_set(scheme = &quot;gray&quot;)</span></span>
-<span id="cb72-293"><a href="#cb72-293" aria-hidden="true" tabindex="-1"></a>ppcModelBG <span class="ot">&lt;-</span> <span class="fu">visualPPC</span>(<span class="at">y.obs =</span> pisa2018<span class="sc">$</span>bel01, <span class="at">yrepM =</span> posterior_predictions[[<span class="dv">2</span>]])</span>
-<span id="cb72-294"><a href="#cb72-294" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-295"><a href="#cb72-295" aria-hidden="true" tabindex="-1"></a>ppcModelBG</span>
-<span id="cb72-296"><a href="#cb72-296" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb72-297"><a href="#cb72-297" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-298"><a href="#cb72-298" aria-hidden="true" tabindex="-1"></a><span class="fu">## Compute Bayesian p-values</span></span>
-<span id="cb72-299"><a href="#cb72-299" aria-hidden="true" tabindex="-1"></a><span class="in">```{r Bayesian p value}</span></span>
-<span id="cb72-300"><a href="#cb72-300" aria-hidden="true" tabindex="-1"></a><span class="co"># https://search.r-project.org/CRAN/refmans/HuraultMisc/html/post_pred_pval.html</span></span>
-<span id="cb72-301"><a href="#cb72-301" aria-hidden="true" tabindex="-1"></a><span class="co">#library(&quot;kableExtra&quot;)</span></span>
-<span id="cb72-302"><a href="#cb72-302" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-303"><a href="#cb72-303" aria-hidden="true" tabindex="-1"></a>num <span class="ot">&lt;-</span> <span class="dv">3</span></span>
-<span id="cb72-304"><a href="#cb72-304" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-305"><a href="#cb72-305" aria-hidden="true" tabindex="-1"></a>pppvModelFull <span class="ot">&lt;-</span> <span class="fu">two.sided.pppv</span>(<span class="at">y.obs =</span> pisa2018<span class="sc">$</span>bel01, <span class="at">yrepM =</span> posterior_predictions[[<span class="dv">1</span>]], <span class="at">alternative =</span> <span class="st">&quot;two.sided&quot;</span>)</span>
-<span id="cb72-306"><a href="#cb72-306" aria-hidden="true" tabindex="-1"></a><span class="co">#kable(kds[[3]], digits = 3, caption = &quot;ATT04&quot;)</span></span>
-<span id="cb72-307"><a href="#cb72-307" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-308"><a href="#cb72-308" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(<span class="fu">matrix</span>(pppvModelFull[[<span class="dv">1</span>]],<span class="at">nrow =</span> <span class="dv">2</span>,<span class="at">byrow=</span><span class="cn">TRUE</span>),  <span class="at">digits =</span> <span class="dv">3</span>, <span class="at">caption =</span> <span class="st">&quot;Bull x ATT04&quot;</span>)</span>
-<span id="cb72-309"><a href="#cb72-309" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(<span class="fu">matrix</span>(pppvModelFull[[<span class="dv">2</span>]],<span class="at">nrow =</span> <span class="dv">2</span>,<span class="at">byrow=</span><span class="cn">TRUE</span>),  <span class="at">digits =</span> <span class="dv">3</span>, <span class="at">caption =</span> <span class="st">&quot;Bull&quot;</span>)</span>
-<span id="cb72-310"><a href="#cb72-310" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(<span class="fu">matrix</span>(pppvModelFull[[<span class="dv">3</span>]],<span class="at">nrow =</span> <span class="dv">2</span>,<span class="at">byrow=</span><span class="cn">TRUE</span>),  <span class="at">digits =</span> <span class="dv">3</span>, <span class="at">caption =</span> <span class="st">&quot;ATT04&quot;</span>)</span>
+<span id="cb72-290"><a href="#cb72-290" aria-hidden="true" tabindex="-1"></a><span class="fu">color_scheme_set</span>(<span class="at">scheme =</span> <span class="st">&quot;blue&quot;</span>)</span>
+<span id="cb72-291"><a href="#cb72-291" aria-hidden="true" tabindex="-1"></a><span class="co">#color_scheme_set(scheme = &quot;gray&quot;)</span></span>
+<span id="cb72-292"><a href="#cb72-292" aria-hidden="true" tabindex="-1"></a>ppcModelBG <span class="ot">&lt;-</span> <span class="fu">visualPPC</span>(<span class="at">y.obs =</span> pisa2018<span class="sc">$</span>bel01, <span class="at">yrepM =</span> posterior_predictions[[<span class="dv">2</span>]])</span>
+<span id="cb72-293"><a href="#cb72-293" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-294"><a href="#cb72-294" aria-hidden="true" tabindex="-1"></a>ppcModelBG</span>
+<span id="cb72-295"><a href="#cb72-295" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb72-296"><a href="#cb72-296" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-297"><a href="#cb72-297" aria-hidden="true" tabindex="-1"></a><span class="fu">## Compute Bayesian p-values</span></span>
+<span id="cb72-298"><a href="#cb72-298" aria-hidden="true" tabindex="-1"></a><span class="in">```{r Bayesian p value}</span></span>
+<span id="cb72-299"><a href="#cb72-299" aria-hidden="true" tabindex="-1"></a><span class="co"># https://search.r-project.org/CRAN/refmans/HuraultMisc/html/post_pred_pval.html</span></span>
+<span id="cb72-300"><a href="#cb72-300" aria-hidden="true" tabindex="-1"></a><span class="co">#library(&quot;kableExtra&quot;)</span></span>
+<span id="cb72-301"><a href="#cb72-301" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-302"><a href="#cb72-302" aria-hidden="true" tabindex="-1"></a>num <span class="ot">&lt;-</span> <span class="dv">3</span></span>
+<span id="cb72-303"><a href="#cb72-303" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-304"><a href="#cb72-304" aria-hidden="true" tabindex="-1"></a>pppvModelFull <span class="ot">&lt;-</span> <span class="fu">two.sided.pppv</span>(<span class="at">y.obs =</span> pisa2018<span class="sc">$</span>bel01, <span class="at">yrepM =</span> posterior_predictions[[<span class="dv">1</span>]], <span class="at">alternative =</span> <span class="st">&quot;two.sided&quot;</span>)</span>
+<span id="cb72-305"><a href="#cb72-305" aria-hidden="true" tabindex="-1"></a><span class="co">#kable(kds[[3]], digits = 3, caption = &quot;ATT04&quot;)</span></span>
+<span id="cb72-306"><a href="#cb72-306" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-307"><a href="#cb72-307" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(<span class="fu">matrix</span>(pppvModelFull[[<span class="dv">1</span>]],<span class="at">nrow =</span> <span class="dv">2</span>,<span class="at">byrow=</span><span class="cn">TRUE</span>),  <span class="at">digits =</span> <span class="dv">3</span>, <span class="at">caption =</span> <span class="st">&quot;Bull x ATT04&quot;</span>)</span>
+<span id="cb72-308"><a href="#cb72-308" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(<span class="fu">matrix</span>(pppvModelFull[[<span class="dv">2</span>]],<span class="at">nrow =</span> <span class="dv">2</span>,<span class="at">byrow=</span><span class="cn">TRUE</span>),  <span class="at">digits =</span> <span class="dv">3</span>, <span class="at">caption =</span> <span class="st">&quot;Bull&quot;</span>)</span>
+<span id="cb72-309"><a href="#cb72-309" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(<span class="fu">matrix</span>(pppvModelFull[[<span class="dv">3</span>]],<span class="at">nrow =</span> <span class="dv">2</span>,<span class="at">byrow=</span><span class="cn">TRUE</span>),  <span class="at">digits =</span> <span class="dv">3</span>, <span class="at">caption =</span> <span class="st">&quot;ATT04&quot;</span>)</span>
+<span id="cb72-310"><a href="#cb72-310" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb72-311"><a href="#cb72-311" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-312"><a href="#cb72-312" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-313"><a href="#cb72-313" aria-hidden="true" tabindex="-1"></a>pppvModelBG <span class="ot">&lt;-</span> <span class="fu">two.sided.pppv</span>(<span class="at">y.obs =</span> pisa2018<span class="sc">$</span>bel01, <span class="at">yrepM =</span> posterior_predictions[[<span class="dv">2</span>]], <span class="at">alternative =</span> <span class="st">&quot;two.sided&quot;</span>)</span>
+<span id="cb72-312"><a href="#cb72-312" aria-hidden="true" tabindex="-1"></a>pppvModelBG <span class="ot">&lt;-</span> <span class="fu">two.sided.pppv</span>(<span class="at">y.obs =</span> pisa2018<span class="sc">$</span>bel01, <span class="at">yrepM =</span> posterior_predictions[[<span class="dv">2</span>]], <span class="at">alternative =</span> <span class="st">&quot;two.sided&quot;</span>)</span>
+<span id="cb72-313"><a href="#cb72-313" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb72-314"><a href="#cb72-314" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-315"><a href="#cb72-315" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-316"><a href="#cb72-316" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(<span class="fu">matrix</span>(pppvModelBG[[<span class="dv">1</span>]],<span class="at">nrow =</span> <span class="dv">2</span>,<span class="at">byrow=</span><span class="cn">TRUE</span>), <span class="at">digits =</span> <span class="dv">3</span>, <span class="at">caption =</span> <span class="st">&quot;Bull x ATT04&quot;</span>)</span>
-<span id="cb72-317"><a href="#cb72-317" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(<span class="fu">matrix</span>(pppvModelBG[[<span class="dv">2</span>]],<span class="at">nrow =</span> <span class="dv">2</span>,<span class="at">byrow=</span><span class="cn">TRUE</span>), <span class="at">digits =</span> <span class="dv">3</span>, <span class="at">caption =</span> <span class="st">&quot;Bull&quot;</span>)</span>
-<span id="cb72-318"><a href="#cb72-318" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(<span class="fu">matrix</span>(pppvModelBG[[<span class="dv">3</span>]],<span class="at">nrow =</span> <span class="dv">2</span>,<span class="at">byrow=</span><span class="cn">TRUE</span>), <span class="at">digits =</span> <span class="dv">3</span>, <span class="at">caption =</span> <span class="st">&quot;ATT04&quot;</span>)</span>
-<span id="cb72-319"><a href="#cb72-319" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-320"><a href="#cb72-320" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb72-321"><a href="#cb72-321" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-322"><a href="#cb72-322" aria-hidden="true" tabindex="-1"></a><span class="fu">## Compute Brier scores</span></span>
-<span id="cb72-323"><a href="#cb72-323" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-324"><a href="#cb72-324" aria-hidden="true" tabindex="-1"></a><span class="in">```{r Brier scores of cands}</span></span>
-<span id="cb72-325"><a href="#cb72-325" aria-hidden="true" tabindex="-1"></a><span class="co"># Brier Scores berechnen</span></span>
-<span id="cb72-326"><a href="#cb72-326" aria-hidden="true" tabindex="-1"></a>br <span class="ot">&lt;-</span> <span class="fu">list</span>()</span>
-<span id="cb72-327"><a href="#cb72-327" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">2</span>) {</span>
-<span id="cb72-328"><a href="#cb72-328" aria-hidden="true" tabindex="-1"></a>  br[[i]] <span class="ot">&lt;-</span> <span class="fu">brierS</span>(pisa2018<span class="sc">$</span>bel01, <span class="fu">colMeans</span>(posterior_predictions[[i]]))</span>
-<span id="cb72-329"><a href="#cb72-329" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb72-330"><a href="#cb72-330" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-331"><a href="#cb72-331" aria-hidden="true" tabindex="-1"></a><span class="co"># In Data Frame umwandeln</span></span>
-<span id="cb72-332"><a href="#cb72-332" aria-hidden="true" tabindex="-1"></a>brier_df <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
-<span id="cb72-333"><a href="#cb72-333" aria-hidden="true" tabindex="-1"></a>  <span class="at">Model =</span> <span class="fu">c</span>(<span class="st">&quot;full&quot;</span>, <span class="st">&quot;bg&quot;</span>),</span>
-<span id="cb72-334"><a href="#cb72-334" aria-hidden="true" tabindex="-1"></a>  <span class="at">BrierScore =</span> <span class="fu">unlist</span>(br)</span>
-<span id="cb72-335"><a href="#cb72-335" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb72-336"><a href="#cb72-336" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-337"><a href="#cb72-337" aria-hidden="true" tabindex="-1"></a><span class="co"># Ausgabe als Tabelle</span></span>
-<span id="cb72-338"><a href="#cb72-338" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(brier_df, <span class="at">digits =</span> <span class="dv">3</span>, <span class="at">caption =</span> <span class="st">&quot;Brier Scores for Models full and bg&quot;</span>)</span>
+<span id="cb72-315"><a href="#cb72-315" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(<span class="fu">matrix</span>(pppvModelBG[[<span class="dv">1</span>]],<span class="at">nrow =</span> <span class="dv">2</span>,<span class="at">byrow=</span><span class="cn">TRUE</span>), <span class="at">digits =</span> <span class="dv">3</span>, <span class="at">caption =</span> <span class="st">&quot;Bull x ATT04&quot;</span>)</span>
+<span id="cb72-316"><a href="#cb72-316" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(<span class="fu">matrix</span>(pppvModelBG[[<span class="dv">2</span>]],<span class="at">nrow =</span> <span class="dv">2</span>,<span class="at">byrow=</span><span class="cn">TRUE</span>), <span class="at">digits =</span> <span class="dv">3</span>, <span class="at">caption =</span> <span class="st">&quot;Bull&quot;</span>)</span>
+<span id="cb72-317"><a href="#cb72-317" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(<span class="fu">matrix</span>(pppvModelBG[[<span class="dv">3</span>]],<span class="at">nrow =</span> <span class="dv">2</span>,<span class="at">byrow=</span><span class="cn">TRUE</span>), <span class="at">digits =</span> <span class="dv">3</span>, <span class="at">caption =</span> <span class="st">&quot;ATT04&quot;</span>)</span>
+<span id="cb72-318"><a href="#cb72-318" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-319"><a href="#cb72-319" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb72-320"><a href="#cb72-320" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-321"><a href="#cb72-321" aria-hidden="true" tabindex="-1"></a><span class="fu">## Compute Brier scores</span></span>
+<span id="cb72-322"><a href="#cb72-322" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-323"><a href="#cb72-323" aria-hidden="true" tabindex="-1"></a><span class="in">```{r Brier scores of cands}</span></span>
+<span id="cb72-324"><a href="#cb72-324" aria-hidden="true" tabindex="-1"></a><span class="co"># Brier Scores berechnen</span></span>
+<span id="cb72-325"><a href="#cb72-325" aria-hidden="true" tabindex="-1"></a>br <span class="ot">&lt;-</span> <span class="fu">list</span>()</span>
+<span id="cb72-326"><a href="#cb72-326" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">2</span>) {</span>
+<span id="cb72-327"><a href="#cb72-327" aria-hidden="true" tabindex="-1"></a>  br[[i]] <span class="ot">&lt;-</span> <span class="fu">brierS</span>(pisa2018<span class="sc">$</span>bel01, <span class="fu">colMeans</span>(posterior_predictions[[i]]))</span>
+<span id="cb72-328"><a href="#cb72-328" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb72-329"><a href="#cb72-329" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-330"><a href="#cb72-330" aria-hidden="true" tabindex="-1"></a><span class="co"># In Data Frame umwandeln</span></span>
+<span id="cb72-331"><a href="#cb72-331" aria-hidden="true" tabindex="-1"></a>brier_df <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb72-332"><a href="#cb72-332" aria-hidden="true" tabindex="-1"></a>  <span class="at">Model =</span> <span class="fu">c</span>(<span class="st">&quot;full&quot;</span>, <span class="st">&quot;bg&quot;</span>),</span>
+<span id="cb72-333"><a href="#cb72-333" aria-hidden="true" tabindex="-1"></a>  <span class="at">BrierScore =</span> <span class="fu">unlist</span>(br)</span>
+<span id="cb72-334"><a href="#cb72-334" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb72-335"><a href="#cb72-335" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-336"><a href="#cb72-336" aria-hidden="true" tabindex="-1"></a><span class="co"># Ausgabe als Tabelle</span></span>
+<span id="cb72-337"><a href="#cb72-337" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(brier_df, <span class="at">digits =</span> <span class="dv">3</span>, <span class="at">caption =</span> <span class="st">&quot;Brier Scores for Models full and bg&quot;</span>)</span>
+<span id="cb72-338"><a href="#cb72-338" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb72-339"><a href="#cb72-339" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-340"><a href="#cb72-340" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-341"><a href="#cb72-341" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb72-342"><a href="#cb72-342" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-343"><a href="#cb72-343" aria-hidden="true" tabindex="-1"></a><span class="fu"># Summarizing results based on the posterior distribution of full model</span></span>
-<span id="cb72-344"><a href="#cb72-344" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-345"><a href="#cb72-345" aria-hidden="true" tabindex="-1"></a><span class="in">```{r Summarizing results}</span></span>
-<span id="cb72-346"><a href="#cb72-346" aria-hidden="true" tabindex="-1"></a><span class="co"># For each quartile compute the median ATT01.</span></span>
-<span id="cb72-347"><a href="#cb72-347" aria-hidden="true" tabindex="-1"></a>pisa18condPr1 <span class="ot">&lt;-</span> pisa2018 <span class="sc">%&gt;%</span></span>
-<span id="cb72-348"><a href="#cb72-348" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(ATT4) <span class="sc">%&gt;%</span></span>
-<span id="cb72-349"><a href="#cb72-349" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">mATT01 =</span> <span class="fu">median</span>(ATT01), <span class="at">sd =</span> <span class="fu">sd</span>(ATT01),<span class="at">min =</span> <span class="fu">min</span>(ATT01),<span class="at">max =</span> <span class="fu">max</span>(ATT01))</span>
-<span id="cb72-350"><a href="#cb72-350" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-351"><a href="#cb72-351" aria-hidden="true" tabindex="-1"></a>meancondPr1 <span class="ot">&lt;-</span> pisa18condPr1<span class="sc">$</span>mATT01</span>
-<span id="cb72-352"><a href="#cb72-352" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-353"><a href="#cb72-353" aria-hidden="true" tabindex="-1"></a>meancondPr1</span>
-<span id="cb72-354"><a href="#cb72-354" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-355"><a href="#cb72-355" aria-hidden="true" tabindex="-1"></a>squcondPr <span class="ot">&lt;-</span> <span class="fu">split</span>(pisa2018,<span class="at">f =</span> <span class="fu">list</span>(pisa2018<span class="sc">$</span>ATT4,pisa2018<span class="sc">$</span>bull))</span>
+<span id="cb72-340"><a href="#cb72-340" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb72-341"><a href="#cb72-341" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-342"><a href="#cb72-342" aria-hidden="true" tabindex="-1"></a><span class="fu"># Summarizing results based on the posterior distribution of full model</span></span>
+<span id="cb72-343"><a href="#cb72-343" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-344"><a href="#cb72-344" aria-hidden="true" tabindex="-1"></a><span class="in">```{r Summarizing results}</span></span>
+<span id="cb72-345"><a href="#cb72-345" aria-hidden="true" tabindex="-1"></a><span class="co"># For each quartile compute the median ATT01.</span></span>
+<span id="cb72-346"><a href="#cb72-346" aria-hidden="true" tabindex="-1"></a>pisa18condPr1 <span class="ot">&lt;-</span> pisa2018 <span class="sc">%&gt;%</span></span>
+<span id="cb72-347"><a href="#cb72-347" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(ATT4) <span class="sc">%&gt;%</span></span>
+<span id="cb72-348"><a href="#cb72-348" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">mATT01 =</span> <span class="fu">median</span>(ATT01), <span class="at">sd =</span> <span class="fu">sd</span>(ATT01),<span class="at">min =</span> <span class="fu">min</span>(ATT01),<span class="at">max =</span> <span class="fu">max</span>(ATT01))</span>
+<span id="cb72-349"><a href="#cb72-349" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-350"><a href="#cb72-350" aria-hidden="true" tabindex="-1"></a>meancondPr1 <span class="ot">&lt;-</span> pisa18condPr1<span class="sc">$</span>mATT01</span>
+<span id="cb72-351"><a href="#cb72-351" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-352"><a href="#cb72-352" aria-hidden="true" tabindex="-1"></a>meancondPr1</span>
+<span id="cb72-353"><a href="#cb72-353" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-354"><a href="#cb72-354" aria-hidden="true" tabindex="-1"></a>squcondPr <span class="ot">&lt;-</span> <span class="fu">split</span>(pisa2018,<span class="at">f =</span> <span class="fu">list</span>(pisa2018<span class="sc">$</span>ATT4,pisa2018<span class="sc">$</span>bull))</span>
+<span id="cb72-355"><a href="#cb72-355" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb72-356"><a href="#cb72-356" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-357"><a href="#cb72-357" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-358"><a href="#cb72-358" aria-hidden="true" tabindex="-1"></a>pint_condPr25 <span class="ot">&lt;-</span> <span class="fu">drawPosteriorInequalityGroup</span>(<span class="at">sgr =</span> squcondPr,<span class="at">fit =</span> fits[[<span class="dv">1</span>]], <span class="at">p =</span> <span class="fl">0.25</span>)</span>
-<span id="cb72-359"><a href="#cb72-359" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-360"><a href="#cb72-360" aria-hidden="true" tabindex="-1"></a>pint_condPr50 <span class="ot">&lt;-</span> <span class="fu">drawPosteriorInequalityGroup</span>(<span class="at">sgr =</span> squcondPr,<span class="at">fit =</span> fits[[<span class="dv">1</span>]], <span class="at">p =</span> <span class="fl">0.5</span>)</span>
-<span id="cb72-361"><a href="#cb72-361" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-362"><a href="#cb72-362" aria-hidden="true" tabindex="-1"></a>pint_condPr75 <span class="ot">&lt;-</span> <span class="fu">drawPosteriorInequalityGroup</span>(<span class="at">sgr =</span> squcondPr,<span class="at">fit =</span> fits[[<span class="dv">1</span>]], <span class="at">p =</span> <span class="fl">0.75</span>)</span>
+<span id="cb72-357"><a href="#cb72-357" aria-hidden="true" tabindex="-1"></a>pint_condPr25 <span class="ot">&lt;-</span> <span class="fu">drawPosteriorInequalityGroup</span>(<span class="at">sgr =</span> squcondPr,<span class="at">fit =</span> fits[[<span class="dv">1</span>]], <span class="at">p =</span> <span class="fl">0.25</span>)</span>
+<span id="cb72-358"><a href="#cb72-358" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-359"><a href="#cb72-359" aria-hidden="true" tabindex="-1"></a>pint_condPr50 <span class="ot">&lt;-</span> <span class="fu">drawPosteriorInequalityGroup</span>(<span class="at">sgr =</span> squcondPr,<span class="at">fit =</span> fits[[<span class="dv">1</span>]], <span class="at">p =</span> <span class="fl">0.5</span>)</span>
+<span id="cb72-360"><a href="#cb72-360" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-361"><a href="#cb72-361" aria-hidden="true" tabindex="-1"></a>pint_condPr75 <span class="ot">&lt;-</span> <span class="fu">drawPosteriorInequalityGroup</span>(<span class="at">sgr =</span> squcondPr,<span class="at">fit =</span> fits[[<span class="dv">1</span>]], <span class="at">p =</span> <span class="fl">0.75</span>)</span>
+<span id="cb72-362"><a href="#cb72-362" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb72-363"><a href="#cb72-363" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-364"><a href="#cb72-364" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-365"><a href="#cb72-365" aria-hidden="true" tabindex="-1"></a>brE <span class="ot">&lt;-</span> <span class="dv">4</span></span>
-<span id="cb72-366"><a href="#cb72-366" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-367"><a href="#cb72-367" aria-hidden="true" tabindex="-1"></a>df_condPr25 <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">x =</span> <span class="fu">rep</span>(<span class="fu">round</span>(meancondPr1,<span class="dv">2</span>),<span class="dv">2</span>),</span>
-<span id="cb72-368"><a href="#cb72-368" aria-hidden="true" tabindex="-1"></a>                          <span class="at">group =</span> <span class="fu">c</span>(<span class="fu">rep</span>(<span class="st">&quot;nbull.&quot;</span>,brE),<span class="fu">rep</span>(<span class="st">&quot;bull.&quot;</span>,brE)),</span>
-<span id="cb72-369"><a href="#cb72-369" aria-hidden="true" tabindex="-1"></a>                          <span class="at">mean =</span>  pint_condPr25[,<span class="dv">2</span>],<span class="at">low =</span> pint_condPr25[,<span class="dv">1</span>], </span>
-<span id="cb72-370"><a href="#cb72-370" aria-hidden="true" tabindex="-1"></a>                          <span class="at">up =</span> pint_condPr25[,<span class="dv">3</span>])</span>
-<span id="cb72-371"><a href="#cb72-371" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-372"><a href="#cb72-372" aria-hidden="true" tabindex="-1"></a>df_condPr50 <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">x =</span> <span class="fu">rep</span>(<span class="fu">round</span>(meancondPr1,<span class="dv">2</span>),<span class="dv">2</span>),</span>
-<span id="cb72-373"><a href="#cb72-373" aria-hidden="true" tabindex="-1"></a>                        <span class="at">group =</span> <span class="fu">c</span>(<span class="fu">rep</span>(<span class="st">&quot;nbull.&quot;</span>,brE),<span class="fu">rep</span>(<span class="st">&quot;bull.&quot;</span>,brE)),</span>
-<span id="cb72-374"><a href="#cb72-374" aria-hidden="true" tabindex="-1"></a>                        <span class="at">mean =</span>  pint_condPr50[,<span class="dv">2</span>],<span class="at">low =</span> pint_condPr50[,<span class="dv">1</span>], </span>
-<span id="cb72-375"><a href="#cb72-375" aria-hidden="true" tabindex="-1"></a>                        <span class="at">up =</span> pint_condPr50[,<span class="dv">3</span>])</span>
-<span id="cb72-376"><a href="#cb72-376" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-377"><a href="#cb72-377" aria-hidden="true" tabindex="-1"></a>df_condPr75 <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">x =</span> <span class="fu">rep</span>(<span class="fu">round</span>(meancondPr1,<span class="dv">2</span>),<span class="dv">2</span>),</span>
-<span id="cb72-378"><a href="#cb72-378" aria-hidden="true" tabindex="-1"></a>                          <span class="at">group =</span> <span class="fu">c</span>(<span class="fu">rep</span>(<span class="st">&quot;nbull.&quot;</span>,brE),<span class="fu">rep</span>(<span class="st">&quot;bull.&quot;</span>,brE)),</span>
-<span id="cb72-379"><a href="#cb72-379" aria-hidden="true" tabindex="-1"></a>                          <span class="at">mean =</span>  pint_condPr75[,<span class="dv">2</span>],<span class="at">low =</span> pint_condPr75[,<span class="dv">1</span>], </span>
-<span id="cb72-380"><a href="#cb72-380" aria-hidden="true" tabindex="-1"></a>                          <span class="at">up =</span> pint_condPr75[,<span class="dv">3</span>])</span>
-<span id="cb72-381"><a href="#cb72-381" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-382"><a href="#cb72-382" aria-hidden="true" tabindex="-1"></a>lowQ <span class="ot">&lt;-</span> <span class="fu">c</span>(pint_condPr25[,<span class="dv">1</span>],pint_condPr50[,<span class="dv">1</span>],pint_condPr75[,<span class="dv">1</span>])</span>
-<span id="cb72-383"><a href="#cb72-383" aria-hidden="true" tabindex="-1"></a>med <span class="ot">&lt;-</span>  <span class="fu">c</span>(pint_condPr25[,<span class="dv">2</span>],pint_condPr50[,<span class="dv">2</span>],pint_condPr75[,<span class="dv">2</span>])</span>
-<span id="cb72-384"><a href="#cb72-384" aria-hidden="true" tabindex="-1"></a>upQ <span class="ot">&lt;-</span>  <span class="fu">c</span>(pint_condPr25[,<span class="dv">3</span>],pint_condPr50[,<span class="dv">3</span>],pint_condPr75[,<span class="dv">3</span>])</span>
+<span id="cb72-364"><a href="#cb72-364" aria-hidden="true" tabindex="-1"></a>brE <span class="ot">&lt;-</span> <span class="dv">4</span></span>
+<span id="cb72-365"><a href="#cb72-365" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-366"><a href="#cb72-366" aria-hidden="true" tabindex="-1"></a>df_condPr25 <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">x =</span> <span class="fu">rep</span>(<span class="fu">round</span>(meancondPr1,<span class="dv">2</span>),<span class="dv">2</span>),</span>
+<span id="cb72-367"><a href="#cb72-367" aria-hidden="true" tabindex="-1"></a>                          <span class="at">group =</span> <span class="fu">c</span>(<span class="fu">rep</span>(<span class="st">&quot;nbull.&quot;</span>,brE),<span class="fu">rep</span>(<span class="st">&quot;bull.&quot;</span>,brE)),</span>
+<span id="cb72-368"><a href="#cb72-368" aria-hidden="true" tabindex="-1"></a>                          <span class="at">mean =</span>  pint_condPr25[,<span class="dv">2</span>],<span class="at">low =</span> pint_condPr25[,<span class="dv">1</span>], </span>
+<span id="cb72-369"><a href="#cb72-369" aria-hidden="true" tabindex="-1"></a>                          <span class="at">up =</span> pint_condPr25[,<span class="dv">3</span>])</span>
+<span id="cb72-370"><a href="#cb72-370" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-371"><a href="#cb72-371" aria-hidden="true" tabindex="-1"></a>df_condPr50 <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">x =</span> <span class="fu">rep</span>(<span class="fu">round</span>(meancondPr1,<span class="dv">2</span>),<span class="dv">2</span>),</span>
+<span id="cb72-372"><a href="#cb72-372" aria-hidden="true" tabindex="-1"></a>                        <span class="at">group =</span> <span class="fu">c</span>(<span class="fu">rep</span>(<span class="st">&quot;nbull.&quot;</span>,brE),<span class="fu">rep</span>(<span class="st">&quot;bull.&quot;</span>,brE)),</span>
+<span id="cb72-373"><a href="#cb72-373" aria-hidden="true" tabindex="-1"></a>                        <span class="at">mean =</span>  pint_condPr50[,<span class="dv">2</span>],<span class="at">low =</span> pint_condPr50[,<span class="dv">1</span>], </span>
+<span id="cb72-374"><a href="#cb72-374" aria-hidden="true" tabindex="-1"></a>                        <span class="at">up =</span> pint_condPr50[,<span class="dv">3</span>])</span>
+<span id="cb72-375"><a href="#cb72-375" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-376"><a href="#cb72-376" aria-hidden="true" tabindex="-1"></a>df_condPr75 <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">x =</span> <span class="fu">rep</span>(<span class="fu">round</span>(meancondPr1,<span class="dv">2</span>),<span class="dv">2</span>),</span>
+<span id="cb72-377"><a href="#cb72-377" aria-hidden="true" tabindex="-1"></a>                          <span class="at">group =</span> <span class="fu">c</span>(<span class="fu">rep</span>(<span class="st">&quot;nbull.&quot;</span>,brE),<span class="fu">rep</span>(<span class="st">&quot;bull.&quot;</span>,brE)),</span>
+<span id="cb72-378"><a href="#cb72-378" aria-hidden="true" tabindex="-1"></a>                          <span class="at">mean =</span>  pint_condPr75[,<span class="dv">2</span>],<span class="at">low =</span> pint_condPr75[,<span class="dv">1</span>], </span>
+<span id="cb72-379"><a href="#cb72-379" aria-hidden="true" tabindex="-1"></a>                          <span class="at">up =</span> pint_condPr75[,<span class="dv">3</span>])</span>
+<span id="cb72-380"><a href="#cb72-380" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-381"><a href="#cb72-381" aria-hidden="true" tabindex="-1"></a>lowQ <span class="ot">&lt;-</span> <span class="fu">c</span>(pint_condPr25[,<span class="dv">1</span>],pint_condPr50[,<span class="dv">1</span>],pint_condPr75[,<span class="dv">1</span>])</span>
+<span id="cb72-382"><a href="#cb72-382" aria-hidden="true" tabindex="-1"></a>med <span class="ot">&lt;-</span>  <span class="fu">c</span>(pint_condPr25[,<span class="dv">2</span>],pint_condPr50[,<span class="dv">2</span>],pint_condPr75[,<span class="dv">2</span>])</span>
+<span id="cb72-383"><a href="#cb72-383" aria-hidden="true" tabindex="-1"></a>upQ <span class="ot">&lt;-</span>  <span class="fu">c</span>(pint_condPr25[,<span class="dv">3</span>],pint_condPr50[,<span class="dv">3</span>],pint_condPr75[,<span class="dv">3</span>])</span>
+<span id="cb72-384"><a href="#cb72-384" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb72-385"><a href="#cb72-385" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-386"><a href="#cb72-386" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-387"><a href="#cb72-387" aria-hidden="true" tabindex="-1"></a>df_condPr1 <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">x =</span> <span class="fu">rep</span>(<span class="fu">round</span>(meancondPr1,<span class="dv">2</span>),<span class="dv">6</span>),</span>
-<span id="cb72-388"><a href="#cb72-388" aria-hidden="true" tabindex="-1"></a>                            <span class="at">group =</span> <span class="fu">c</span>(<span class="fu">rep</span>(<span class="st">&quot;bv = 25%, nb.&quot;</span>,brE),<span class="fu">rep</span>(<span class="st">&quot;bv = 25%, b.&quot;</span>,brE),</span>
-<span id="cb72-389"><a href="#cb72-389" aria-hidden="true" tabindex="-1"></a>                                  <span class="fu">rep</span>(<span class="st">&quot;bv = 50%, nb.&quot;</span>,brE),<span class="fu">rep</span>(<span class="st">&quot;bv = 50%, b.&quot;</span>,brE),</span>
-<span id="cb72-390"><a href="#cb72-390" aria-hidden="true" tabindex="-1"></a>                                  <span class="fu">rep</span>(<span class="st">&quot;bv = 75%, nb.&quot;</span>,brE),<span class="fu">rep</span>(<span class="st">&quot;bv = 75%, b.&quot;</span>,brE)),</span>
-<span id="cb72-391"><a href="#cb72-391" aria-hidden="true" tabindex="-1"></a>                                  <span class="at">mean =</span>  med,<span class="at">low =</span> lowQ, </span>
-<span id="cb72-392"><a href="#cb72-392" aria-hidden="true" tabindex="-1"></a>                                   <span class="at">up =</span> upQ)</span>
+<span id="cb72-386"><a href="#cb72-386" aria-hidden="true" tabindex="-1"></a>df_condPr1 <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">x =</span> <span class="fu">rep</span>(<span class="fu">round</span>(meancondPr1,<span class="dv">2</span>),<span class="dv">6</span>),</span>
+<span id="cb72-387"><a href="#cb72-387" aria-hidden="true" tabindex="-1"></a>                            <span class="at">group =</span> <span class="fu">c</span>(<span class="fu">rep</span>(<span class="st">&quot;bv = 25%, nb.&quot;</span>,brE),<span class="fu">rep</span>(<span class="st">&quot;bv = 25%, b.&quot;</span>,brE),</span>
+<span id="cb72-388"><a href="#cb72-388" aria-hidden="true" tabindex="-1"></a>                                  <span class="fu">rep</span>(<span class="st">&quot;bv = 50%, nb.&quot;</span>,brE),<span class="fu">rep</span>(<span class="st">&quot;bv = 50%, b.&quot;</span>,brE),</span>
+<span id="cb72-389"><a href="#cb72-389" aria-hidden="true" tabindex="-1"></a>                                  <span class="fu">rep</span>(<span class="st">&quot;bv = 75%, nb.&quot;</span>,brE),<span class="fu">rep</span>(<span class="st">&quot;bv = 75%, b.&quot;</span>,brE)),</span>
+<span id="cb72-390"><a href="#cb72-390" aria-hidden="true" tabindex="-1"></a>                                  <span class="at">mean =</span>  med,<span class="at">low =</span> lowQ, </span>
+<span id="cb72-391"><a href="#cb72-391" aria-hidden="true" tabindex="-1"></a>                                   <span class="at">up =</span> upQ)</span>
+<span id="cb72-392"><a href="#cb72-392" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb72-393"><a href="#cb72-393" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-394"><a href="#cb72-394" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-395"><a href="#cb72-395" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(df_condPr1, <span class="at">format =</span> <span class="st">&quot;simple&quot;</span>, <span class="at">digits =</span> <span class="dv">3</span>)</span>
+<span id="cb72-394"><a href="#cb72-394" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(df_condPr1, <span class="at">format =</span> <span class="st">&quot;simple&quot;</span>, <span class="at">digits =</span> <span class="dv">3</span>)</span>
+<span id="cb72-395"><a href="#cb72-395" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb72-396"><a href="#cb72-396" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb72-397"><a href="#cb72-397" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-398"><a href="#cb72-398" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-399"><a href="#cb72-399" aria-hidden="true" tabindex="-1"></a>p_condPr <span class="ot">&lt;-</span> <span class="fu">plot.result</span>(df_condPr1)</span>
+<span id="cb72-398"><a href="#cb72-398" aria-hidden="true" tabindex="-1"></a>p_condPr <span class="ot">&lt;-</span> <span class="fu">plot.result</span>(df_condPr1)</span>
+<span id="cb72-399"><a href="#cb72-399" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb72-400"><a href="#cb72-400" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-401"><a href="#cb72-401" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb72-402"><a href="#cb72-402" aria-hidden="true" tabindex="-1"></a>p_condPr</span>
-<span id="cb72-403"><a href="#cb72-403" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb72-401"><a href="#cb72-401" aria-hidden="true" tabindex="-1"></a>p_condPr</span>
+<span id="cb72-402"><a href="#cb72-402" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div></div></div></div></div>
 </div> <!-- /content -->
 

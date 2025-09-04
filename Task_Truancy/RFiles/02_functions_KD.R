@@ -83,6 +83,17 @@ plot_violin_residuals <- function(qres, data, title) {
     Bull = factor(data$bull),  # Binärer Prädiktor
     ATT4 = factor(data$ATT4)   # Kategorischer Prädiktor mit 4 Levels
   )
+  # define enlarged theme
+  # enlarged theme with explicit font sizes
+  enlarged_theme <- theme_minimal() +
+    theme(
+      text = element_text(size = 20),               # Basisgröße für Text
+      axis.title = element_text(size = 20),         # Achsentitel
+      axis.text = element_text(size = 18),          # Achsentext
+      plot.title = element_text(size = 22, face = "bold"),  # Plot-Titel
+      legend.text = element_text(size = 18),        # Legendentext
+      legend.title = element_text(size = 18)        # Legendentitel
+    )
   
   # creating violin plots
   p1 <- ggplot(res_data, aes(x = Fitted, y = Residuals)) +
