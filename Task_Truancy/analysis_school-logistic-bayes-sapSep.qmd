@@ -114,7 +114,7 @@ glue("{length(VARIABLES$nonfocal)} non-focal variables used for modeling accordi
 
 ## Define model two models, first full model, second background model
 
-```{r  define model,results='hide', message=FALSE, warning=FALSE}
+```{r  define model, results='hide', message=FALSE, warning=FALSE}
 models<-list()
 # Full model, variable selection based on PIM  including focal variables
 models[[1]] <- as.formula(bel01 ~ bull*ATT4 + female + nld +  aca  + val  + nfof  + native+ joyread + goal + mot + res +  ndis_clim    + GYM + UNI  +  NDISH + N_SC + (1 | school.id))
@@ -143,6 +143,8 @@ save(fits, file = file.path(res.path,"fits.RData"))
 summary_list <- lapply(fits, summary) # mcse Rhat n_eff
 # launch_shinystan(fits[[1]])
 # launch_shinystan(fits[[2]])
+# https://lnalborczyk.github.io/blog/2017-10-10-icc/index.html
+# ICC of 0.6 %
 ```
 ## Summary of results
 ```{r Summary of results}
@@ -183,9 +185,6 @@ print(prior_summaries[[2]])
 #  cat("\n----------------------\n")
 #}
 ```
-
-
-
 
 
 
