@@ -262,10 +262,10 @@ Next we compute Spearman correlations between the pairs of predictors. We depict
 
 ### A helper function for network graphs
 
-*   You can adjust the `threshold` to filter weak correlations.
-*    Only numeric variables are used.
-*    You can adapt the layout using `layout_with_kk()` or `layout_nicely()` if desired.
-*    If you don’t want to use `ggraph`, I can provide a base `plot.igraph()` version.
+-   You can adjust the `threshold` to filter weak correlations.
+-   Only numeric variables are used.
+-   You can adapt the layout using `layout_with_kk()` or `layout_nicely()` if desired.
+-   If you don't want to use `ggraph`, I can provide a base `plot.igraph()` version.
 
 ```{r}
 # helper function for correlation network graph
@@ -340,7 +340,6 @@ correlation_network <- function(data, threshold = 0.3, title = "Spearman Correla
 ```
 
 In the following, we depict the network for varying thresholds (edges with correlation coefficients below the threshold are omitted):
-
 
 ```{r}
 correlation_network(women[,c("Weight", "Height", "BMI", "Age", "Neck", "Chest", "Biceps", "Hips", "Waist", "Forearm", "MThigh", "Wrist", "Knee", "Ankle")], threshold = 0.25, title = "Women: correlation network. Threshold=0.25")
