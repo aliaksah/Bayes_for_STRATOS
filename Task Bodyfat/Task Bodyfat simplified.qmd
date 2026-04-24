@@ -258,7 +258,50 @@ The variable Calf and Elbow only exist for women; hence, to be able to validate 
 
 ## Correlation analysis
 
-Next we compute Spearman correlations between the pairs of predictors. We depict the correlation using a network graph.
+Next we compute Spearman correlations between the pairs of predictors. We depict the correlation using heatmaps.
+
+### Bivariate correlation in women
+
+```{r}
+library(reshape2)
+
+relevant_vars <- c("Weight", "Height", "BMI", "Age", "Neck",
+                   "Chest", "Biceps", "Hips", "Waist", "Forearm", "MThigh",
+                   "Wrist", "Knee", "Ankle")
+
+cor_mat_women <- cor(women[,relevant_vars], use = "pairwise.complete.obs", method="spearman")
+cor_df_women <- melt(cor_mat_women, varnames = c("Var1", "Var2"), value.name = "Correlation")
+
+
+ggplot(cor_df_women, aes(Var1, Var2, color = Correlation, size = abs(Correlation))) +
+  geom_point() +
+  scale_color_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
+  scale_size(range = c(1, 5)) +
+  theme_minimal() +
+  coord_fixed() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Correlation Heatmap: women",
+       x = NULL, y = NULL)
+```
+### Bivariate correlation in men
+
+```{r}
+cor_mat_men <- cor(men[,relevant_vars], use = "pairwise.complete.obs", method="spearman")
+cor_df_men <- melt(cor_mat_men, varnames = c("Var1", "Var2"), value.name = "Correlation")
+
+
+ggplot(cor_df_men, aes(Var1, Var2, color = Correlation, size = abs(Correlation))) +
+  geom_point() +
+  scale_color_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
+  scale_size(range = c(1, 5)) +
+  theme_minimal() +
+  coord_fixed() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Correlation Heatmap: men",
+       x = NULL, y = NULL)
+```
+
+
 
 ### A helper function for network graphs
 
