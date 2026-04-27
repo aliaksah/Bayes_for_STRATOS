@@ -28,7 +28,15 @@ format:
   docx: default                               
 ---
 
+
+
+
+
 ## Load libraries
+
+
+
+
 
 ```{r}
 library(mfp2)
@@ -45,13 +53,25 @@ library(Hmisc)
 library(sjlabelled)
 ```
 
+
+
+
+
 # Model estimation
 
 ## Load data
 
+
+
+
+
 ```{r}
 load("Datafiles/bodyfatdata.Rdata")
 ```
+
+
+
+
 
 ## Initial data analysis for women data
 
@@ -73,6 +93,10 @@ The source data dictionary of the college women bodyfat data set is described in
 
 Here we transform the data into long format for purpose of conducting IDA efficiently.
 
+
+
+
+
 ```{r}
 ## transform
 women_long <-
@@ -87,6 +111,10 @@ women_long <-
   mutate(PARAMCD = if_else(PARAMCD == "AgeP", "Age", PARAMCD)) ## rename AGE param code 
 
 ```
+
+
+
+
 
 #### PRE4: domain expertise
 
@@ -107,6 +135,10 @@ There are no missing values in this data set.
 Since there only continuous predictors and a continuous outcome variable involved, we will only consider subdomain U2: continuous variables.
 
 #### Structural variable and key predictors
+
+
+
+
 
 ```{r uni02, message=FALSE, warning =FALSE , echo=FALSE}
 #| layout-ncol: 3
@@ -132,7 +164,15 @@ for (plts in 1:length(key_plts)) {
 
 ```
 
+
+
+
+
 #### Remaining predictors
+
+
+
+
 
 ```{r}
 #| layout-ncol: 3
@@ -153,9 +193,17 @@ for (plts in 1:length(rem_plts)) {
 
 ```
 
+
+
+
+
 ### IDA domain V: multivariate descriptions
 
 #### Key predictors vs. structural variable
+
+
+
+
 
 ```{r}
 library(tidyr)
@@ -194,7 +242,15 @@ for (plts in 1:length(key_plts)) {
 
 ```
 
+
+
+
+
 #### Remaining predictors vs. structural variable
+
+
+
+
 
 ```{r}
 key_plts <- lapply(c("BMI", "Neck", "Chest", "Calf", "Biceps", "Hips", "Waist", "Forearm", "PThigh", "MThigh", "DThigh", "Wrist", "Knee", "Elbow", "Ankle"), function(X) {
@@ -208,6 +264,10 @@ for (plts in 1:length(key_plts)) {
 }
 ```
 
+
+
+
+
 #### Summary of IDA
 
 There seem to be some mismeasured data points in the following variables:
@@ -219,6 +279,10 @@ There seem to be some mismeasured data points in the following variables:
 | 31      | Calf     | Calf == 66    | set to NA |
 | 124     | Knee     | Knee ==24.7   | set to NA |
 | 136     | Elbow    | Elbow == 15.5 | set to NA |
+
+
+
+
 
 ```{r}
 # we first copy the data into an analysis set women_AS
@@ -232,7 +296,15 @@ women_AS$Knee[women_AS$Knee ==24.7] <-  NA
 women_AS$Elbow[women_AS$Elbow == 15.5] <- NA
 ```
 
+
+
+
+
 After this data cleaning, we repeat the IDA with the clean data. Since the missing values are not overlapping, we don't have to pay special attention to their description.
+
+
+
+
 
 ```{r}
 ## transform
@@ -249,7 +321,15 @@ women_long_AS <-
 
 ```
 
+
+
+
+
 #### IDA domain U: univariate descriptions
+
+
+
+
 
 ```{r uni03, message=FALSE, warning =FALSE , echo=FALSE}
 #| layout-ncol: 3
@@ -287,9 +367,17 @@ for (plts in 1:length(rem_plts)) {
 
 ```
 
+
+
+
+
 \#### IDA domain V: Correlation between predictors
 
 Calculate correlation matrix using Spearman correlation coefficient.
+
+
+
+
 
 ```{r mcorrs, message=FALSE, warning=FALSE, echo=FALSE, fig.height=3}
 
@@ -306,7 +394,15 @@ corr_spearman <-
 
 ```
 
+
+
+
+
 The Spearman correlation coefficients are depicted in a quadratic heat map:
+
+
+
+
 
 ```{r plotcorr, message=FALSE, warning=FALSE, echo=FALSE, fig.width = 16, fig.height=16}
 
@@ -328,13 +424,25 @@ corr_spearman_disp <- cbind(term=corr_spearman$term, round(corr_spearman[,-1]*10
 print(corr_spearman_disp)
 ```
 
+
+
+
+
 ### Plot of the variables PThigh, MThigh, DThigh
+
+
+
+
 
 ```{r}
 ggplot(data=women_AS, aes(x=PThigh, y=MThigh)) + geom_point()
 ggplot(data=women_AS, aes(x=PThigh, y=DThigh)) + geom_point()
 ggplot(data=women_AS, aes(x=DThigh, y=MThigh)) + geom_point()
 ```
+
+
+
+
 
 ### Summary from IDA
 
@@ -352,6 +460,10 @@ The key predictors Waist, Weight and Height have correlations of:
 
 #### Model M1
 
+
+
+
+
 ```{r, message=FALSE}
 library(mfp2)
 
@@ -362,7 +474,15 @@ M1 <- mfp2(x=x, y=y, select=1, df=4, criterion="aic")
 summary(M1)
 ```
 
+
+
+
+
 #### Model M2
+
+
+
+
 
 ```{r, message=FALSE}
 x <- as.matrix(women_AS[, c("Waist", "Height", "Weight", "BMI")])
@@ -374,7 +494,15 @@ summary(M2)
 
 ```
 
+
+
+
+
 #### Model M3
+
+
+
+
 
 ```{r, message=FALSE}
 # refit M2
@@ -389,7 +517,15 @@ M3 <- mfp2(y=yM3, x=xM3, keep=c("Height","Weight","Waist"), df=c(4, 4, 2, 2, 2, 
 summary(M3)
 ```
 
+
+
+
+
 #### Model M4
+
+
+
+
 
 ```{r, message=FALSE}
 # refit M3 with complete cases
@@ -412,6 +548,10 @@ M4.lin <- mfp2(y=yM3r, x=xM3r, keep=NULL, select=0.084, df=c(1, 1, 1, 1, 1, 1), 
 summary(M4.lin)
 ```
 
+
+
+
+
 ### SAP amendments
 
 #### Problems encountered and solutions
@@ -428,17 +568,33 @@ summary(M4.lin)
 
 #### Check local bias
 
+
+
+
+
 ```{r}
 ggplot(data.frame(fitted.values=M4.fp1$fitted.values, y=M4.fp1$y), aes(x=fitted.values, y=y)) + geom_point() + geom_smooth() + geom_abline(slope=1, intercept=0)
 ```
+
+
+
+
 
 Observation: There seems to be only little local bias at the very lower end of the distribution of fitted values.
 
 #### Check heteroskedasticity
 
+
+
+
+
 ```{r}
 ggplot(data.frame(fitted.values=M4.fp1$fitted.values, y=sqrt(abs(M4.fp1$residuals))), aes(x=fitted.values, y=y)) + geom_point() + geom_smooth() 
 ```
+
+
+
+
 
 Observation: there is a little bit of higher variability of residuals when predictions are around 15%.
 
@@ -446,13 +602,25 @@ Observation: there is a little bit of higher variability of residuals when predi
 
 The MFP algorithm iteratively checks for possible inclusion of previously excluded predictors. Hence, we do not expect that any predictor might show an relevant association with the model residuals. Still, we will check this for Weight, which was excluded when moving from M3 to M4.
 
+
+
+
+
 ```{r}
 ggplot(data.frame(Weight=women_AS_M3$Weight, Residuals=M4.fp1$residuals), aes(x=Weight, y=Residuals)) + geom_point() + geom_smooth() 
 ```
 
+
+
+
+
 Observation: No residual association with Weight can be noted.
 
 #### Check normality of residuals
+
+
+
+
 
 ```{r}
 ggplot(data.frame(residuals=M4.fp1$residuals), aes(sample=residuals)) +
@@ -462,11 +630,19 @@ ggplot(data.frame(residuals=M4.fp1$residuals), aes(sample=residuals)) +
 ggplot(data=data.frame(residuals=M4.fp1$residuals), aes(x=residuals)) + geom_histogram(bins=20)
 ```
 
+
+
+
+
 Conclusion: there are only little deviations from the normality assumption for residuals, probably more on the left tail.
 
 ### Apparent performance of the model
 
 #### Root mean squared prediction error
+
+
+
+
 
 ```{r}
 rmspe_app <- sqrt(mean(M4.fp1$residuals^2))
@@ -474,7 +650,15 @@ rmspe_app
 
 ```
 
+
+
+
+
 #### Adjusted R-square
+
+
+
+
 
 ```{r}
 model_df = length(coef(M4.fp1))
@@ -484,24 +668,48 @@ R2_adj_app <- 1-(sum(M4.fp1$residuals^2)/(n-model_df)) / var(women_AS_M3$Fat)
 R2_adj_app
 ```
 
+
+
+
+
 ### Model description
 
 #### Term plots
+
+
+
+
 
 ```{r}
 fracplot(M4.fp1)
 ```
 
+
+
+
+
 #### Standardized regression coefficients
+
+
+
+
 
 ```{r}
 sd.beta <- coef(M4.fp1) * apply(M4.fp1$x, 2, sd)
 sd.beta
 ```
 
+
+
+
+
 # Internal validation
 
 ## Performing bootstrap replications of model building
+
+
+
+
 
 ```{r, message=FALSE}
 # define a function that automates the complex model building process. The function returns the model M4.
@@ -669,44 +877,92 @@ powers_sf <- lapply(candidate_predictors, function(X) {
 names(powers_sf) <- candidate_predictors
 ```
 
+
+
+
+
 ## Optimism-corrected measures of performance
 
 ### Optimism-corrected root mean squared prediction error
+
+
+
+
 
 ```{r, message=FALSE}
 rmspe_optcorr
 rmspe_optcorr_ci
 ```
 
+
+
+
+
 ### Optimism-corrected R-squared
+
+
+
+
 
 ```{r, message=FALSE}
 rsqu_optcorr
 rsqu_optcorr_ci
 ```
 
+
+
+
+
 ### Calibration slope
+
+
+
+
 
 ```{r, message=FALSE}
 mean_calib_slope
 calib_slope_ci
 ```
 
+
+
+
+
 ## Model instability
 
 ### Predictor selection frequencies
+
+
+
+
 
 ```{r, message=FALSE}
 -sort(-predictor_sf)
 ```
 
+
+
+
+
 ### FP power selection frequencies per predictor
+
+
+
+
 
 ```{r, message=FALSE}
 powers_sf
 ```
 
+
+
+
+
 ### Spaghetti plots of bootstrapped and original predictor-outcome relations
+
+
+
+
 
 ```{r, message=FALSE}
 for(predictor in sel.predictors.M4.fp1){
@@ -723,11 +979,19 @@ for(predictor in sel.predictors.M4.fp1){
 
 ```
 
+
+
+
+
 ## Recalibration
 
 ### Recalibrated coefficients
 
 Recalibrate the model with the estimated calibration slope.
+
+
+
+
 
 ```{r}
 # since the model only has linear effects, first refit the model with lm for simplicity
@@ -743,7 +1007,15 @@ M4.recalib$coefficients[-1] <- M4.refit$coefficients[-1] * mean_calib_slope
 M4.recalib$coefficients[1] <- M4.refit$coefficients[1] - mean(predict(M4.recalib, newdata=women_AS[,sel.predictors.M4.fp1]), na.rm=T) + mean(M4.refit$y, na.rm=T)
 ```
 
+
+
+
+
 ### Check the coefficients
+
+
+
+
 
 ```{r}
 cbind(M4.recalib$coefficients, M4.refit$coefficients)
@@ -751,7 +1023,15 @@ cbind(M4.recalib$coefficients, M4.refit$coefficients)
 
 ```
 
+
+
+
+
 ### Check the mean prediction against the mean Fat value of training set
+
+
+
+
 
 ```{r}
 cat("Mean prediction:\n")
@@ -761,9 +1041,17 @@ cat("Mean of Fat in training set:\n")
 mean(M4.refit$y)
 ```
 
+
+
+
+
 # External validation
 
 ## Apply the fitted, recalibrated model to men data set
+
+
+
+
 
 ```{r}
 men2 <- men |>
@@ -774,16 +1062,32 @@ pred_ext <- predict(M4.recalib, newdata=men2)
 eval_men <- data.frame(men2, Prediction=pred_ext)
 ```
 
+
+
+
+
 ## Performance measures at external validation
 
 ### Root mean squared prediction error
+
+
+
+
 
 ```{r}
 rmspe_ext <- sqrt(mean((men2$Fat - pred_ext)^2))
 rmspe_ext
 ```
 
+
+
+
+
 ### R-squared
+
+
+
+
 
 ```{r}
 Rsqu_ext <- 1 - mean((men2$Fat - pred_ext)^2)/var(men2$Fat)
@@ -791,26 +1095,54 @@ Rsqu_ext
 
 ```
 
+
+
+
+
 ### Calibration
+
+
+
+
 
 ```{r}
 library(ggplot2)
 ggplot(eval_men, aes(Prediction, Fat)) + geom_point() + geom_smooth() + geom_smooth(method="lm", col="red") + geom_abline(intercept=0, slope=1) 
 ```
 
+
+
+
+
 #### Calibration slope
+
+
+
+
 
 ```{r}
 calib_slope_ext <- coef(lm(data=eval_men, Fat~Prediction))[2]
 calib_slope_ext
 ```
 
+
+
+
+
 #### Calibration intercept
+
+
+
+
 
 ```{r}
 calib_inter_ext <- coef(lm(data=eval_men, Fat~offset(Prediction)))[1]
 calib_inter_ext
 ```
+
+
+
+
 
 ### Residual plots
 
@@ -818,24 +1150,44 @@ calib_inter_ext
 
 Plot the residuals vs. the predictions.
 
+
+
+
+
 ```{r}
 ggplot(eval_men, aes(x=Prediction, y=Fat-Prediction)) + geom_point() + geom_smooth()
 
 
 ```
 
+
+
+
+
 #### Heteroskedasticity
 
 Plot the square root of absolute residuals vs. predictions.
+
+
+
+
 
 ```{r}
 ggplot(eval_men, aes(x=Prediction, y=sqrt(abs(Fat-Prediction)))) + geom_point() + geom_smooth()
 
 ```
 
+
+
+
+
 #### Residual nonlinear association with predictors
 
 Plot residuals vs. predictors.
+
+
+
+
 
 ```{r}
 ggplot(eval_men, aes(x=Height, y=Fat-Prediction)) + geom_point() + geom_smooth() 
@@ -846,9 +1198,17 @@ ggplot(eval_men, aes(x=Knee, y=Fat-Prediction)) + geom_point() + geom_smooth()
 
 ```
 
+
+
+
+
 #### Residual association with non-predictors
 
 Plot residuals vs. variables not used for predictions.
+
+
+
+
 
 ```{r}
 nonpredictors <- colnames(eval_men)[is.na(match(candidate_predictors, sel.predictors.M4.fp1))]
@@ -861,8 +1221,13 @@ for(p in nonpredictors){
 
 ```
 
+
+
+
+
 ## Conclusion from external validation
 
 When applying the model that was trained on women to men, we find that it underpredicts the bodyfat percentage by about 10% (9.33% precisely). This is not caused by the restricted age range in women, as the model seems to predict slightly better for old men compared to young men. It is also not caused by overfit, because the calibration slope in the external data is very close to 1. There is also no seemingly unaccounted linear or nonlinear association with any predictor or any variable not used in the model except of age. Refitting the model with age, however, does not seem to be sensible as the age range is very restricted in the training set, and age may play a different role in predicting percentage body fat in men than in women.
 
 When discounting the effect of miscalibration-in-the-large, the root mean squared prediction error (root MSPE) at external validation is `r sqrt(rmspe_ext^2 - calib_inter_ext^2)`. The $R^2$ (calculated as $1 - MSPE/Var(Y))$), where $Var(Fat)$ = `r var(men$Fat)` with the recalibrated predictions would be estimated at $R^2$ = `r 1 - (rmspe_ext^2 - calib_inter_ext^2)/var(men$Fat)`. This number is also very well approximated by the squared correlation of predictions and observed outcomes given as `r cor(pred_ext, men$Fat)^2`, which does not account for miscalibration-in-the-large.
+
