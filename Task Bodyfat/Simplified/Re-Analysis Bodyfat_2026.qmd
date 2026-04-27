@@ -152,7 +152,7 @@ inspect_variable_selection <- function(vs_object, top_n = 5) {
   ))
 }
 
-# Computes Bayesian R² as defined by Gelman et al. (2019). for post-selection inference
+# Computes posterior predictive distribution of Bayesian R² as defined by Gelman et al. (2019). for post-selection inference
 # Measures the proportion of variance in the predictions (ypred) relative to total variance (predictions + residuals).
 # The function returns a vector of R² values across posterior draws.
 # Input: 
@@ -169,7 +169,7 @@ bayes_r2 <- function(ypred, y) {
   return(r2)
 }
 
-# This function computes a posterior distribution of Bayesian R².
+# This function computes a posterior predictive distribution of Bayesian R².
 # For each posterior predictive draw (each row of ypred), it calculates
 # the coefficient of determination:
 # R² = 1 - RSS / TSS, where RSS is the residual sum of squares between
