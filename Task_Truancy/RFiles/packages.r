@@ -43,6 +43,9 @@ library("knitr")
 library("DHARMa") 
 # Load required packages
 
+library(bayesplot)
+library(ggplot2)
+library(patchwork)  # oder cowplot
 
 library(purrr) 
 library(tidyverse)        # ggplot, dplyr, %>%, and friends
