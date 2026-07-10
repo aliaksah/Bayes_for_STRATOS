@@ -317,11 +317,12 @@ proj_ref_fit <- project(vs_cvl, predictor_terms = solterms_final_fivel, ns = 400
 Standardized coefficients based on the standard deviation of partial linear predictors, thus scaled coefficients (β · SD(X)).
 
 ```{r model summary table}
-
+#set.seed(1234)
+set.seed(5734)
 # assemble data
 results_beta <- matrix(0, nrow = 6 , ncol  = 5)
 rownames(results_beta) <- c("(Intercept)",solterms_final_fivel)
-colnames(results_beta) <- c("Regression coefficient", "Standardized beta", "Cum. proportions <=5", "5% PD-quantile", "95% PD-quantile")
+colnames(results_beta) <- c("Regression coefficient", "Standardized beta", "Cum. proportions <=5", "2.5% PD-quantile", "97.5% PD-quantile")
 
 mat <- as.matrix(proj_ref_fit)
 beta <- mat[, 1:(ncol(mat) - 1)]
@@ -329,7 +330,9 @@ beta <- mat[, 1:(ncol(mat) - 1)]
 # Transform matrix to draws format (optional, for posterior-friendly summaries)
 draws1 <- posterior::as_draws_matrix(beta)
 
-summary_tbl <- summarise_draws(draws1, mean,  median, ~ quantile(.x, probs = c(0.05, 0.95)))
+summary_tbl <- summarise_draws(draws1, mean,  median, ~ quantile(.x, probs = c(0.025, 0.975)))
+
+#str(summary_tbl)
 # Compute standard deviations (excluding the first two columns) for women dataset
 sd_women <- apply(women[, -c(1,2)], 2, sd)
 vars_to_select <- key_results$top_terms
@@ -341,8 +344,8 @@ std_coef <- c(summary_tbl$mean[1],std_coef)
 results_beta[,1] <- round(summary_tbl$mean,3)
 results_beta[,2] <- round(std_coef,3)
 results_beta[,3] <- round(c(1.0,key_results$cumprop[1:5]),3)
-results_beta[,4] <- round(summary_tbl$`5%`,3)
-results_beta[,5] <- round(summary_tbl$`95%`,3)
+results_beta[,4] <- round(summary_tbl$`2.5%`,3)
+results_beta[,5] <- round(summary_tbl$`97.5%`,3)
 
 
 results_beta <- results_beta[order(-abs(results_beta[,3])),]
