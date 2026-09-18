@@ -1,0 +1,552 @@
+---
+title: "School belonging data analysis, logistic model, Bayes"
+author: 
+  - Mariana Nold
+date: now
+date-format: iso
+title-block-banner: "#828282"
+format:
+  html:
+    code-fold: true
+    code-tools: true
+    theme: default
+    toc: true
+    number-sections: true
+    toc-location: right
+    embed-resources: true
+    self-contained: true
+    df-print: kable
+params: 
+  folder_analysis: Data/Processed/School_FSAP
+---
+
+# Background 
+
+This Bayesian analysis for the school belonging analysis task follows the 
+statistical analysis plan by Mariana Nold dated 5.2025 (and referring
+to the task description for the simplified school belonging task with the same 
+date that addresses a binary outcome variable). For a very brief initial data
+analysis we refer to `analysis_school-logistic-ida`.
+
+```{r load package, message = FALSE, warning = FALSE}
+#| code-fold: true
+PPath <- "C:/Users/zo95yup/Documents/GitHub/Bayes_for_STRATOS/Task_Truancy"
+source(file.path(PPath,"RFiles/packages.r"))
+# Load original PISA data, single imputed data set, to avoid missing data as statistical issue here
+load(file = file.path(PPath,"Orgdata/IMPDAT_PISA.RData"))
+# Prepare data, thus build PISA scales 
+# Pole so that high values indicate a higher sense of belonging based on PIM
+source(file.path(PPath,"RFiles/01_datapreperation.r"))
+to.rm <- objects()[!objects() %in% c("PPath","pisa18")]
+# There should be at least ten students per school. Schools with fewer observations are excluded from the analysis. 
+pisa18$school.id <- as.factor(pisa18$school.id)
+help <- split(pisa18,pisa18$school.id)
+nst <- lapply(help, function(x) length(x[[1]]))
+tf <- lapply(nst, function(x) x[[1]] > 9)
+utf <- unlist(tf)
+large_school <- help[utf]
+pisa2018 <- list.rbind(large_school)
+pisa2018$school.id <- droplevels(pisa2018$school.id)
+#table(pisa2018$school.id)
+
+rm(pisa18,tf,nst,help,large_school,utf)
+
+save(pisa2018,file = file.path(PPath,"Files/pisa2018.RData")) 
+
+```
+## Prepare focal variables
+
+```{r  define second focal variable and outcome}
+#| code-fold: true
+# Compute quartiles of being bullied at school level
+pisa2018$ATT4 <- cut_number(pisa2018$ATT01,4)
+levels(pisa2018$ATT4)
+levels(pisa2018$ATT4) <- 1:4
+threshold <- quantile(pisa2018$belong, 0.25)
+threshold
+# Focal variable is 1, if student has a low sense of school-belonging
+pisa2018$bel01 <- ifelse(pisa2018$belong <= threshold, 1, 0)
+#print("Focal variables")
+#print("ATT4")
+#table(pisa2018$ATT4)
+#print("Bel01")
+#table(pisa2018$bel01)
+print("Joint distribution of ATT4 and Bel01")
+
+library(janitor)
+
+pisa2018 %>%
+  tabyl(ATT4, bel01) %>%
+  adorn_totals(where = c("row", "col"))
+
+```
+
+
+
+## Helper functions
+
+Code for helper functions.
+
+```{r helper functions}
+#| code-fold: true
+# 02_functions_KD_ScID
+#source(file.path(PPath,"RFiles/02_functions_KD.R"))
+
+source(file.path(PPath,"RFiles/02_functions_KD_ScID.R"))
+```
+
+## Variables
+
+As outlined in Table 1 in the task description. 
+
+```{r non-focal variables}
+
+VARIABLES = list(
+    outcome = "bel01", 
+    focal = c("bull", "ATT4"), 
+    nonfocal = c("female", "nld", "aca", "val", "nfof", "native", "joyread", 
+                 "goal", "mot", "res", "ndis_clim", "GYM", "UNI", "NDISH", "N_SC")
+)
+
+glue("{length(VARIABLES$nonfocal)} non-focal variables used for modeling according to SAP: 
+     {VARIABLES$nonfocal |> paste0(collapse = ', ')}")
+```
+
+# Analysis
+
+## Define model two models, first full model, second background model
+
+```{r  define model, results='hide', message=FALSE, warning=FALSE}
+models<-list()
+# Full model, variable selection based on PIM  including focal variables
+models[[1]] <- as.formula(bel01 ~ bull*ATT4 + female + nld +  aca  + val  + nfof  + native+ joyread + goal + mot + res +  ndis_clim    + GYM + UNI  +  NDISH + N_SC + (1 | school.id))
+# Background model, variable selection based on PIM without focal variables
+models[[2]] <- as.formula(bel01 ~ female + nld +  aca  + val  + nfof  + native + joyread + goal + mot + res +  ndis_clim    + GYM + UNI  + NDISH + N_SC + (1 | school.id))
+```
+
+
+## Check the convergence criteria 
+
+```{r fit modesl and do MCMC diagnostic,results='hide', message = FALSE, warning = FALSE, cache=TRUE}
+a.seed <- 12345 
+a.iter <-  2000 
+a.chains <- 4  
+
+fits <- list()
+# full model
+fits[[1]] <- stan_glmer(models[[1]], data = pisa2018, seed = a.seed,
+                      iter = a.iter, chains = a.chains,family = binomial()) 
+# background model
+fits[[2]] <- stan_glmer(models[[2]], data = pisa2018, seed = a.seed,
+                      iter = a.iter, chains = a.chains,family = binomial()) 
+
+res.path <- file.path(PPath,"Result")
+save(fits, file = file.path(res.path,"fits.RData"))
+summary_list <- lapply(fits, summary) # mcse Rhat n_eff
+# launch_shinystan(fits[[1]])
+# launch_shinystan(fits[[2]])
+# https://lnalborczyk.github.io/blog/2017-10-10-icc/index.html
+# ICC of 0.6 %
+```
+## Summary of results
+```{r Summary of results}
+
+# Calculate summaries for all models in fits
+summaryFixed <- map(fits, ~ tidy(.x, conf.int = TRUE, conf.level = .95, effects = "fixed"))
+summarySchools <- map(fits, ~ tidy(.x, conf.int = TRUE, conf.level = .95, effects = "ran_vals"))
+summaryVar <- map(fits, ~ tidy(.x, conf.int = TRUE, conf.level = .95, effects = "ran_pars"))
+summaryPrior <- map(fits, ~ tidy(.x, conf.int = TRUE, conf.level = .95, effects = "ran_pars"))
+
+
+
+
+
+# --- Fixed Effects ---
+cat("### Fixed Effects for Models\n\n")
+
+kable(
+  format_summary_table(summaryFixed[[1]]),
+  caption = "Fixed Effects: Model 1",
+  align = "r"
+)
+
+kable(
+  format_summary_table(summaryFixed[[2]]),
+  caption = "Fixed Effects: Model 2",
+  align = "r"
+)
+
+# --- Random Effect Variances ---
+cat("### Random Effect Variances for Models\n\n")
+
+kable(
+  format_summary_table(summaryVar[[1]]),
+  caption = "Random Effect Variances: Model 1",
+  align = "r"
+)
+
+kable(
+  format_summary_table(summaryVar[[2]]),
+  caption = "Random Effect Variances: Model 2",
+  align = "r"
+)
+
+prior_summaries <- lapply(fits, prior_summary)
+print(prior_summaries[[1]])
+print(prior_summaries[[2]])
+
+# Prior summaries
+# show prior_summaries 
+#for (i in seq_along(prior_summaries)) {
+#  cat("Prior Summary for model", i, ":\n")
+#  print(prior_summaries[[i]])
+#  cat("\n----------------------\n")
+#}
+```
+
+
+
+## LOOIC
+
+```{r looic, cache = TRUE}
+loo_list <- list()
+# Compute loo
+
+loo_list <- lapply(fits, loo, cores = 1)
+# Save loo
+
+save("loo_list", file = file.path(res.path,"loo_list.RData"))
+
+loo_comparison <- loo_compare(loo_list[[1]], loo_list[[2]])
+
+loo_df <- as.data.frame(loo_comparison)
+rownames(loo_df) <- c("full", "bg")
+
+kable(loo_df, digits = 2, caption = "LOO Model Comparison")
+```
+
+## Randomized Quantile Residuals
+
+To provide a visual diagnostic of model calibration, we plot the PIT values as empirical cumulative distribution functions (ECDFs). The colored lines represent the ECDFs of the PIT values obtained from the observed data for the three fitted models. The thin grey lines represent ECDFs of PIT values generated from posterior predictive simulations based on the respective fitted models. Under a well-calibrated model, PIT values are expected to be approximately uniformly distributed on the interval from 0 to 1, such that the expected ECDF follows the diagonal.
+
+The posterior-predictive ECDFs provide a reference for the sampling variability that can be expected under the fitted model. Their spread around the diagonal is therefore particularly informative. A relatively wide range of simulated ECDFs indicates that substantial deviations from the diagonal can arise from sampling variability alone, whereas a narrow range indicates that the empirical distribution of PIT values is expected to remain closer to the uniform reference distribution.
+
+The observed ECDFs can be interpreted by considering both their shape and their position relative to the posterior-predictive ECDFs. The characteristic patterns identified in the simulation study presented in the Supplementary Material provide a reference for interpreting systematic deviations. In particular, a positive shift corresponds to an underestimation bias. In this case, the PIT density is shifted towards values above 0.5, indicating that observed outcomes tend to be larger than the values predicted by the model. In the ECDF representation, this corresponds to an ECDF lying below the diagonal, reflecting the greater proportion of PIT values at larger values. Conversely, a negative shift corresponds to an overestimation bias, with PIT values shifted towards smaller values and the ECDF lying above the diagonal.
+
+```{r Randomized Quantile Residuals}
+post_pred <- lapply(fits, posterior_predict)
+
+plots <- vector("list", length(post_pred))
+
+plots[[1]] <-ppc_pit_ecdf_overlay(y = pisa2018$bel01,
+                                 yrep = post_pred[[1]],
+                                 ndraws = 100,
+                                 color_observed = "darkred",
+                                 seed = 1234)
+
+plots[[2]] <-ppc_pit_ecdf_overlay(y = pisa2018$bel01,
+                                 yrep = post_pred[[2]],
+                                 ndraws = 100,
+                                 color_observed = "darkblue",
+                                 seed = 1234)
+
+p1 <- plots[[1]] + ggtitle("Full model")
+p2 <- plots[[2]] + ggtitle("Background model")
+
+# show
+p1 + p2
+```
+
+
+## Quantile residuals in subgroups
+### Full model: Residuals versus bull
+```{r sub1}
+group <- pisa2018$bull
+# 
+idx_1 <- group == 1
+idx_0 <- group == 0
+y <- pisa2018$bel01
+yrep <- post_pred[[1]]
+#  1
+p1 <- ppc_pit_ecdf_overlay(
+  y = y[idx_1],
+  yrep = yrep[, idx_1],
+  color_observed = "darkred"
+)
+
+#  0
+p0 <- ppc_pit_ecdf_overlay(
+  y = y[idx_0],
+  yrep = yrep[, idx_0],
+  color_observed = "darkred",
+)
+
+
+pit_bull_full0 <- p0 + ggtitle("Full:  bull = 0")
+pit_bull_full1 <- p1 + ggtitle("Full.: bull = 1")
+
+# show
+pit_bull_full0 + pit_bull_full1
+
+```
+
+## Quantile residuals in subgroups
+### Background model: Residuals versus bull
+```{r sub2}
+group <- pisa2018$bull
+# 
+idx_1 <- group == 1
+idx_0 <- group == 0
+y <- pisa2018$bel01
+yrep <- post_pred[[2]]
+#  1
+p1 <- ppc_pit_ecdf_overlay(
+  y = y[idx_1],
+  yrep = yrep[, idx_1],
+  color_observed = "darkblue"
+)
+
+#  0
+p0 <- ppc_pit_ecdf_overlay(
+  y = y[idx_0],
+  yrep = yrep[, idx_0],
+  color_observed = "darkblue",
+)
+
+
+pit_bull_back0 <- p0 + ggtitle("Back.:  bull = 0")
+pit_bull_back1 <- p1 + ggtitle("Back.: bull = 1")
+
+# show
+pit_bull_back0 + pit_bull_back1
+
+```
+For bull = 1 we see a clear positive shift in the background model. ECDF lies below the diagonal, indicating PIT values shifted towards larger values. Consequently, the model systematically underestimates the true prevalence of bullying victimization in this subgroup. This suggests a lack of predictive sufficiency, meaning the model is provided with insufficient information to arrive at valid or near-accurate predictions.
+
+### Full model: Residuals versus ATT4
+```{r sub3}
+
+y <- pisa2018$bel01
+yrep <- post_pred[[1]]
+
+plots <- lapply(sort(unique(pisa2018$ATT4)), function(val) {
+  idx <- pisa2018$ATT4 == val
+  ppc_pit_ecdf_overlay(y = y[idx], yrep = yrep[, idx], color_observed = "darkred") + 
+    ggplot2::ggtitle(paste("ATT4 =", val))
+})
+
+
+wrap_plots(plots, ncol = 2)
+```
+
+### Back. model: Residuals versus ATT4
+```{r sub4}
+
+y <- pisa2018$bel01
+yrep <- post_pred[[2]]
+
+plots <- lapply(sort(unique(pisa2018$ATT4)), function(val) {
+  idx <- pisa2018$ATT4 == val
+  ppc_pit_ecdf_overlay(y = y[idx], yrep = yrep[, idx], color_observed = "darkblue") + 
+    ggplot2::ggtitle(paste("ATT4 =", val))
+})
+
+
+wrap_plots(plots, ncol = 2)
+```
+
+## Distinctiveness of Predictions of the Mean Based on Kolmogorov Distance
+
+### Subgroup Predictive Distinctiveness
+
+To evaluate the distinctiveness of predictions between the full model and the background model across specified subgroups, we calculate the Kolmogorov-Smirnov (KS) distance between their respective distributions of subgroup posterior predictive means. 
+
+A key advantage of this Bayesian approach is that the posterior predictive distribution fully incorporates parameter uncertainty by integrating over the joint posterior distribution of the model parameters $\theta$:
+
+$$p(\tilde{y} \mid y) = \int p(\tilde{y} \mid \theta) \, p(\theta \mid y) \, d\theta$$
+
+Consequently, the subgroup means—computed row-wise across posterior draws—naturally reflect both sampling variation and parameter uncertainty. The resulting KS statistic measures the maximum absolute vertical distance between the cumulative distribution functions (CDFs) of these uncertainty-aware subgroup means, yielding a bounded metric $D \in [0, 1]$.
+
+**Interpretation of the KS Distance ($D$):**
+
+* **$D < 0.10$ (Negligible/Small):** The full model and background model yield virtually identical posterior predictions for the given subgroup, suggesting that adding model complexity provides little additional predictive information here.
+* **$0.10 \le D < 0.20$ (Moderate):** Noticeable differences exist in the location or spread of the subgroup predictions between the two models.
+* **$D \ge 0.20$ (Large/Substantial):** The predictions of the full model deviate substantially from those of the background model, indicating that the additional terms (the focal variables) heavily impact this specific subgroup.
+
+### Methodological Context: PPN and Classical PPCs
+
+This comparison of posterior predictive distributions across two models can be framed as a simple, intuitive application of a **Posterior Predictive Null Check (PPN)**.
+
+In traditional model evaluation, the standard approach is a **Posterior Predictive Check (PPC)** (Guttman, 1967; Rubin, 1984). A classic PPC evaluates model adequacy by comparing replicated data drawn from a single model's posterior predictive distribution against the actual observed data $y$. While PPCs excel at detecting whether an individual model provides a plausible representation of the real data, they are not designed to compare competing models against one another.
+
+To address this limitation, the PPN framework extends classical model criticism by replacing the observed data benchmark with a baseline "null" model. Rather than asking whether a single model fits the observed data, a PPN asks whether the posterior predictive output of a full model can be distinguished from that of a simpler background model. 
+
+In our analysis, calculating the KS distance between the subgroup predictive means of the full and background models acts as a practical, direct realization of a PPN. By quantifying the maximum discrepancy between the two predictive CDFs, the KS statistic serves as the diagnostic test metric that determines whether the additional model complexity yields genuinely distinct predictive behavior.
+```{r KDs}
+#post_pred 
+# Compute Kolmogorov distance
+kds <- KD(ypredCore = post_pred[[1]], yrep = post_pred[[2]])
+
+
+
+# Tabelle 1: Summary
+kable(kds[[1]], digits = 3, caption = "Bull & ATT04")
+
+# Tabelle 2: Details
+kable(kds[[2]], digits = 3, caption = "Bull")
+
+# Tabelle 3: Diagnostics
+kable(kds[[3]], digits = 3, caption = "ATT04")
+
+
+```
+
+### Interpretation of Subgroup Predictive Distinctiveness
+While the ECDF plots of the quantile residuals revealed a lack of predictive sufficiency exclusively for the bull variable, using the KS statistic of the posterior means as a test statistic demonstrates a lack of predictive sufficiency overall, with KS values consistently exceeding 0.5. Importantly, this discrepancy highlights that quantile residuals assess misfit per individual observation, whereas the KS statistic captures performance at a grouped level.
+
+## Posterior predictive checks
+
+Complementing the KS statistic, the associated posterior predictive checks are presented visually, accompanied by the calculation of the corresponding posterior-predictive $p$-values. **Importantly, these two approaches serve different diagnostic purposes:** whereas the KS statistic compares the posterior predictive distributions across models, posterior predictive checks evaluate whether the model captures the observed data, focusing here on the mean within focal groups as the test statistic.
+```{r ppcs, message = FALSE, warning = FALSE}
+color_scheme_set(scheme = "red")
+ppcModelFull <- visualPPC(y.obs = pisa2018$bel01, yrepM = post_pred[[1]])
+
+ppcModelFull
+
+
+color_scheme_set(scheme = "blue")
+#color_scheme_set(scheme = "gray")
+ppcModelBG <- visualPPC(y.obs = pisa2018$bel01, yrepM = post_pred[[2]])
+
+ppcModelBG
+```
+## Compute Bayesian p-values
+```{r Bayesian p value}
+# https://search.r-project.org/CRAN/refmans/HuraultMisc/html/post_pred_pval.html
+#library("kableExtra")
+
+num <- 3
+
+pppvModelFull <- two.sided.pppv(y.obs = pisa2018$bel01, yrepM = post_pred[[1]], alternative = "two.sided")
+#kable(kds[[3]], digits = 3, caption = "ATT04")
+
+kable(matrix(pppvModelFull[[1]],nrow = 2,byrow=TRUE),  digits = 3, caption = "Full Model: Bull x ATT04")
+kable(matrix(pppvModelFull[[2]],nrow = 2,byrow=TRUE),  digits = 3, caption = "Full Model: Bull")
+kable(matrix(pppvModelFull[[3]],nrow = 2,byrow=TRUE),  digits = 3, caption = "Full Model: ATT04")
+
+
+pppvModelBG <- two.sided.pppv(y.obs = pisa2018$bel01, yrepM = post_pred[[2]], alternative = "two.sided")
+
+
+kable(matrix(pppvModelBG[[1]],nrow = 2,byrow=TRUE), digits = 3, caption = "Back. Model:Bull x ATT04")
+kable(matrix(pppvModelBG[[2]],nrow = 2,byrow=TRUE), digits = 3, caption = "Back. Bull")
+kable(matrix(pppvModelBG[[3]],nrow = 2,byrow=TRUE), digits = 3, caption = "Back. ATT04")
+
+```
+
+
+
+These findings consistently indicate a lack of predictive sufficiency within the background model, most notably in forecasting the level of school belonging among bullied students. This finding is further corroborated by the corresponding $p$-values. Rather than relying on a fixed decision threshold, this $p$-value should be evaluated alongside the corresponding plot. Low values point toward model misspecification, but the metric is intended to supplement, not replace, visual inspection.
+
+## Compute Brier scores
+
+In addition, the Brier score is reported as a measure of overall forecast accuracy.
+```{r Brier scores of cands}
+# Brier Scores berechnen
+br <- list()
+for (i in 1:2) {
+  br[[i]] <- brierS(pisa2018$bel01, colMeans(post_pred[[i]]))
+}
+
+# In Data Frame umwandeln
+brier_df <- data.frame(
+  Model = c("full", "bg"),
+  BrierScore = unlist(br)
+)
+
+# Ausgabe als Tabelle
+kable(brier_df, digits = 3, caption = "Brier Scores for Models full and bg")
+
+
+```
+
+
+
+# Summarizing results based on the posterior distribution of full model
+
+```{r Summarizing results, message = FALSE, warning = FALSE}
+# For each quartile compute the median ATT01.
+library(dplyr)
+library(knitr)
+
+# 1. Calculate summary statistics and round to 3 decimal places
+pisa18condPr1 <- pisa2018 %>%
+  group_by(ATT4) %>%
+  summarise(
+    `Median ATT01` = median(ATT01, na.rm = TRUE),
+    `SD`           = sd(ATT01, na.rm = TRUE),
+    `Min`          = min(ATT01, na.rm = TRUE),
+    `Max`          = max(ATT01, na.rm = TRUE)
+  ) %>%
+  mutate(across(where(is.numeric), ~ round(., 3)))
+
+# 2. Extract vector of medians (if needed separately)
+median_condPr1 <- pisa18condPr1$`Median ATT01`
+
+# 3. Render a clean table in Quarto
+kable(
+  pisa18condPr1, 
+  caption = "Summary statistics of ATT01 conditioned on ATT4 groups",
+  align = c("l", "r", "r", "r", "r")
+)
+
+squcondPr <- split(pisa2018,f = list(pisa2018$ATT4,pisa2018$bull))
+
+
+pint_condPr25 <- drawPosteriorInequalityGroup(sgr = squcondPr,fit = fits[[1]], p = 0.25)
+
+pint_condPr50 <- drawPosteriorInequalityGroup(sgr = squcondPr,fit = fits[[1]], p = 0.5)
+
+pint_condPr75 <- drawPosteriorInequalityGroup(sgr = squcondPr,fit = fits[[1]], p = 0.75)
+
+
+brE <- 4
+
+# Combine quantile predictions into a single tidy data frame
+p_levels <- c(25, 50, 75)
+p_results <- list(pint_condPr25, pint_condPr50, pint_condPr75)
+
+group_labels <- c(
+  "bv = %d%%, nb.",
+  "bv = %d%%, b."
+)
+
+df_condPr1 <- do.call(rbind, lapply(seq_along(p_levels), function(i) {
+  p_val <- p_levels[i]
+  mat <- p_results[[i]]
+  
+  data.frame(
+    x = rep(round(meancondPr1, 2), 2),
+    group = c(
+      rep(sprintf(group_labels[1], p_val), brE),
+      rep(sprintf(group_labels[2], p_val), brE)
+    ),
+    mean = mat[, 2],
+    low  = mat[, 1],
+    up   = mat[, 3]
+  )
+}))
+
+# Tidy Data Frame erzeugen & anzeigen
+knitr::kable(df_condPr1, format = "simple", digits = 3)
+
+# Plot erzeugen
+p_condPr <- plot.result2(df_condPr1)
+
+# Plot anzeigen (falls p_condPr bereits ein Patchwork/Ggplot-Objekt ist)
+p_condPr
+
+# FALLS p_condPr eine Liste von Plots ist und du patchwork nutzt:
+# wrap_plots(p_condPr, ncol = 2)
+```
+
