@@ -89,10 +89,10 @@ Code for helper functions.
 
 ```{r helper functions}
 #| code-fold: true
-# 02_functions_KD_ScID
-#source(file.path(PPath,"RFiles/02_functions_KD.R"))
+# 02_functions
 
-source(file.path(PPath,"RFiles/02_functions_KD_ScID.R"))
+
+source(file.path(PPath,"RFiles/02_functions.R"))
 ```
 
 ## Variables
@@ -493,6 +493,7 @@ pisa18condPr1 <- pisa2018 %>%
 # 2. Extract vector of medians (if needed separately)
 median_condPr1 <- pisa18condPr1$`Median ATT01`
 
+
 # 3. Render a clean table in Quarto
 kable(
   pisa18condPr1, 
@@ -526,7 +527,7 @@ df_condPr1 <- do.call(rbind, lapply(seq_along(p_levels), function(i) {
   mat <- p_results[[i]]
   
   data.frame(
-    x = rep(round(meancondPr1, 2), 2),
+    x = rep(round(median_condPr1, 2), 2),
     group = c(
       rep(sprintf(group_labels[1], p_val), brE),
       rep(sprintf(group_labels[2], p_val), brE)
