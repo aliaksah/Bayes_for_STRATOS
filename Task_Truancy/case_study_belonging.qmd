@@ -30,14 +30,14 @@ analysis we refer to `analysis_school-logistic-ida`.
 
 ```{r load package, message = FALSE, warning = FALSE}
 #| code-fold: true
-PPath <- "C:/Users/zo95yup/Documents/GitHub/Bayes_for_STRATOS/Task_Truancy"
-source(file.path(PPath,"RFiles/packages.r"))
+
+source("RFiles/packages.r")
 # Load original PISA data, single imputed data set, to avoid missing data as statistical issue here
-load(file = file.path(PPath,"Orgdata/IMPDAT_PISA.RData"))
+load(file = "Orgdata/IMPDAT_PISA.RData")
 # Prepare data, thus build PISA scales 
 # Pole so that high values indicate a higher sense of belonging based on PIM
-source(file.path(PPath,"RFiles/01_datapreperation.r"))
-to.rm <- objects()[!objects() %in% c("PPath","pisa18")]
+source("RFiles/01_datapreperation.r")
+to.rm <- objects()[!objects() %in% c("pisa18")]
 # There should be at least ten students per school. Schools with fewer observations are excluded from the analysis. 
 pisa18$school.id <- as.factor(pisa18$school.id)
 help <- split(pisa18,pisa18$school.id)
@@ -51,7 +51,7 @@ pisa2018$school.id <- droplevels(pisa2018$school.id)
 
 rm(pisa18,tf,nst,help,large_school,utf)
 
-save(pisa2018,file = file.path(PPath,"Files/pisa2018.RData")) 
+save(pisa2018,file = "Files/pisa2018.RData") 
 
 ```
 ## Prepare focal variables
@@ -92,7 +92,7 @@ Code for helper functions.
 # 02_functions
 
 
-source(file.path(PPath,"RFiles/02_functions.R"))
+source("RFiles/02_functions.R")
 ```
 
 ## Variables
@@ -140,7 +140,7 @@ fits[[1]] <- stan_glmer(models[[1]], data = pisa2018, seed = a.seed,
 fits[[2]] <- stan_glmer(models[[2]], data = pisa2018, seed = a.seed,
                       iter = a.iter, chains = a.chains,family = binomial()) 
 
-res.path <- file.path(PPath,"Result")
+res.path <- "Results"
 save(fits, file = file.path(res.path,"fits.RData"))
 summary_list <- lapply(fits, summary) # mcse Rhat n_eff
 # launch_shinystan(fits[[1]])
@@ -322,6 +322,9 @@ pit_bull_back0 + pit_bull_back1
 
 ```
 For bull = 1 we see a clear positive shift in the background model. ECDF lies below the diagonal, indicating PIT values shifted towards larger values. Consequently, the model systematically underestimates the true prevalence of bullying victimization in this subgroup. This suggests a lack of predictive sufficiency, meaning the model is provided with insufficient information to arrive at valid or near-accurate predictions.
+```{r key comp, cache = TRUE}
+pit_bull_full1 + pit_bull_back1
+```
 
 ### Full model: Residuals versus ATT4
 ```{r sub3}
@@ -542,8 +545,8 @@ df_condPr1 <- do.call(rbind, lapply(seq_along(p_levels), function(i) {
 knitr::kable(df_condPr1, format = "simple", digits = 3)
 
 # Plot erzeugen
-p_condPr <- plot.result2(df_condPr1)
-
+#p_condPr <- plot.result2(df_condPr1)
+p_condPr  <- plot.profile(df_condPr1)
 # Plot anzeigen (falls p_condPr bereits ein Patchwork/Ggplot-Objekt ist)
 p_condPr
 

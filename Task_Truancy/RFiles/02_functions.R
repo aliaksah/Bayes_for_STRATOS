@@ -918,9 +918,85 @@ plot.result2 <- function(gfg = df_condPr1) {
       legend.text = element_text(size = 16),
       legend.title = element_text(size = 17, face = "bold"),
       legend.background = element_rect(fill = "white", color = "grey80"),
+      guides(
+        color = guide_legend(nrow = 2, ncol = 3, byrow = TRUE)
+      ),
       
       # Grid-Linien dezent halten
       panel.grid.minor = element_blank()
     ) +
     guides(colour = guide_legend(ncol = 2), fill = guide_legend(ncol = 2))
+}
+
+plot.profile <- function(gfg = df_condPr1) {
+  
+  # Minimale Verschiebung, damit überlappende Fehlerbalken sichtbar bleiben
+  pd <- position_dodge(width = 0.005)
+  
+  # Okabe-Ito-basierte Farbpalette
+  cbp1 <- c("#D55E00", "#E69F00", "#009E73", "#56B4E9",
+            "#999999", "#000090", "#0072B2", "#CC79A7")
+  
+  xlab_text <- "Truancy level (with corres. median)"
+  tit_text  <- "Risk of Withdrawal"
+  
+  ggplot(gfg, aes(x = x, y = mean, colour = group,
+                  fill = group, group = group)) +
+    
+    # Referenzlinien
+    geom_hline(yintercept = 0.3, linetype = "dotted",
+               linewidth = 0.8, color = "grey40") +
+    geom_hline(yintercept = 0.5, linetype = "dotted",
+               linewidth = 0.8, color = "grey40") +
+    
+    # Fehlerbalken und Verbindungslinien
+    geom_errorbar(aes(ymin = low, ymax = up),
+                  width = 0.003, position = pd, alpha = 0.7) +
+    geom_line(position = pd, linetype = "solid", linewidth = 1) +
+    
+    # Gefüllte Punkte
+    geom_point(position = pd, size = 3.5, shape = 21,
+               color = "white", stroke = 0.8) +
+    
+    # Achsen und Titel
+    labs(
+      x = xlab_text,
+      y = "Risk of Withdrawal",
+      title = tit_text,
+      colour = "Group",
+      fill = "Group"
+    ) +
+    
+    # Skalierungen und Grenzen
+    expand_limits(y = 0.8) +
+    scale_y_continuous(breaks = seq(0, 0.9, 0.10)) +
+    scale_x_continuous(breaks = seq(0, 0.4, 0.05)) +
+    
+    # Farben synchronisieren
+    scale_color_manual(values = cbp1) +
+    scale_fill_manual(values = cbp1) +
+    
+    # Design und Typografie
+    theme_bw() +
+    theme(
+      text = element_text(size = 19),
+      axis.text = element_text(size = 19),
+      axis.title = element_text(size = 19),
+      plot.title = element_text(size = 19, face = "bold", hjust = 0.5),
+      
+      # Legende
+      legend.position = "bottom",
+      legend.text = element_text(size = 16),
+      legend.title = element_text(size = 17, face = "bold"),
+      legend.background = element_rect(fill = "white", color = "grey80"),
+      
+      # Grid-Linien
+      panel.grid.minor = element_blank()
+    ) +
+    
+    # Eine gemeinsame Legende: 3 Spalten, 2 Zeilen
+    guides(
+      colour = guide_legend(nrow = 2, ncol = 3, byrow = FALSE),
+      fill = "none"
+    )
 }
