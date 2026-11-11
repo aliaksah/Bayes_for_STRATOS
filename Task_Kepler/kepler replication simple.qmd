@@ -33,13 +33,13 @@ As part of the robustness check of the Kepler case study, here the frequentist a
 
 It consists of the following steps:
 
--   Preparations
--   Symbolic regression run on training data
--   Computation of G constant with confidence interval
--   Evaluation of stability of symbolic regression with set hyperparameters:
-    -   Algorithmic stability (impact of different seeds on achieved optimal solution)
-    -   Data stability (impact of different data sets on achieved solution)
--   Validation with test set
+- Preparations
+- Symbolic regression run on training data
+- Computation of G constant with confidence interval
+- Evaluation of stability of symbolic regression with set hyperparameters:
+  - Algorithmic stability (impact of different seeds on achieved optimal solution)
+  - Data stability (impact of different data sets on achieved solution)
+- Validation with test set
 
 ## Preparations
 
@@ -134,9 +134,9 @@ This calculation gives an estimate $\hat G$ = `r G_conv(coef(refit_orig))*10^11`
 
 Since the variables have very skew distributions, one could try to improve this confidence interval in two ways:
 
--   compute a bootstrap confidence interval for $\beta$
--   compute a model based on the logarithm of both the outcome and the construct $(period^2 \cdot hoststar\_mass)^{1/3}$. In this model, the slope is fixed at 1 and only the intercept $\gamma_0$ is estimated. The proportionality factor is given by $\exp(\hat\gamma_0)$.
--   a model-based confidence interval for $\gamma_0$ could be compared to its bootstrap counterpart to evaluate its validity
+- compute a bootstrap confidence interval for $\beta$
+- compute a model based on the logarithm of both the outcome and the construct $(period^2 \cdot hoststar\_mass)^{1/3}$. In this model, the slope is fixed at 1 and only the intercept $\gamma_0$ is estimated. The proportionality factor is given by $\exp(\hat\gamma_0)$.
+- a model-based confidence interval for $\gamma_0$ could be compared to its bootstrap counterpart to evaluate its validity
 
 ```{r}
 # log model
@@ -175,8 +175,8 @@ kable(all_est*1e11, caption="Estimates of G (x 1e-11) and confidence intervals")
 
 Our first model yielded the Kepler model, but it is not guaranteed that
 
--   the model will always converge to the Kepler model, no matter which seed is used to initiate the random number generator,
--   the Kepler model is the best simple model in terms of proportionality to semimajoraxis
+- the model will always converge to the Kepler model, no matter which seed is used to initiate the random number generator,
+- the Kepler model is the best simple model in terms of proportionality to semimajoraxis
 
 Moreover, the stability of the model when the data is resampled is also unclear. Hence two stability investigations are performed.
 
